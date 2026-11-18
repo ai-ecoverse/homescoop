@@ -8,4 +8,4 @@
 - **Runtime:** `_sodium` imports `_cffi_backend` from `@ai-ecoverse/py-cffi` (a dependency).
 - **Randomness:** `nacl.utils.random` is libsodium's `randombytes_buf`, which on WASIX is libc's `arc4random_buf`, keyed from WASI `random_get` (the kernel's CSPRNG).
 - **Password hashing:** Argon2 runs in python's wasm32 memory with libsodium's SIMD128 code; `nacl.pwhash` `INTERACTIVE` (64 MiB), `MODERATE` (256 MiB) and `SENSITIVE` (1 GiB) all work (the cert checks each against Node's `crypto.argon2`). Much more than that won't fit in a 4 GiB wasm32 address space.
-- **Python range:** `>=3.15.0-1 <3.15.1`.
+- **Python range:** `>=3.15.0-1 <3.15.1 || … || >=3.15.29-1 <3.15.30` (3.15.0-1 or any later 3.15 patch release, homescoop#1939).

@@ -24,7 +24,8 @@
     "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.15.0-1 <3.15.1 and py-numpy >=2.5.4-1 <2.5.5 (the headers it is built against)",
     "1.18.1-2 (homescoop#761, the cp315 wave; npm-tag python3.15): py-scipy's 1.18.1-1 recipe (homescoop#211 A6) for CPython 3.15: wasix-python 3.15.0-1, py-numpy 2.5.4-1 (its headers and f2py), Cython 3.3.0, the same patches 0001-0010, tools/scipy_cfix.py and static wasix-openblas 0.3.28-1; every side module links with -Wl,--fatal-warnings; every cp314 spec",
     "cert/coverage.mjs (homescoop#1242): spatial (Qhull ConvexHull/Delaunay/Voronoi, cKDTree, pdist), interpolate (FITPACK splrep/bisplrep, griddata, RBFInterpolator), ndimage (label, gaussian_filter), integrate (odeint, LSODA, vode, solve_bvp), io (savemat/loadmat, wavfile, mmwrite/mmread, arff, FortranFile), cluster (kmeans2, linkage), stats.sampling (UNU.RAN NumericalInversePolynomial), csgraph (shortest_path, minimum_spanning_tree), each against the native result",
-    "1.18.1-3 (homescoop#761, the fold): packages/py-scipy3.15 moved over packages/py-scipy after the python3.15 -> latest flip; no npm-tag, the recipe and package name lose the 3.15 suffix (package.json homescoop.recipe, repository.directory), so the revision moves on; same sources and build as 1.18.1-2; every spec as before"
+    "1.18.1-3 (homescoop#761, the fold): packages/py-scipy3.15 moved over packages/py-scipy after the python3.15 -> latest flip; no npm-tag, the recipe and package name lose the 3.15 suffix (package.json homescoop.recipe, repository.directory), so the revision moves on; same sources and build as 1.18.1-2; every spec as before",
+    "1.18.1-4 (homescoop#1939): packaging-only repack of 1.18.1-3 (repack.from, README.md) with @ai-ecoverse/wasix-python as the series range pythonSeries('3.15.0-1'), the 3.15.0-1 line and every 3.15.Z-1 line through 3.15.29, instead of >=3.15.0-1 <3.15.1. scripts/browser-cert/python-range.mjs: the tarball resolves one python with 3.15.0-1, with the newest in needsInstall and with stand-ins 3.15.1-1 and 3.15.29-1 (cert/meta.json peers py-numpy: this run's series re-pins). 1.18.1-3 nests a second python under the 3.15.1-1 stand-in (NEGATIVE.md)"
   ],
   "patches": {
     "0001-gemm_-no-const.patch": "Pyodide: SuperLU's gemm prototypes lose const (they must match the int-ABI BLAS); cert/lapack.mjs runs splu/spilu",
@@ -80,5 +81,6 @@
       "license": "BSD-3-Clause",
       "text": "Permission was granted on 23 March 2021 by Josef Leydold"
     }
-  ]
+  ],
+  "peers": ["py-numpy"]
 }

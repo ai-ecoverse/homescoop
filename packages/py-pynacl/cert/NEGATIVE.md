@@ -1,5 +1,9 @@
 # py-pynacl: negative proof
 
+## python-range.mjs: 1.6.2-1 nests a second python under a later 3.15 patch release (1.6.2-2; homescoop#1939; 2026-11-18)
+
+npm `@ai-ecoverse/py-pynacl@1.6.2-1` takes wasix-python as the patch-line range. `npm install --package-lock-only` of its tarball beside a stand-in `@ai-ecoverse/wasix-python` 3.15.2-1 (a package.json-only tarball, `python-range.mjs`'s `fakePython`) resolves a second python from the registry: `node_modules/@ai-ecoverse/py-cffi/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10, `node_modules/@ai-ecoverse/py-pynacl/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10. `_slicc_site` refuses a py-\* whose python isn't the one running, so on wasix-python 3.15.2-1 its import would fail. 1.6.2-2's repack, with the series range, resolves one python, at the top level, with 3.15.1-1, 3.15.2-1 and 3.15.29-1 stand-ins and with the floor and newest from npm.
+
 ## 1.6.2-1: linked with a libsodium that has the wasm32 SIMD Argon2 bug (2026-11-17)
 
 The same recipe, with `sources.wasix_libsodium` pointed at a wasix-libsodium

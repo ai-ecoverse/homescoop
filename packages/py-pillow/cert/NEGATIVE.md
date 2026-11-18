@@ -1,5 +1,9 @@
 # py-pillow: negative proof
 
+## python-range.mjs: 13.0.0-3 nests a second python under a later 3.15 patch release (13.0.0-4; homescoop#1939; 2026-11-18)
+
+npm `@ai-ecoverse/py-pillow@13.0.0-3` takes wasix-python as the patch-line range. `npm install --package-lock-only` of its tarball beside a stand-in `@ai-ecoverse/wasix-python` 3.15.2-1 (a package.json-only tarball, `python-range.mjs`'s `fakePython`) resolves a second python from the registry: `node_modules/@ai-ecoverse/py-pillow/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10. `_slicc_site` refuses a py-\* whose python isn't the one running, so on wasix-python 3.15.2-1 its import would fail. 13.0.0-4's repack, with the series range, resolves one python, at the top level, with 3.15.1-1, 3.15.2-1 and 3.15.29-1 stand-ins and with the floor and newest from npm.
+
 ## 13.0.0-2: no notices check (13.0.0-3, #726; 2026-10-20)
 
 13.0.0-2 already ships libjpeg-turbo's and FreeType's licences, but no `cert/meta.json` `notices` block checked them. 13.0.0-3 adds the block and `cert/notices.mjs`; npm 13.0.0-2's file passes the same checker, so this is coverage, not a fix of shipped bytes.

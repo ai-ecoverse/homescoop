@@ -1,6 +1,23 @@
 {
   "note": "npm manifests (engines.slicc-kernel, dependencies, dist-tags) of every package a cert/meta.json installs; written by node scripts/cert-kernel-floor.mjs --refresh. Read by scripts/test/cert-kernel-floor.test.mjs (homescoop#1292).",
   "packages": {
+    "@ai-ecoverse/py-bcrypt": {
+      "tags": {"latest":"5.0.0-1"},
+      "versions": {
+        "0.0.0-stage": {},
+        "0.0.0": {},
+        "5.0.0-1": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.15.0-8 <3.15.1"}}
+      }
+    },
+    "@ai-ecoverse/py-cffi": {
+      "tags": {"latest":"2.1.1-2"},
+      "versions": {
+        "0.0.0-stage": {},
+        "0.0.0": {},
+        "2.1.1-1": {"dependencies":{"@ai-ecoverse/py-pycparser":">=3.12.0-1 <3.12.1","@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}},
+        "2.1.1-2": {"dependencies":{"@ai-ecoverse/py-pycparser":">=3.12.0-1 <3.12.1","@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}}
+      }
+    },
     "@ai-ecoverse/py-contourpy": {
       "tags": {"latest":"1.4.0-12"},
       "versions": {
@@ -16,6 +33,29 @@
         "1.4.0-10": {"dependencies":{"@ai-ecoverse/py-numpy":">=2.5.4-1 <2.5.5","@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}},
         "1.4.0-11": {"dependencies":{"@ai-ecoverse/py-numpy":">=2.5.4-1 <2.5.5","@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}},
         "1.4.0-12": {"dependencies":{"@ai-ecoverse/py-numpy":">=2.5.4-1 <2.5.5","@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}}
+      }
+    },
+    "@ai-ecoverse/py-cryptography": {
+      "tags": {"latest":"50.0.2-1"},
+      "versions": {
+        "0.0.0-stage": {},
+        "0.0.0": {},
+        "50.0.2-1": {"dependencies":{"@ai-ecoverse/py-cffi":">=2.1.1-1 <2.1.2","@ai-ecoverse/wasix-python":">=3.15.0-8 <3.15.1"}}
+      }
+    },
+    "@ai-ecoverse/py-cycler": {
+      "tags": {"latest":"0.12.1-10"},
+      "versions": {
+        "0.12.1-1": {"dependencies":{"@ai-ecoverse/wasix-python":"^3.14.2-5"}},
+        "0.12.1-2": {"dependencies":{"@ai-ecoverse/wasix-python":"3.14.2-11"}},
+        "0.12.1-3": {"dependencies":{"@ai-ecoverse/wasix-python":"3.14.2-12"}},
+        "0.12.1-4": {"dependencies":{"@ai-ecoverse/wasix-python":"3.14.2-13"}},
+        "0.12.1-5": {"dependencies":{"@ai-ecoverse/wasix-python":"3.14.2-15"}},
+        "0.12.1-6": {"dependencies":{"@ai-ecoverse/wasix-python":"3.14.2-16"}},
+        "0.12.1-7": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.14.2-16 <3.14.3"}},
+        "0.12.1-8": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.14.2-16 <3.14.3"}},
+        "0.12.1-9": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}},
+        "0.12.1-10": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}}
       }
     },
     "@ai-ecoverse/py-fonttools": {
@@ -52,6 +92,24 @@
         "1.5.1-12": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}}
       }
     },
+    "@ai-ecoverse/py-matplotlib": {
+      "tags": {"latest":"3.11.2-14"},
+      "versions": {
+        "3.11.2-2": {"dependencies":{"@ai-ecoverse/py-numpy":"^2.3.2-2","@ai-ecoverse/py-cycler":"^0.12.1-1","@ai-ecoverse/py-pillow":"^12.3.0-2","@ai-ecoverse/py-contourpy":"^1.4.0-1","@ai-ecoverse/py-fonttools":"^4.66.1-1","@ai-ecoverse/py-packaging":"^26.3.0-1","@ai-ecoverse/py-pyparsing":"^3.3.3-1","@ai-ecoverse/wasix-python":"^3.14.2-5","@ai-ecoverse/py-kiwisolver":"^1.5.1-1","@ai-ecoverse/py-python-dateutil":"^2.9.0-post0.2"}},
+        "3.11.2-3": {"dependencies":{"@ai-ecoverse/py-numpy":"2.3.2-5","@ai-ecoverse/py-cycler":"0.12.1-2","@ai-ecoverse/py-pillow":"12.3.0-3","@ai-ecoverse/py-contourpy":"1.4.0-2","@ai-ecoverse/py-fonttools":"4.66.1-2","@ai-ecoverse/py-packaging":"26.3.0-2","@ai-ecoverse/py-pyparsing":"3.3.3-2","@ai-ecoverse/wasix-python":"3.14.2-11","@ai-ecoverse/py-kiwisolver":"1.5.1-2","@ai-ecoverse/py-python-dateutil":"2.9.0-post0.2"}},
+        "3.11.2-4": {"dependencies":{"@ai-ecoverse/py-numpy":"2.3.2-6","@ai-ecoverse/py-cycler":"0.12.1-3","@ai-ecoverse/py-pillow":"12.3.0-4","@ai-ecoverse/py-contourpy":"1.4.0-3","@ai-ecoverse/py-fonttools":"4.66.1-3","@ai-ecoverse/py-packaging":"26.3.0-3","@ai-ecoverse/py-pyparsing":"3.3.3-3","@ai-ecoverse/wasix-python":"3.14.2-12","@ai-ecoverse/py-kiwisolver":"1.5.1-3","@ai-ecoverse/py-python-dateutil":"2.9.0-post0.2"}},
+        "3.11.2-5": {"dependencies":{"@ai-ecoverse/py-numpy":"2.3.2-7","@ai-ecoverse/py-cycler":"0.12.1-4","@ai-ecoverse/py-pillow":"12.3.0-5","@ai-ecoverse/py-contourpy":"1.4.0-4","@ai-ecoverse/py-fonttools":"4.66.1-4","@ai-ecoverse/py-packaging":"26.3.0-4","@ai-ecoverse/py-pyparsing":"3.3.3-4","@ai-ecoverse/wasix-python":"3.14.2-13","@ai-ecoverse/py-kiwisolver":"1.5.1-4","@ai-ecoverse/py-python-dateutil":"2.9.0-post0.2"}},
+        "3.11.2-6": {"dependencies":{"@ai-ecoverse/py-numpy":"2.3.2-8","@ai-ecoverse/py-cycler":"0.12.1-5","@ai-ecoverse/py-pillow":"12.3.0-6","@ai-ecoverse/py-contourpy":"1.4.0-5","@ai-ecoverse/py-fonttools":"4.66.1-5","@ai-ecoverse/py-packaging":"26.3.0-5","@ai-ecoverse/py-pyparsing":"3.3.3-5","@ai-ecoverse/wasix-python":"3.14.2-15","@ai-ecoverse/py-kiwisolver":"1.5.1-5","@ai-ecoverse/py-python-dateutil":"2.9.0-post0.2"}},
+        "3.11.2-7": {"dependencies":{"@ai-ecoverse/py-numpy":"2.3.2-9","@ai-ecoverse/py-cycler":"0.12.1-6","@ai-ecoverse/py-pillow":"12.3.0-7","@ai-ecoverse/py-contourpy":"1.4.0-6","@ai-ecoverse/py-fonttools":"4.66.1-6","@ai-ecoverse/py-packaging":"26.3.0-6","@ai-ecoverse/py-pyparsing":"3.3.3-6","@ai-ecoverse/wasix-python":"3.14.2-16","@ai-ecoverse/py-kiwisolver":"1.5.1-6","@ai-ecoverse/py-python-dateutil":"2.9.0-post0.2"}},
+        "3.11.2-8": {"dependencies":{"@ai-ecoverse/py-numpy":"2.3.2-9","@ai-ecoverse/py-cycler":"0.12.1-6","@ai-ecoverse/py-pillow":"12.3.0-7","@ai-ecoverse/py-contourpy":"1.4.0-6","@ai-ecoverse/py-fonttools":"4.66.1-6","@ai-ecoverse/py-packaging":"26.3.0-6","@ai-ecoverse/py-pyparsing":"3.3.3-6","@ai-ecoverse/wasix-python":"3.14.2-16","@ai-ecoverse/py-kiwisolver":"1.5.1-7","@ai-ecoverse/py-python-dateutil":"2.9.0-post0.2"}},
+        "3.11.2-9": {"dependencies":{"@ai-ecoverse/py-numpy":"2.3.2-10","@ai-ecoverse/py-cycler":"0.12.1-7","@ai-ecoverse/py-pillow":"12.3.0-8","@ai-ecoverse/py-contourpy":"1.4.0-7","@ai-ecoverse/py-fonttools":"4.66.1-7","@ai-ecoverse/py-packaging":"26.3.0-7","@ai-ecoverse/py-pyparsing":"3.3.3-7","@ai-ecoverse/wasix-python":">=3.14.2-16 <3.14.3","@ai-ecoverse/py-kiwisolver":"1.5.1-8","@ai-ecoverse/py-python-dateutil":"2.9.0-post0.2"}},
+        "3.11.2-10": {"dependencies":{"@ai-ecoverse/py-numpy":">=2.3.2-11 <2.3.3","@ai-ecoverse/py-cycler":"0.12.1-8","@ai-ecoverse/py-pillow":">=12.3.0-10 <12.3.1","@ai-ecoverse/py-contourpy":">=1.4.0-9 <1.4.1","@ai-ecoverse/py-fonttools":"4.66.1-8","@ai-ecoverse/py-packaging":"26.3.0-8","@ai-ecoverse/py-pyparsing":"3.3.3-8","@ai-ecoverse/wasix-python":">=3.14.2-27 <3.14.3","@ai-ecoverse/py-kiwisolver":">=1.5.1-9 <1.5.2","@ai-ecoverse/py-python-dateutil":"2.9.0-post0.3"}},
+        "3.11.2-11": {"dependencies":{"@ai-ecoverse/py-numpy":">=2.5.4-1 <2.5.5","@ai-ecoverse/py-cycler":"0.12.1-9","@ai-ecoverse/py-pillow":">=13.0.0-1 <13.0.1","@ai-ecoverse/py-contourpy":">=1.4.0-10 <1.4.1","@ai-ecoverse/py-fonttools":"4.66.1-9","@ai-ecoverse/py-packaging":"26.3.0-9","@ai-ecoverse/py-pyparsing":"3.3.3-9","@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1","@ai-ecoverse/py-kiwisolver":">=1.5.1-10 <1.5.2","@ai-ecoverse/py-python-dateutil":"2.9.0-post0.3"}},
+        "3.11.2-12": {"dependencies":{"@ai-ecoverse/py-numpy":">=2.5.4-1 <2.5.5","@ai-ecoverse/py-cycler":"0.12.1-9","@ai-ecoverse/py-pillow":">=13.0.0-1 <13.0.1","@ai-ecoverse/py-contourpy":">=1.4.0-10 <1.4.1","@ai-ecoverse/py-fonttools":"4.66.1-9","@ai-ecoverse/py-packaging":"26.3.0-9","@ai-ecoverse/py-pyparsing":"3.3.3-9","@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1","@ai-ecoverse/py-kiwisolver":">=1.5.1-10 <1.5.2","@ai-ecoverse/py-python-dateutil":"2.9.0-post0.4"}},
+        "3.11.2-13": {"dependencies":{"@ai-ecoverse/py-numpy":">=2.5.4-1 <2.5.5","@ai-ecoverse/py-cycler":">=0.12.1-10 <0.12.2","@ai-ecoverse/py-pillow":">=13.0.0-1 <13.0.1","@ai-ecoverse/py-contourpy":">=1.4.0-10 <1.4.1","@ai-ecoverse/py-fonttools":">=4.66.1-10 <4.66.2","@ai-ecoverse/py-packaging":">=26.3.0-10 <26.3.1","@ai-ecoverse/py-pyparsing":">=3.3.3-10 <3.3.4","@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1","@ai-ecoverse/py-kiwisolver":">=1.5.1-10 <1.5.2","@ai-ecoverse/py-python-dateutil":">=2.9.0-post0.5 <2.9.1"}},
+        "3.11.2-14": {"dependencies":{"@ai-ecoverse/py-numpy":">=2.5.4-1 <2.5.5","@ai-ecoverse/py-cycler":">=0.12.1-10 <0.12.2","@ai-ecoverse/py-pillow":">=13.0.0-1 <13.0.1","@ai-ecoverse/py-contourpy":">=1.4.0-10 <1.4.1","@ai-ecoverse/py-fonttools":">=4.66.1-10 <4.66.2","@ai-ecoverse/py-packaging":">=26.3.0-10 <26.3.1","@ai-ecoverse/py-pyparsing":">=3.3.3-10 <3.3.4","@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1","@ai-ecoverse/py-kiwisolver":">=1.5.1-10 <1.5.2","@ai-ecoverse/py-python-dateutil":">=2.9.0-post0.5 <2.9.1"}}
+      }
+    },
     "@ai-ecoverse/py-numpy": {
       "tags": {"latest":"2.5.4-4"},
       "versions": {
@@ -71,6 +129,21 @@
         "2.5.4-2": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}},
         "2.5.4-3": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}},
         "2.5.4-4": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}}
+      }
+    },
+    "@ai-ecoverse/py-packaging": {
+      "tags": {"latest":"26.3.0-10"},
+      "versions": {
+        "26.3.0-1": {"dependencies":{"@ai-ecoverse/wasix-python":"^3.14.2-5"}},
+        "26.3.0-2": {"dependencies":{"@ai-ecoverse/wasix-python":"3.14.2-11"}},
+        "26.3.0-3": {"dependencies":{"@ai-ecoverse/wasix-python":"3.14.2-12"}},
+        "26.3.0-4": {"dependencies":{"@ai-ecoverse/wasix-python":"3.14.2-13"}},
+        "26.3.0-5": {"dependencies":{"@ai-ecoverse/wasix-python":"3.14.2-15"}},
+        "26.3.0-6": {"dependencies":{"@ai-ecoverse/wasix-python":"3.14.2-16"}},
+        "26.3.0-7": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.14.2-16 <3.14.3"}},
+        "26.3.0-8": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.14.2-16 <3.14.3"}},
+        "26.3.0-9": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}},
+        "26.3.0-10": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}}
       }
     },
     "@ai-ecoverse/py-pandas": {
@@ -105,6 +178,46 @@
         "13.0.0-1": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}},
         "13.0.0-2": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}},
         "13.0.0-3": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}}
+      }
+    },
+    "@ai-ecoverse/py-pynacl": {
+      "tags": {"latest":"1.6.2-1"},
+      "versions": {
+        "0.0.0-stage": {},
+        "0.0.0": {},
+        "1.6.2-1": {"dependencies":{"@ai-ecoverse/py-cffi":">=2.1.1-1 <2.1.2","@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}}
+      }
+    },
+    "@ai-ecoverse/py-pyparsing": {
+      "tags": {"latest":"3.3.3-10"},
+      "versions": {
+        "3.3.3-1": {"dependencies":{"@ai-ecoverse/wasix-python":"^3.14.2-5"}},
+        "3.3.3-2": {"dependencies":{"@ai-ecoverse/wasix-python":"3.14.2-11"}},
+        "3.3.3-3": {"dependencies":{"@ai-ecoverse/wasix-python":"3.14.2-12"}},
+        "3.3.3-4": {"dependencies":{"@ai-ecoverse/wasix-python":"3.14.2-13"}},
+        "3.3.3-5": {"dependencies":{"@ai-ecoverse/wasix-python":"3.14.2-15"}},
+        "3.3.3-6": {"dependencies":{"@ai-ecoverse/wasix-python":"3.14.2-16"}},
+        "3.3.3-7": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.14.2-16 <3.14.3"}},
+        "3.3.3-8": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.14.2-16 <3.14.3"}},
+        "3.3.3-9": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}},
+        "3.3.3-10": {"dependencies":{"@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}}
+      }
+    },
+    "@ai-ecoverse/py-scipy": {
+      "tags": {"latest":"1.18.1-3"},
+      "versions": {
+        "1.18.0-4": {"dependencies":{"@ai-ecoverse/py-numpy":"^2.3.2-4","@ai-ecoverse/wasix-python":"^3.14.2-6"}},
+        "1.18.0-5": {"dependencies":{"@ai-ecoverse/py-numpy":"^2.3.2-4","@ai-ecoverse/wasix-python":"^3.14.2-7"}},
+        "1.18.0-6": {"dependencies":{"@ai-ecoverse/py-numpy":"^2.3.2-4","@ai-ecoverse/wasix-python":"^3.14.2-7"}},
+        "1.18.0-7": {"dependencies":{"@ai-ecoverse/py-numpy":"2.3.2-5","@ai-ecoverse/wasix-python":"3.14.2-11"}},
+        "1.18.0-8": {"dependencies":{"@ai-ecoverse/py-numpy":"2.3.2-6","@ai-ecoverse/wasix-python":"3.14.2-12"}},
+        "1.18.0-9": {"dependencies":{"@ai-ecoverse/py-numpy":"2.3.2-7","@ai-ecoverse/wasix-python":"3.14.2-13"}},
+        "1.18.0-10": {"dependencies":{"@ai-ecoverse/py-numpy":"2.3.2-8","@ai-ecoverse/wasix-python":"3.14.2-15"}},
+        "1.18.0-11": {"dependencies":{"@ai-ecoverse/py-numpy":"2.3.2-9","@ai-ecoverse/wasix-python":"3.14.2-16"}},
+        "1.18.0-12": {"dependencies":{"@ai-ecoverse/py-numpy":"2.3.2-10","@ai-ecoverse/wasix-python":">=3.14.2-16 <3.14.3"}},
+        "1.18.1-1": {"dependencies":{"@ai-ecoverse/py-numpy":">=2.3.2-12 <2.3.3","@ai-ecoverse/wasix-python":">=3.14.2-28 <3.14.3"}},
+        "1.18.1-2": {"dependencies":{"@ai-ecoverse/py-numpy":">=2.5.4-1 <2.5.5","@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}},
+        "1.18.1-3": {"dependencies":{"@ai-ecoverse/py-numpy":">=2.5.4-1 <2.5.5","@ai-ecoverse/wasix-python":">=3.15.0-1 <3.15.1"}}
       }
     },
     "@ai-ecoverse/py-six": {

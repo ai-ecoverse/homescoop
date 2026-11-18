@@ -1,5 +1,9 @@
 # Negative proof (py-numpy, cp315 line)
 
+## python-range.mjs: 2.5.4-4 nests a second python under a later 3.15 patch release (2.5.4-5; homescoop#1939; 2026-11-18)
+
+npm `@ai-ecoverse/py-numpy@2.5.4-4` takes wasix-python as the patch-line range. `npm install --package-lock-only` of its tarball beside a stand-in `@ai-ecoverse/wasix-python` 3.15.2-1 (a package.json-only tarball, `python-range.mjs`'s `fakePython`) resolves a second python from the registry: `node_modules/@ai-ecoverse/py-numpy/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10. `_slicc_site` refuses a py-\* whose python isn't the one running, so on wasix-python 3.15.2-1 its import would fail. 2.5.4-5's repack, with the series range, resolves one python, at the top level, with 3.15.1-1, 3.15.2-1 and 3.15.29-1 stand-ins and with the floor and newest from npm.
+
 ## 2.5.4-3: numpy-config and f2py are not on PATH (2.5.4-4; #1405; 2026-10-21)
 
 `cert/commands.mjs` on npm 2.5.4-3 (wasix-python 3.15.0-3, slicc-kernel 1.142.0, `--users enforce`, Node entry): FAIL `numpy-config --version: rc=127 stdout= stderr=numpy-config: command not found`. 2.5.4-3 has no `slicc.commands` and no `bin/`. The same tarball with 2.5.4-4's `package.json` and the `bin/` launchers `build.sh` now writes passes: `numpy-config --version` 2.5.4, `--cflags -I/node_modules/@ai-ecoverse/py-numpy/lib/python3.15/site-packages/numpy/_core/include`, `f2py -v` 2.5.4.

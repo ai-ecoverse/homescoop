@@ -9,6 +9,8 @@ source:
   sha256: "85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30"
 inputs:
   - scripts/stage-pure-wheel.sh
+repack:
+  from: "0.12.1-10"
 dependencies:
   build: []
   host: []

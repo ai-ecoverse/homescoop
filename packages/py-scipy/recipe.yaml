@@ -39,6 +39,10 @@ notices:
 inputs:
   - packages/py-kiwisolver/test/wasm-call-signatures.mjs
   - packages/py-scipy/tools/scipy_cfix.py
+repack:
+  from: "1.18.1-3"
+  files:
+    - README.md
 dependencies:
   build:
     - wasix-python

@@ -1,5 +1,9 @@
 # Negative proof (py-pandas, cp315 line)
 
+## python-range.mjs: 3.0.6-4 nests a second python under a later 3.15 patch release (3.0.6-5; homescoop#1939; 2026-11-18)
+
+npm `@ai-ecoverse/py-pandas@3.0.6-4` takes wasix-python as the patch-line range. `npm install --package-lock-only` of its tarball beside a stand-in `@ai-ecoverse/wasix-python` 3.15.2-1 (a package.json-only tarball, `python-range.mjs`'s `fakePython`) resolves a second python from the registry: `node_modules/@ai-ecoverse/py-numpy/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10, `node_modules/@ai-ecoverse/py-pandas/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10. `_slicc_site` refuses a py-\* whose python isn't the one running, so on wasix-python 3.15.2-1 its import would fail. 3.0.6-5's repack, with the series range, resolves one python, at the top level, with 3.15.1-1, 3.15.2-1 and 3.15.29-1 stand-ins and with the floor and newest from npm.
+
 ## cert-only on 3.0.6-4: a needsInstall peer left out of needs (#1190; 2026-10-22)
 
 `scripts/test/cert-needs.test.mjs` fails a py-* meta.json that installs a package without mounting it: with `@ai-ecoverse/py-six` taken out of `needs` here, it fails with `packages/py-pandas/cert/meta.json: @ai-ecoverse/py-six is in needsInstall but not in needs`, and its fixture of py-pandas3.15 3.0.6-1's meta as cert-review saw it on #1188 is flagged the same way (there `cert/import.mjs` failed with `ModuleNotFoundError: No module named 'six'`). The current meta passes. The new pandas.mjs rows (#1192) and cert/users.mjs (#1333) are coverage: npm 3.0.6-4 passes them, so no version change.

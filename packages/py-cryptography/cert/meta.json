@@ -17,7 +17,8 @@
     "cert/threads.mjs: 4 Python threads hash (equal to hashlib) and sign/verify with Ed25519 at once, so the side module's thread-local state works on each kernel thread; python.wasm's ssl.OPENSSL_VERSION and _rust's openssl_version_text() are the same OpenSSL 3.5.9, and ssl.create_default_context() still works with both copies loaded",
     "cert/notices.mjs: THIRD-PARTY-NOTICES.md names OpenSSL (Apache-2.0), cffi (MIT-0, its headers are in the generated _openssl.c) and the wasix-org Rust standard library, each with its licence text, and (scripts/rust-crate-notices.mjs, checked against cargo tree by check-rust-notices.mjs at build) every crate _rust links",
     "build.sh (scripts/rust-pyext/check-side-module.mjs): _rust has dylink.0, exports PyModExport__rust and the TLS entry points, every env/GOT import is exported by wasix-python 3.15.0-8's python.wasm, no import of an OpenSSL name (its own copy binds to itself, -Bsymbolic), and wasm-opt --metrics counts no Try/TryTable/Throw/ThrowRef/Rethrow (python.wasm is legacy EH)",
-    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.15.0-8 <3.15.1"
+    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.15.0-8 <3.15.1",
+    "50.0.2-2 (homescoop#1939): packaging-only repack of 50.0.2-1 (repack.from, README.md) with @ai-ecoverse/wasix-python as the series range pythonSeries('3.15.0-8'), the 3.15.0-8 line and every 3.15.Z-1 line through 3.15.29, instead of >=3.15.0-8 <3.15.1. scripts/browser-cert/python-range.mjs: the tarball resolves one python with 3.15.0-8, with the newest in needsInstall and with stand-ins 3.15.1-1 and 3.15.29-1 (cert/meta.json peers py-cffi: this run's series re-pins). 50.0.2-1 nests a second python under the 3.15.1-1 stand-in (NEGATIVE.md)"
   ],
   "ci": [
     "node scripts/browser-cert/python-range.mjs py-cryptography"
@@ -36,5 +37,6 @@
       "name": "Rust standard library",
       "license": "MIT OR Apache-2.0"
     }
-  ]
+  ],
+  "peers": ["py-cffi"]
 }

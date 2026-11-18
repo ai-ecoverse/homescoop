@@ -4,7 +4,7 @@
 
 - **What's in it:** `_cffi_backend.cpython-315-wasm32-wasix.so`, a `dylink.0` side module that `python.wasm` loads by `dlopen`, sits at the top of `lib/python3.15/site-packages`, as in cffi's wheels. Beside it are the `cffi` package and `cffi-2.1.1.dist-info`.
 - **Who uses it:** compiled cffi modules import `_cffi_backend` by name: PyNaCl's `nacl._sodium`, cryptography's bindings, bcrypt's. pycparser comes with it, as [`@ai-ecoverse/py-pycparser`](https://www.npmjs.com/package/@ai-ecoverse/py-pycparser); `ffi.cdef()` parses with it.
-- **Python range:** `>=3.15.0-1 <3.15.1`.
+- **Python range:** `>=3.15.0-1 <3.15.1 || … || >=3.15.29-1 <3.15.30` (3.15.0-1 or any later 3.15 patch release, homescoop#1939).
 - **Licence:** MIT-0 (`LICENSE`); cffi moved from MIT to MIT No Attribution with 2.x. `THIRD-PARTY-NOTICES.md` has libffi's.
 
 ## How it's built
