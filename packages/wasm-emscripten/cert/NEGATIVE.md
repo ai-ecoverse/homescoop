@@ -1,5 +1,9 @@
 # Negative proof (wasm-emscripten)
 
+## python-range.mjs: 6.0.9-31 nests a second python under a later 3.15 patch release (6.0.9-32; homescoop#1939; 2026-11-18)
+
+npm `@ai-ecoverse/wasm-emscripten@6.0.9-31` takes wasix-python as `>=3.15.0-2 <3.15.1`. `npm install --package-lock-only` of its tarball beside a stand-in `@ai-ecoverse/wasix-python` 3.15.2-1 (a package.json-only tarball, `python-range.mjs`'s `fakePython`) resolves a second python from the registry: `node_modules/@ai-ecoverse/wasm-emscripten/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10, so emcc would run on a nested 3.15.0 python beside the 3.15.2 one. 6.0.9-32's repack, with the series range, resolves one python at the top level with the 3.15.2-1 stand-in, and `python-range.mjs --lock-only` passes with 3.15.0-2, 3.15.0-10 and stand-ins 3.15.1-1 and 3.15.29-1.
+
 ## 6.0.9-18: path resolution (#277)
 
 `run-paths.mjs --expect old` against 6.0.9-17 is a `ci` entry: in an npm layout its em-config looks under `/shared/lib/node_modules`, which no package manager fills.
