@@ -85,6 +85,10 @@ import bcrypt
 pw = bcrypt.hashpw(b"pw", bcrypt.gensalt(rounds=4))
 out["bcrypt"] = [bcrypt.checkpw(b"pw", pw), bcrypt.checkpw(b"no", pw)]
 `,
+  'py-pycparser': String.raw`
+import pycparser
+out["pycparser"] = [type(pycparser.CParser().parse("int x;").ext[0]).__name__]
+`,
   'py-pyopenssl': String.raw`
 from OpenSSL import crypto
 pk = crypto.PKey(); pk.generate_key(crypto.TYPE_RSA, 1024)
@@ -92,7 +96,7 @@ out["pyopenssl"] = [__import__("OpenSSL").__version__, pk.bits()]
 `,
 };
 const PURE = String.raw`
-import fontTools.ttLib, cycler, packaging.version, pyparsing, dateutil.parser, pytz, six, tzdata, pycparser
+import fontTools.ttLib, cycler, packaging.version, pyparsing, dateutil.parser, pytz, six, tzdata
 out["pure"] = [str(packaging.version.Version("1.2.3")), dateutil.parser.isoparse("2026-10-10T12:00:00").year,
                str(pytz.timezone("Europe/Berlin")), six.PY3]
 `;
@@ -134,6 +138,7 @@ export default async function (ctx) {
   if (has('py-cryptography')) assert.deepEqual(o.cryptography, ['ba7816bf8f01cfea', 64]);
   if (has('py-pynacl')) assert.deepEqual(o.pynacl, ['sealed']);
   if (has('py-bcrypt')) assert.deepEqual(o.bcrypt, [true, false]);
+  if (has('py-pycparser')) assert.deepEqual(o.pycparser, ['Decl']);
   if (has('py-pyopenssl')) assert.deepEqual(o.pyopenssl, ['26.4.0', 1024]);
   assert.deepEqual(o.pure, ['1.2.3', 2026, 'Europe/Berlin', true]);
 }
