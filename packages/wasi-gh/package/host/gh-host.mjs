@@ -3,6 +3,13 @@
 // for the process: memory, fs, spawn/wait, syscall and async. gh.wasm sends
 // JSON requests through call/take: start a command and wait for it, or send
 // an HTTP request and read its body.
+//
+// Each operation is a generator that yields every ctx call it makes and gets
+// its answer back. createImports (a kernel with blocking workers: a page,
+// Node) drives them synchronously. createAsyncImports (the async process
+// host: a Cloudflare Dynamic Worker, where every ctx call returns a promise)
+// awaits each answer, and gh_host.call is an async function, so the kernel
+// suspends gh.wasm with JSPI until it is done.
 
 export const PROBE = 0x67683131
 const READ_MAX = 65536
@@ -52,26 +59,31 @@ const concat = parts => {
 
 const reason = error => error?.message ?? String(error)
 
-export function createHost (ctx) {
-  function which ({ name }) {
+// A ctx call: `yield call(() => ctx.x(...))` answers what ctx.x returned, or
+// throws what it threw, in either driver.
+const call = fn => ({ call: fn })
+
+export function * operations (ctx, request) {
+  function * which ({ name }) {
     if (typeof name !== 'string' || name === '') return ''
-    if (name.includes('/')) return ctx.fs.exists(name) ? name : ''
+    if (name.includes('/')) return (yield call(() => ctx.fs.exists(name))) ? name : ''
     const dirs = (ctx.env?.PATH ?? '/usr/bin:/bin').split(':').filter(Boolean)
     for (const dir of dirs) {
-      if (ctx.fs.exists(`${dir}/${name}`)) return `${dir}/${name}`
+      if (yield call(() => ctx.fs.exists(`${dir}/${name}`))) return `${dir}/${name}`
     }
     // Installed slicc commands (git from @ai-ecoverse/wasm-git) are names,
     // not files on PATH. Spawn resolves them; a missing name fails there.
     return name
   }
 
-  function run ({ argv, env, dir, stdin, inherit }) {
+  function * run ({ argv, env, dir, stdin, inherit }) {
     let child
     try {
       // gh's git client sets Cmd.Stdin to the process stdin. Slurping that
       // waits for EOF, so an interactive shell never reaches spawn. Inherit
       // the fd instead. A reader gh supplied (a buffer) is still piped.
-      child = ctx.spawn({ argv, env: envObject(env), cwd: dir || ctx.cwd(), stdin: inherit ? 'inherit' : 'pipe', stdout: 'pipe', stderr: 'pipe' })
+      const cwd = dir || (yield call(() => ctx.cwd()))
+      child = yield call(() => ctx.spawn({ argv, env: envObject(env), cwd, stdin: inherit ? 'inherit' : 'pipe', stdout: 'pipe', stderr: 'pipe' }))
     } catch (error) {
       const code = error?.code ?? reason(error)
       throw new Error(code === 'ENOENT' ? `exec: "${argv[0]}": executable file not found in $PATH` : `exec: "${argv[0]}": ${code}`)
@@ -79,52 +91,54 @@ export function createHost (ctx) {
     const pending = new Map()
     const output = { stdout: [], stderr: [] }
     let input = inherit ? new Uint8Array(0) : fromBase64(stdin)
-    const read = stream => pending.set(ctx.async.submit({ op: 'fd-read', fd: child[stream], max: READ_MAX }), stream)
-    const write = () => {
+    function * read (stream) {
+      pending.set(yield call(() => ctx.async.submit({ op: 'fd-read', fd: child[stream], max: READ_MAX })), stream)
+    }
+    function * write () {
       if (inherit) return
       if (input.length === 0) {
-        ctx.syscall({ op: 'fd-close', fd: child.stdin })
+        yield call(() => ctx.syscall({ op: 'fd-close', fd: child.stdin }))
         return
       }
-      pending.set(ctx.async.submit({ op: 'fd-write', fd: child.stdin, body: input }), 'stdin')
+      pending.set(yield call(() => ctx.async.submit({ op: 'fd-write', fd: child.stdin, body: input })), 'stdin')
     }
-    write()
-    read('stdout')
-    read('stderr')
+    yield * write()
+    yield * read('stdout')
+    yield * read('stderr')
     while (pending.size > 0) {
-      const id = ctx.async.wait()
+      const id = yield call(() => ctx.async.wait())
       const stream = pending.get(id)
       if (stream === undefined) continue
       pending.delete(id)
-      const taken = ctx.async.take(id)
+      const taken = yield call(() => ctx.async.take(id))
       if (taken?.error !== undefined) {
         if (stream === 'stdin') {
           input = new Uint8Array(0)
-          write()
+          yield * write()
           continue
         }
-        ctx.syscall({ op: 'fd-close', fd: child[stream] })
+        yield call(() => ctx.syscall({ op: 'fd-close', fd: child[stream] }))
         continue
       }
       if (stream === 'stdin') {
         const written = Number(taken?.value)
         input = written > 0 ? input.subarray(written) : new Uint8Array(0)
-        write()
+        yield * write()
         continue
       }
       const bytes = taken?.value
       if (!(bytes instanceof Uint8Array) || bytes.length === 0) {
-        ctx.syscall({ op: 'fd-close', fd: child[stream] })
+        yield call(() => ctx.syscall({ op: 'fd-close', fd: child[stream] }))
         continue
       }
       output[stream].push(bytes)
-      read(stream)
+      yield * read(stream)
     }
-    const { status } = ctx.wait(child.pid)
+    const { status } = yield call(() => ctx.wait(child.pid))
     return { status, stdout: toBase64(concat(output.stdout)), stderr: toBase64(concat(output.stderr)) }
   }
 
-  function http ({ method, url, headers, body }) {
+  function * http ({ method, url, headers, body }) {
     let target
     try {
       target = new URL(url)
@@ -135,63 +149,124 @@ export function createHost (ctx) {
     const bytes = fromBase64(body)
     let head
     try {
-      head = ctx.syscall({ op: 'net-request', url: target.href, method: method || 'GET', headers: headers ?? [], ...(bytes.length ? { body: bytes } : {}) })
+      head = yield call(() => ctx.syscall({ op: 'net-request', url: target.href, method: method || 'GET', headers: headers ?? [], ...(bytes.length ? { body: bytes } : {}) }))
     } catch (error) {
       throw new Error(`could not reach ${target.host} (${error?.code ?? reason(error)})`)
     }
     return { handle: head.handle, status: head.status, headers: responseHeaders(head) }
   }
 
-  function httpRead ({ handle }) {
-    const bytes = ctx.syscall({ op: 'net-read', handle, max: READ_MAX })
+  function * httpRead ({ handle }) {
+    const bytes = yield call(() => ctx.syscall({ op: 'net-read', handle, max: READ_MAX }))
     return toBase64(bytes instanceof Uint8Array ? bytes : new Uint8Array(0))
   }
 
-  function httpClose ({ handle }) {
-    ctx.syscall({ op: 'net-close', handle })
+  function * httpClose ({ handle }) {
+    yield call(() => ctx.syscall({ op: 'net-close', handle }))
     return null
   }
 
   // wasip1 mkdir and open do not pass a mode. gh asks for one after it
   // creates a config directory or hosts.yml. mode is the permission bits.
-  function chmod ({ path, mode }) {
+  function * chmod ({ path, mode }) {
     if (typeof path !== 'string' || path === '' || !Number.isInteger(mode)) {
       throw new Error('chmod needs a path and a mode')
     }
-    ctx.fs.chmod(path, mode)
+    yield call(() => ctx.fs.chmod(path, mode))
     return null
   }
 
   const ops = { which, run, http, 'http.read': httpRead, 'http.close': httpClose, chmod }
-  return request => {
-    const op = ops[request?.op]
-    if (!op) throw new Error(`unknown gh_host operation ${request?.op}`)
-    return op(request)
-  }
+  const op = ops[request?.op]
+  if (!op) throw new Error(`unknown gh_host operation ${request?.op}`)
+  return yield * op(request)
 }
 
-export function createImports (ctx) {
-  const handle = createHost(ctx)
-  let result = new Uint8Array(0)
+function runSync (steps) {
+  let step = steps.next()
+  while (!step.done) {
+    let value
+    try {
+      value = step.value.call()
+    } catch (error) {
+      step = steps.throw(error)
+      continue
+    }
+    step = steps.next(value)
+  }
+  return step.value
+}
+
+async function runAsync (steps) {
+  let step = steps.next()
+  while (!step.done) {
+    let value
+    try {
+      value = await step.value.call()
+    } catch (error) {
+      step = steps.throw(error)
+      continue
+    }
+    step = steps.next(value)
+  }
+  return step.value
+}
+
+export function createHost (ctx) {
+  return request => runSync(operations(ctx, request))
+}
+
+export function createAsyncHost (ctx) {
+  return request => runAsync(operations(ctx, request))
+}
+
+function respond (state, response) {
+  state.result = encoder.encode(JSON.stringify(response))
+  return state.result.length
+}
+
+function table (ctx, state, call) {
   const bytes = () => new Uint8Array(ctx.memory().buffer)
   return {
     gh_host: {
       probe: () => PROBE,
-      call: (pointer, size) => {
-        let response
-        try {
-          const request = JSON.parse(decoder.decode(bytes().slice(pointer >>> 0, (pointer >>> 0) + (size >>> 0))))
-          response = { ok: true, value: handle(request) ?? null }
-        } catch (error) {
-          response = { ok: false, error: reason(error) }
-        }
-        result = encoder.encode(JSON.stringify(response))
-        return result.length
-      },
+      call,
       take: pointer => {
-        bytes().set(result, pointer >>> 0)
-        result = new Uint8Array(0)
+        bytes().set(state.result, pointer >>> 0)
+        state.result = new Uint8Array(0)
       },
     },
   }
+}
+
+const parse = (ctx, pointer, size) => {
+  const bytes = new Uint8Array(ctx.memory().buffer)
+  return JSON.parse(decoder.decode(bytes.slice(pointer >>> 0, (pointer >>> 0) + (size >>> 0))))
+}
+
+export function createImports (ctx) {
+  const handle = createHost(ctx)
+  const state = { result: new Uint8Array(0) }
+  return table(ctx, state, (pointer, size) => {
+    try {
+      return respond(state, { ok: true, value: handle(parse(ctx, pointer, size)) ?? null })
+    } catch (error) {
+      return respond(state, { ok: false, error: reason(error) })
+    }
+  })
+}
+
+export function createAsyncImports (ctx) {
+  const handle = createAsyncHost(ctx)
+  const state = { result: new Uint8Array(0) }
+  return table(ctx, state, async (pointer, size) => {
+    try {
+      // Read the request before the first await: the memory can grow, and
+      // the program is suspended, not gone, while the host works.
+      const request = parse(ctx, pointer, size)
+      return respond(state, { ok: true, value: (await handle(request)) ?? null })
+    } catch (error) {
+      return respond(state, { ok: false, error: reason(error) })
+    }
+  })
 }

@@ -1,0 +1,21 @@
+{
+  "harness": "slicc-kernel",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "patches": {
+    "loadimage-unistd.patch": "a PostScript usershape (shape=epsf, shapefile=) is read into the output with -Tps"
+  },
+  "checklist": [
+    "dot -V names the graphviz version",
+    "-Tjson: the nodes placed, the cluster's box, the edges, rankdir=LR left to right",
+    "-Tsvg: three nodes and three edges",
+    "-K dot, neato, fdp, circo, twopi, osage and patchwork each lay out a triangle (-Tplain); sfdp, which needs GTS (not built), fails with dot's message",
+    "a DOT file as argument, -Txdot",
+    "a syntax error and -Tpng (not built: no cairo, gd or pango) exit non-zero with dot's message",
+    "loadimage-unistd.patch: without <sys/mman.h> (the kernel's runtime has no _munmap_js), a PostScript usershape is read with read(2) and is in the -Tps output",
+    "cert/heap.mjs: the measurement behind recipe.yaml wasm (initial-memory 32MiB, measured-peak 32MiB, measured-by; homescoop#1287; dot.wasm has no shared memory, so check-threaded-heap finds no threaded module and checks the recorded fields). 3 rounds of dot -Tjson and -Tsvg of a 400-node digraph in 8 clusters, neato and fdp of a 400-node graph, and dot -Tjson of a 1,500-node digraph: rc 0, every node placed, 0 wasm traps, and VmSize stays at 32,768 kB, with no memory.grow"
+  ]
+}

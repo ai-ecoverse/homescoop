@@ -1,0 +1,108 @@
+Leave out of the wasip1 build the commands that cannot run on slicc and
+that make gh.wasm too large for a Cloudflare Dynamic Worker.
+
+Reason: a Dynamic Worker's code is at most 64 MiB, and gh.wasm 2.102.0-2
+is 78 MB, so slicc-kernel's Cloudflare kernel cannot load it ("Dynamic
+Worker code size (78982007 bytes) exceeds the maximum allowed size of
+67108864 bytes"). attestation and release verify/verify-asset bring in
+sigstore-go, TUF, in-toto and their protobuf (13.6 MB); release/shared
+has them through attestation.go, which only verify and verify-asset use.
+codespace needs SSH and gRPC (6.6 MB). copilot downloads a native binary,
+preview is a demo of the interactive prompts, and send-telemetry is the
+child gh starts with os/exec, which wasip1 cannot (3.6 MB together). With
+this patch and wasm-opt -Oz, gh.wasm is 49.8 MB.
+
+Upstream: not for upstream (a slicc build choice).
+removeWhen: Dynamic Workers take more than 64 MiB of code, or these
+commands can run on slicc.
+
+diff --git a/pkg/cmd/release/release.go b/pkg/cmd/release/release.go
+--- a/pkg/cmd/release/release.go
++++ b/pkg/cmd/release/release.go
+@@ -8,8 +8,6 @@
+ 	cmdUpdate "github.com/cli/cli/v2/pkg/cmd/release/edit"
+ 	cmdList "github.com/cli/cli/v2/pkg/cmd/release/list"
+ 	cmdUpload "github.com/cli/cli/v2/pkg/cmd/release/upload"
+-	cmdVerify "github.com/cli/cli/v2/pkg/cmd/release/verify"
+-	cmdVerifyAsset "github.com/cli/cli/v2/pkg/cmd/release/verify-asset"
+ 	cmdView "github.com/cli/cli/v2/pkg/cmd/release/view"
+ 	"github.com/cli/cli/v2/pkg/cmdutil"
+ 	"github.com/spf13/cobra"
+@@ -36,8 +34,6 @@
+ 		cmdDownload.NewCmdDownload(f, nil),
+ 		cmdDelete.NewCmdDelete(f, nil),
+ 		cmdDeleteAsset.NewCmdDeleteAsset(f, nil),
+-		cmdVerify.NewCmdVerify(f, nil),
+-		cmdVerifyAsset.NewCmdVerifyAsset(f, nil),
+ 	)
+ 
+ 	return cmd
+diff --git a/pkg/cmd/release/shared/attestation.go b/pkg/cmd/release/shared/attestation.go
+--- a/pkg/cmd/release/shared/attestation.go
++++ b/pkg/cmd/release/shared/attestation.go
+@@ -1,3 +1,5 @@
++//go:build !wasip1
++
+ package shared
+ 
+ import (
+diff --git a/pkg/cmd/root/root.go b/pkg/cmd/root/root.go
+--- a/pkg/cmd/root/root.go
++++ b/pkg/cmd/root/root.go
+@@ -13,14 +13,11 @@
+ 	aliasCmd "github.com/cli/cli/v2/pkg/cmd/alias"
+ 	"github.com/cli/cli/v2/pkg/cmd/alias/shared"
+ 	apiCmd "github.com/cli/cli/v2/pkg/cmd/api"
+-	attestationCmd "github.com/cli/cli/v2/pkg/cmd/attestation"
+ 	authCmd "github.com/cli/cli/v2/pkg/cmd/auth"
+ 	browseCmd "github.com/cli/cli/v2/pkg/cmd/browse"
+ 	cacheCmd "github.com/cli/cli/v2/pkg/cmd/cache"
+-	codespaceCmd "github.com/cli/cli/v2/pkg/cmd/codespace"
+ 	completionCmd "github.com/cli/cli/v2/pkg/cmd/completion"
+ 	configCmd "github.com/cli/cli/v2/pkg/cmd/config"
+-	copilotCmd "github.com/cli/cli/v2/pkg/cmd/copilot"
+ 	discussionCmd "github.com/cli/cli/v2/pkg/cmd/discussion"
+ 	extensionCmd "github.com/cli/cli/v2/pkg/cmd/extension"
+ 	"github.com/cli/cli/v2/pkg/cmd/factory"
+@@ -31,7 +28,6 @@
+ 	licensesCmd "github.com/cli/cli/v2/pkg/cmd/licenses"
+ 	orgCmd "github.com/cli/cli/v2/pkg/cmd/org"
+ 	prCmd "github.com/cli/cli/v2/pkg/cmd/pr"
+-	previewCmd "github.com/cli/cli/v2/pkg/cmd/preview"
+ 	projectCmd "github.com/cli/cli/v2/pkg/cmd/project"
+ 	releaseCmd "github.com/cli/cli/v2/pkg/cmd/release"
+ 	repoCmd "github.com/cli/cli/v2/pkg/cmd/repo"
+@@ -40,7 +36,6 @@
+ 	runCmd "github.com/cli/cli/v2/pkg/cmd/run"
+ 	searchCmd "github.com/cli/cli/v2/pkg/cmd/search"
+ 	secretCmd "github.com/cli/cli/v2/pkg/cmd/secret"
+-	sendTelemetryCmd "github.com/cli/cli/v2/pkg/cmd/send-telemetry"
+ 	skillsCmd "github.com/cli/cli/v2/pkg/cmd/skills"
+ 	sshKeyCmd "github.com/cli/cli/v2/pkg/cmd/ssh-key"
+ 	statusCmd "github.com/cli/cli/v2/pkg/cmd/status"
+@@ -137,7 +132,6 @@
+ 	cmd.AddCommand(actionsCmd.NewCmdActions(f))
+ 	cmd.AddCommand(aliasCmd.NewCmdAlias(f))
+ 	cmd.AddCommand(authCmd.NewCmdAuth(f))
+-	cmd.AddCommand(attestationCmd.NewCmdAttestation(f))
+ 	cmd.AddCommand(configCmd.NewCmdConfig(f))
+ 	cmd.AddCommand(gistCmd.NewCmdGist(f))
+ 	cmd.AddCommand(gpgKeyCmd.NewCmdGPGKey(f))
+@@ -147,17 +141,13 @@
+ 	cmd.AddCommand(secretCmd.NewCmdSecret(f))
+ 	cmd.AddCommand(variableCmd.NewCmdVariable(f))
+ 	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
+-	cmd.AddCommand(codespaceCmd.NewCmdCodespace(f))
+ 	cmd.AddCommand(projectCmd.NewCmdProject(f))
+-	cmd.AddCommand(previewCmd.NewCmdPreview(f))
+ 	cmd.AddCommand(skillsCmd.NewCmdSkills(f, telemetry))
+ 
+ 	// Root commands with standalone functionality and no subcommands
+-	cmd.AddCommand(copilotCmd.NewCmdCopilot(f, telemetry, nil))
+ 	cmd.AddCommand(statusCmd.NewCmdStatus(f, nil))
+ 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
+ 	cmd.AddCommand(licensesCmd.NewCmdLicenses(f))
+-	cmd.AddCommand(sendTelemetryCmd.NewCmdSendTelemetry(f))
+ 
+ 	// below here at the commands that require the "intelligent" BaseRepo resolver
+ 	repoResolvingCmdFactory := *f

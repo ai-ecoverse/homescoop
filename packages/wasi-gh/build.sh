@@ -52,6 +52,17 @@ mkdir -p "$DEST/bin"
   go build -trimpath -buildvcs=false \
     -ldflags="-s -w -buildid= -X github.com/cli/cli/v2/internal/build.Version=${GH_VERSION} -X github.com/cli/cli/v2/internal/build.Date=${GH_DATE}" \
     -o "$DEST/bin/gh.wasm" ./cmd/gh)
+# Go's wasm uses sign extension, saturating float conversion and bulk memory.
+homescoop_wasm_opt "$DEST/bin/gh.wasm" wasi-gh \
+  --enable-sign-ext --enable-nontrapping-float-to-int --enable-bulk-memory --enable-mutable-globals
+# A Cloudflare Dynamic Worker takes at most 64 MiB of code, and slicc-kernel's
+# process host (about 0.5 MB) and gh-host.mjs share it with gh.wasm.
+GH_WASM_MAX=$((62 * 1024 * 1024))
+gh_wasm_size=$(wc -c <"$DEST/bin/gh.wasm" | tr -d ' ')
+if (( gh_wasm_size > GH_WASM_MAX )); then
+  echo "homescoop: gh.wasm is $gh_wasm_size bytes, over $GH_WASM_MAX: too large for a Cloudflare Dynamic Worker" >&2
+  exit 1
+fi
 chmod 755 "$DEST/bin/gh.wasm"
 
 cp "$SRC/LICENSE" "$DEST/LICENSE"

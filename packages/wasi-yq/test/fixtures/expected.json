@@ -1,7 +1,7 @@
 {
  "version": {
   "status": 0,
-  "stdout": "yq (https://github.com/mikefarah/yq/) version v4.54.2\n",
+  "stdout": "yq (https://github.com/mikefarah/yq/) version v4.54.3\n",
   "stderr": ""
  },
  "gha first steps": {
@@ -193,7 +193,7 @@
  "bad yaml": {
   "status": 1,
   "stdout": "",
-  "stderr": "Error: bad file '-': yaml: line 2: did not find expected ',' or ']'\n"
+  "stderr": "Error: bad file '-': go-yaml load error in parser (while parsing a flow sequence) at L1.C4-L2.C2: did not find expected ',' or ']'\n"
  },
  "exit status": {
   "status": 1,

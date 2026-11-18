@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasi-gh",
-  "version": "2.102.0-2",
-  "description": "gh 2.102.0 (GitHub CLI) for slicc WASI preview1 (command gh); gh.wasm built by homescoop from gh v2.102.0 with a documented patch",
+  "version": "2.102.0-3",
+  "description": "gh 2.102.0 (GitHub CLI) for slicc WASI preview1 (command gh); gh.wasm built by homescoop from gh v2.102.0 with documented patches",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -36,7 +36,8 @@
     "source": "cli/cli@fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd",
     "patches": [
       "0001-wasip1-slicc-host.patch",
-      "0002-wasip1-gh-browser.patch"
+      "0002-wasip1-gh-browser.patch",
+      "0003-wasip1-slim-for-dynamic-workers.patch"
     ]
   },
   "slicc": {

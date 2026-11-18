@@ -13,14 +13,14 @@ inputs:
   - scripts/build-common.sh
   - scripts/rust-wasm-refresh-alloc.rs
 # renovate: datasource=github-releases depName=pbakaus/impeccable extractVersion=^engine-v(?<version>.*)$
-version: "0.1.18"
+version: "0.1.21"
 npm: "@ai-ecoverse/wasi-impeccable"
 toolchain:
   rust: "1.98.1"
-summary: "impeccable engine 0.1.18 for slicc WASI preview1 (command impeccable; file-local, HTTP and live verbs)"
+summary: "impeccable engine 0.1.21 for slicc WASI preview1 (command impeccable; file-local, HTTP and live verbs)"
 source:
   url: "https://github.com/pbakaus/impeccable/archive/refs/tags/engine-v{{version}}.tar.gz"
-  sha256: "7ae8222638542bf4d11ca20d367aa7281cce64b7aeba552845646e00dad03140"
+  sha256: "ff614044c40de0e851d241b535fe9a2e7e9c25e7ab5f501292fcb425481d64ff"
 # homescoop#1287: the initial heap from the measured peak, with headroom.
 wasm:
   initial-memory: 64MiB
@@ -84,3 +84,10 @@ about:
     hunk; the wasm-side dependency change itself is unchanged, and the skill
     download's new connect and idle timeouts already exist in wasix-ureq.
     cert/checklist.mjs reads the expected --version from this recipe.
+    0.1.21-1: 0001 rebased onto engine-v0.1.21. The verb router moved from
+    the cli's main.rs into its library (router.rs, run with an
+    InstalledPack), so lib.rs gates only its native browser adapters and
+    router.rs the CDP / listening-socket verbs; 0002's allocator include
+    stays in main.rs. The new agents crate (the agents verb) named its temp
+    files after std::process::id(), which panics on wasm32-wasip1; 0001 uses
+    impeccable_common::process_id() there too (cert/agents.mjs).

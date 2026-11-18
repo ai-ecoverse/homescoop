@@ -1,0 +1,348 @@
+Reach slicc-kernel's network and file modes from the Fastly CLI on wasip1.
+
+Reason: wasip1 cannot dial, so every API call fails at DNS. pkg/slicchost
+talks to host/fastly-host.mjs (fastly_host probe/call/take) and sets
+http.DefaultTransport to it; the CLI's own client, the update and log-tail
+clients and auth's token requests use that transport. go-fastly builds its
+own http.Transport, so on wasip1 its client takes http.DefaultTransport
+instead. Requests and response bodies cross as JSON; each body read yields
+to other goroutines first. wasip1 mkdir and open pass no mode and wasip1
+chmod does nothing, so the config directory (0700), config.toml (0600,
+it holds API tokens) and errors.log (0600, it records command lines,
+--token included) are set through the host's chmod. text.InputSecure reads
+a line when stdin is not a terminal (term.ReadPassword fails on a pipe,
+and wasip1 has no terminal ioctls), so `fastly auth login` takes a pasted
+or piped token. Without the host module, HTTP fails with "it needs
+slicc-kernel with @ai-ecoverse/wasi-fastly's host module" and the modes
+are left alone.
+
+Upstream: not filed (homescoop does not file upstream reports).
+removeWhen: wasip1 can dial and set file modes without a host module.
+
+diff --git a/cmd/fastly/main.go b/cmd/fastly/main.go
+--- a/cmd/fastly/main.go
++++ b/cmd/fastly/main.go
+@@ -6,6 +6,7 @@
+ 
+ 	"github.com/fastly/cli/pkg/app"
+ 	fsterr "github.com/fastly/cli/pkg/errors"
++	_ "github.com/fastly/cli/pkg/slicchost"
+ )
+ 
+ func main() {
+diff --git a/pkg/slicchost/slicchost.go b/pkg/slicchost/slicchost.go
+--- /dev/null
++++ b/pkg/slicchost/slicchost.go
+@@ -0,0 +1,10 @@
++// Package slicchost reaches the host functions that wasi-fastly's host
++// module (host/fastly-host.mjs) provides on slicc-kernel: sending HTTP
++// requests and setting file modes. Where the module is missing, HTTP returns
++// ErrUnsupported.
++package slicchost
++
++import "errors"
++
++// ErrUnsupported is returned when the runtime does not provide the host module.
++var ErrUnsupported = errors.New("this runtime cannot open network connections for fastly (it needs slicc-kernel with @ai-ecoverse/wasi-fastly's host module)")
+diff --git a/pkg/slicchost/slicchost_other.go b/pkg/slicchost/slicchost_other.go
+--- /dev/null
++++ b/pkg/slicchost/slicchost_other.go
+@@ -0,0 +1,21 @@
++//go:build !wasip1
++
++package slicchost
++
++import (
++	"net/http"
++	"os"
++)
++
++// Restrict does nothing outside wasip1: open and mkdir already set the mode.
++func Restrict(string, os.FileMode) error {
++	return nil
++}
++
++// Transport returns ErrUnsupported outside wasip1.
++type Transport struct{}
++
++// RoundTrip implements http.RoundTripper.
++func (Transport) RoundTrip(*http.Request) (*http.Response, error) {
++	return nil, ErrUnsupported
++}
+diff --git a/pkg/slicchost/slicchost_wasip1.go b/pkg/slicchost/slicchost_wasip1.go
+--- /dev/null
++++ b/pkg/slicchost/slicchost_wasip1.go
+@@ -0,0 +1,167 @@
++//go:build wasip1
++
++package slicchost
++
++import (
++	"bytes"
++	"encoding/json"
++	"errors"
++	"fmt"
++	"io"
++	"net/http"
++	"os"
++	"runtime"
++	"sync"
++	"unsafe"
++)
++
++// probeMagic is the value host/fastly-host.mjs returns from probe ("fsly").
++const probeMagic = 0x66736c79
++
++//go:wasmimport fastly_host probe
++func hostProbe() uint32
++
++//go:wasmimport fastly_host call
++func hostCall(request unsafe.Pointer, size uint32) uint32
++
++//go:wasmimport fastly_host take
++func hostTake(response unsafe.Pointer)
++
++var available = sync.OnceValue(func() bool { return hostProbe() == probeMagic })
++
++func init() {
++	// The CLI's own client and go-fastly's (see its client.go on wasip1)
++	// use http.DefaultTransport. wasip1 cannot dial; the host sends the
++	// request through slicc-kernel's network.
++	http.DefaultTransport = Transport{}
++}
++
++type envelope struct {
++	OK    bool            `json:"ok"`
++	Error string          `json:"error"`
++	Value json.RawMessage `json:"value"`
++}
++
++func call(request any, value any) error {
++	if !available() {
++		return ErrUnsupported
++	}
++	data, err := json.Marshal(request)
++	if err != nil {
++		return err
++	}
++	size := hostCall(unsafe.Pointer(unsafe.SliceData(data)), uint32(len(data)))
++	response := make([]byte, size)
++	if size > 0 {
++		hostTake(unsafe.Pointer(unsafe.SliceData(response)))
++	}
++	var result envelope
++	if err := json.Unmarshal(response, &result); err != nil {
++		return err
++	}
++	if !result.OK {
++		return errors.New(result.Error)
++	}
++	if value == nil || len(result.Value) == 0 || string(result.Value) == "null" {
++		return nil
++	}
++	return json.Unmarshal(result.Value, value)
++}
++
++// Restrict sets mode on path through the host. wasip1 mkdir and open pass
++// no mode, and wasip1 chmod does nothing, so config.toml (which holds API
++// tokens) would otherwise keep the kernel's default mode. Without the host
++// module there is nothing to ask, and nothing else shares the files.
++func Restrict(path string, mode os.FileMode) error {
++	if !available() {
++		return nil
++	}
++	return call(map[string]any{"op": "chmod", "path": path, "mode": uint32(mode.Perm())}, nil)
++}
++
++// Transport sends HTTP requests through the host.
++type Transport struct{}
++
++// RoundTrip implements http.RoundTripper.
++func (Transport) RoundTrip(request *http.Request) (*http.Response, error) {
++	var body []byte
++	if request.Body != nil {
++		data, err := io.ReadAll(request.Body)
++		_ = request.Body.Close()
++		if err != nil {
++			return nil, err
++		}
++		body = data
++	}
++	headers := [][2]string{}
++	for name, values := range request.Header {
++		for _, value := range values {
++			headers = append(headers, [2]string{name, value})
++		}
++	}
++	var head struct {
++		Handle  int         `json:"handle"`
++		Status  int         `json:"status"`
++		Headers [][2]string `json:"headers"`
++	}
++	if err := call(map[string]any{
++		"op":      "http",
++		"method":  request.Method,
++		"url":     request.URL.String(),
++		"headers": headers,
++		"body":    body,
++	}, &head); err != nil {
++		return nil, err
++	}
++	response := &http.Response{
++		Status:        fmt.Sprintf("%d %s", head.Status, http.StatusText(head.Status)),
++		StatusCode:    head.Status,
++		Proto:         "HTTP/1.1",
++		ProtoMajor:    1,
++		ProtoMinor:    1,
++		Header:        http.Header{},
++		Body:          &responseBody{handle: head.Handle},
++		ContentLength: -1,
++		Request:       request,
++	}
++	for _, pair := range head.Headers {
++		response.Header.Add(pair[0], pair[1])
++	}
++	return response, nil
++}
++
++type responseBody struct {
++	handle  int
++	pending bytes.Buffer
++	done    bool
++	closed  bool
++}
++
++func (b *responseBody) Read(p []byte) (int, error) {
++	for b.pending.Len() == 0 {
++		if b.done || b.closed {
++			return 0, io.EOF
++		}
++		// A host read blocks the only thread. Let other goroutines (a
++		// spinner, fastly log-tail's printer) run first.
++		runtime.Gosched()
++		var chunk []byte
++		if err := call(map[string]any{"op": "http.read", "handle": b.handle}, &chunk); err != nil {
++			return 0, err
++		}
++		if len(chunk) == 0 {
++			b.done = true
++			continue
++		}
++		b.pending.Write(chunk)
++	}
++	return b.pending.Read(p)
++}
++
++func (b *responseBody) Close() error {
++	if b.closed {
++		return nil
++	}
++	b.closed = true
++	return call(map[string]any{"op": "http.close", "handle": b.handle}, nil)
++}
+diff --git a/pkg/config/config.go b/pkg/config/config.go
+--- a/pkg/config/config.go
++++ b/pkg/config/config.go
+@@ -14,6 +14,7 @@
+ 	fsterr "github.com/fastly/cli/pkg/errors"
+ 	"github.com/fastly/cli/pkg/filesystem"
+ 	"github.com/fastly/cli/pkg/revision"
++	"github.com/fastly/cli/pkg/slicchost"
+ 	"github.com/fastly/cli/pkg/text"
+ )
+ 
+@@ -191,7 +192,15 @@
+ // doesn't already exist.
+ func ensureConfigDirExists(path string) error {
+ 	basePath := filepath.Dir(path)
+-	return filesystem.MakeDirectoryIfNotExists(basePath)
++	_, statErr := os.Stat(basePath)
++	if err := filesystem.MakeDirectoryIfNotExists(basePath); err != nil {
++		return err
++	}
++	if errors.Is(statErr, os.ErrNotExist) {
++		// wasip1 mkdir passes no mode; a new config directory is 0700.
++		return slicchost.Restrict(basePath, DirectoryPermissions)
++	}
++	return nil
+ }
+ 
+ // File represents our application toml configuration.
+@@ -436,6 +445,12 @@
+ 	if err != nil {
+ 		return fmt.Errorf("error creating config file: %w", err)
+ 	}
++	// wasip1 open passes no mode; config.toml holds API tokens, so it is
++	// restricted while still empty, before any token is written.
++	if err := slicchost.Restrict(path, FilePermissions); err != nil {
++		_ = fp.Close()
++		return fmt.Errorf("error restricting config file permissions: %w", err)
++	}
+ 	encoder := toml.NewEncoder(fp)
+ 	// Remove leading spaces from the TOML file.
+ 	encoder.Indentation("")
+diff --git a/pkg/errors/log.go b/pkg/errors/log.go
+--- a/pkg/errors/log.go
++++ b/pkg/errors/log.go
+@@ -12,6 +12,8 @@
+ 	"time"
+ 
+ 	"github.com/fastly/go-fastly/v19/fastly"
++
++	"github.com/fastly/cli/pkg/slicchost"
+ )
+ 
+ // LogPath is the location of the fastly CLI error log.
+@@ -86,6 +88,12 @@
+ 	if err != nil {
+ 		return fmt.Errorf(errMsg, err)
+ 	}
++	// wasip1 open passes no mode; the log records each failing command line,
++	// --token included.
++	if err := slicchost.Restrict(logPath, 0o600); err != nil {
++		_ = f.Close()
++		return fmt.Errorf(errMsg, err)
++	}
+ 
+ 	if fi, err := f.Stat(); err == nil {
+ 		if fi.Size() >= FileRotationSize {
+@@ -103,6 +111,10 @@
+ 			if err != nil {
+ 				return fmt.Errorf(errMsg, err)
+ 			}
++			if err := slicchost.Restrict(logPath, 0o600); err != nil {
++				_ = f.Close()
++				return fmt.Errorf(errMsg, err)
++			}
+ 		}
+ 	}
+ 
+diff --git a/pkg/text/text.go b/pkg/text/text.go
+--- a/pkg/text/text.go
++++ b/pkg/text/text.go
+@@ -148,7 +148,9 @@
+ // InputSecure is like Input but doesn't echo input back to the terminal,
+ // if and only if r is os.Stdin.
+ func InputSecure(w io.Writer, prefix string, r io.Reader, validators ...func(string) error) (string, error) {
+-	if !IsStdin(r) {
++	// A piped stdin has no echo to turn off (term.ReadPassword fails on it),
++	// and wasip1 has no terminal ioctls at all: read the line as it comes.
++	if !IsStdin(r) || !term.IsTerminal(int(syscall.Stdin)) { //nolint:unconvert
+ 		return Input(w, prefix, r, validators...)
+ 	}
+ 
+diff --git a/vendor/github.com/fastly/go-fastly/v19/fastly/client.go b/vendor/github.com/fastly/go-fastly/v19/fastly/client.go
+--- a/vendor/github.com/fastly/go-fastly/v19/fastly/client.go
++++ b/vendor/github.com/fastly/go-fastly/v19/fastly/client.go
+@@ -179,6 +179,11 @@
+ 	}
+ 	c.url = u
+ 
++	if c.HTTPClient == nil && runtime.GOOS == "wasip1" {
++		// wasip1 cannot dial: the Fastly CLI for slicc sets http.DefaultTransport
++		// to its host module, which sends requests through slicc-kernel.
++		c.HTTPClient = &http.Client{Transport: http.DefaultTransport}
++	}
+ 	if c.HTTPClient == nil {
+ 		c.HTTPClient = &http.Client{
+ 			// IMPORTANT: Avoid a transport with DisableKeepAlives set. This mirrors

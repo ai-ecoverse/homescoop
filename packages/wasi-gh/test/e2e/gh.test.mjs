@@ -7,7 +7,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { relative, join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { createNodeKernel, nodeTransport } from '@ai-ecoverse/slicc-kernel/node'
+import { createNodeKernel, fetchTransport, nodeTransport } from '@ai-ecoverse/slicc-kernel/node'
 
 const here = path => fileURLToPath(new URL(path, import.meta.url))
 const PACKAGES = {
@@ -31,8 +31,11 @@ async function install (kernel, name) {
   }
 }
 
-async function kernelWith ({ hostModule = true, git = false } = {}) {
-  const kernel = await createNodeKernel({ network: { transport: nodeTransport() } })
+async function kernelWith ({ hostModule = true, git = false, blocking, transport = nodeTransport({ hostLoopback: true }) } = {}) {
+  const kernel = await createNodeKernel({
+    network: { transport },
+    ...(blocking === 'async' ? { blocking: 'async', emscripten: 'kernel' } : {}),
+  })
   kernel.hostModule = hostModule
   await install(kernel, 'wasi-gh')
   if (git) {
@@ -55,7 +58,7 @@ async function serve () {
     })
   })
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
-  return { base: `http://127.0.0.1:${server.address().port}`, close: () => new Promise(resolve => server.close(resolve)) }
+  return { base: `http://host.slicc.internal:${server.address().port}`, close: () => new Promise(resolve => server.close(resolve)) }
 }
 
 const env = {
@@ -107,6 +110,41 @@ test('without the host module, gh api says the runtime cannot open a connection'
 
 test('gh runs wasm-git inside a repository', async () => {
   const kernel = await kernelWith({ git: true })
+  try {
+    const gitEnv = { ...env, GIT_AUTHOR_NAME: 'test', GIT_AUTHOR_EMAIL: 'test@example.invalid' }
+    let result = await kernel.run(['git', 'init', '-q', '-b', 'main'], { cwd: '/home/app', env: gitEnv })
+    assert.equal(result.status, 0, output(result))
+    result = await kernel.run(['git', 'remote', 'add', 'origin', 'https://github.com/cli/cli.git'], { cwd: '/home/app', env: gitEnv })
+    assert.equal(result.status, 0, output(result))
+    result = await kernel.run(['gh', 'repo', 'set-default', '--view'], { cwd: '/home/app', env })
+    assert.equal(result.status, 0, output(result))
+    assert.match(result.stderr, /No default remote repository has been set/)
+  } finally {
+    kernel.terminate()
+  }
+})
+
+// The async process host is how slicc-kernel runs programs in a Cloudflare
+// Dynamic Worker. The kernel calls createAsyncImports there.
+test('on the async process host, gh api goes through the kernel transport, token placeholder included', async () => {
+  const seen = []
+  const gateway = async (url, init) => {
+    seen.push(`${init.method} ${url} ${new Headers(init.headers).get('authorization')}`)
+    return Response.json({ full_name: 'cli/cli' })
+  }
+  const kernel = await kernelWith({ blocking: 'async', transport: fetchTransport({ fetch: gateway, redirect: 'manual' }) })
+  try {
+    const result = await kernel.run(['gh', 'api', 'repos/cli/cli', '--jq', '.full_name'], { cwd: '/home/app', env })
+    assert.equal(result.status, 0, output(result))
+    assert.equal(result.stdout, 'cli/cli\n')
+    assert.deepEqual(seen, ['GET https://api.github.com/repos/cli/cli token test-token'])
+  } finally {
+    kernel.terminate()
+  }
+})
+
+test('on the async process host, gh runs wasm-git inside a repository', async () => {
+  const kernel = await kernelWith({ blocking: 'async', git: true })
   try {
     const gitEnv = { ...env, GIT_AUTHOR_NAME: 'test', GIT_AUTHOR_EMAIL: 'test@example.invalid' }
     let result = await kernel.run(['git', 'init', '-q', '-b', 'main'], { cwd: '/home/app', env: gitEnv })

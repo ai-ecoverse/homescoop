@@ -28,12 +28,46 @@ head's runs waiting for "Approve and run"). A stale branch fails with one
 machine-readable line per package,
 `recipe-sha: FAIL <pkg>: needs refresh: node scripts/refresh-recipe-sha.mjs <pkg> && node scripts/sync-package-version.mjs <pkg> --write && node scripts/readme-table.mjs --write`,
 plus `recipe-sha: FAIL README.md: needs refresh: node scripts/readme-table.mjs --write`
-when only the root table is stale. For a Renovate PR the homescoop
-coordinator's automation acts on those lines: it runs main's scripts on the
-branch and pushes as a user, so the PR's run starts normally; anyone else runs the
-printed command and pushes. A refreshed PR then carries the new version
-everywhere; `check-package-meta.mjs` fails the build when any text still names
-the old one (docs/versioning.md, "Upstream versions in text").
+when only the root table is stale. Anyone can run the printed command and
+push. A refreshed PR then carries the new version everywhere;
+`check-package-meta.mjs` fails the build when any text still names the old one
+(docs/versioning.md, "Upstream versions in text").
+
+### The refresh
+
+For Renovate PRs no person or agent has to act on those lines:
+[`scripts/renovate-refresh.mjs`](../scripts/renovate-refresh.mjs) does it, run
+by `scripts/renovate-refresh-host.sh` (its own clone, main's scripts) from a bb
+script automation on Lars's host every 15 minutes. It pushes with that host's
+git credentials, so the PR's runs start normally; the Mend-hosted Renovate app
+runs no `postUpgradeTasks`, and a `GITHUB_TOKEN` push starts none. Before it,
+the refresh waited for the coordinator agent, and bumps stalled for days when
+it was down (#2083, #2085 and #2087 in November 2026).
+
+It picks an open PR by Renovate (not a draft, not from a fork, on a
+`renovate/` branch) that changes only `packages/*/recipe.yaml`, whose commits
+are all Renovate's and whose `recipe-sha` check failed on that head. For each,
+in a temporary worktree, it rebases onto main (so the branch's own scripts,
+which the `recipe-sha` job runs, are main's), runs the printed command for each
+touched recipe with `RECIPE_SHA_BASE=origin/main`, and commits only
+`packages/<pkg>/recipe.yaml`, `package/package.json`, `package/README.md` and
+`README.md` as `renovate-refresh@homescoop.invalid` (in `gitIgnoredAuthors`, so
+Renovate keeps rebasing the branch; a Renovate rebase drops the commit and the
+next run writes it again). It pushes with `--force-with-lease` against the head
+it read, so a push that races Renovate or a queued PR is refused and retried
+later.
+
+Anything that isn't mechanical stays with a person or the coordinator: a draft
+(a held bump such as #1932), a head with any commit not by Renovate (hand work
+or an earlier refresh), a rebase conflict, a refresh that fails (patches that no
+longer apply show up later, in host-build; here: a tag that moved, bytes that
+changed under an unchanged URL, a missing download), or a change outside those
+files. A failed refresh gets one PR comment per head
+(`<!-- homescoop:renovate-refresh -->`, the reason and the log's tail) and
+nothing is pushed. Run it by hand with
+`node scripts/renovate-refresh.mjs [--pr <n>] [--dry-run]`;
+`scripts/test/renovate-refresh.test.mjs` covers the choice and a refresh
+against a local origin.
 
 Manual publish of a merged recipe whose push published nothing: `gh workflow run ladder-build.yml -f packages=zlib`.
 
@@ -44,6 +78,32 @@ placeholders so the tarball URL tracks the bump (libxml2's GNOME path is
 `libpng16/{{version}}` series). Do not hardcode `SRC_DIR` / `TARBALL`
 versions in `build.sh` — `homescoop_load_recipe` sets them from the
 recipe.
+
+**Commit-pinned sources follow a tag.** A source pinned to a GitHub commit
+archive (`archive/<40-hex>.tar.gz` with `commit:` and `tree:`, such as
+wasi-yq and wasi-html-to-markdown) can't put `{{version}}` in its URL. It
+names the upstream tag instead, as a template:
+
+```yaml
+source:
+  url: "https://github.com/mikefarah/yq/archive/f2944b82….tar.gz"
+  sha256: "…"
+  tag: "v{{version}}"
+  commit: "f2944b82…"
+  tree: "dfe36c54…"
+```
+
+`refresh-recipe-sha.mjs` fetches that tag (`git:`, or the repo in the URL) and,
+when it names another commit than the one pinned, re-pins first: the commit in
+`url:` and `commit:`, `tree:` (the commit's tree) and the short commit in
+`package/README.md`, printing
+`recipe-sha: REPIN <pkg> <tag> <old>→<new>`; the sha256 refresh then sees a
+changed URL and checks the archive against the new tree. So the printed
+refresh command is all a Renovate bump of such a recipe needs (before, each
+one needed the commit re-pinned by hand: #2061, #2088). It re-pins only a
+commit carried over from the base, and only for a new tag: a tag the base
+pinned to another commit has moved upstream, which fails and writes nothing. `--check` re-pins nothing and fails on a stale pin. `about.notes` is
+not rewritten; update its version and commit by hand.
 
 The PR run downloads the expanded URL and checks the PR branch's `sha256`
 (see above), and also refreshes sha256 in the host-build checkout. A bump whose patches no
@@ -83,6 +143,8 @@ Patches live beside the recipe as `packages/<name>/*.patch` (applied by
 
 | package | upstream | notes |
 | --- | --- | --- |
+| aws-cli | `aws/aws-cli` | github-tags, `2.x` only (renovate.json: the repo tags v1 too); the recipe pins AWS's source distribution, and build.sh checks the recipe's wheels against its `system-sandbox-lock.txt`, so a bump that moves a dependency fails until the wheel `sources:` follow |
+| azure-cli | PyPI `azure-cli` | `pypi`; the recipe pins upstream's `requirements.py3.Linux.txt` and `trim_sdk.py` at the release tag (the sha256 refresh fills both). A bump also needs `python3 packages/azure-cli/src/lock.py` (uv and the network) to rewrite `wheels.lock`: build.sh refuses a lock made for another release, and the refresh automation doesn't run it. The two `.patch` files may need a refresh too |
 | bash | savannah `bash.git` | tags `bash-X.Y` |
 | cmake | `Kitware/CMake` | github-releases |
 | coreutils | savannah `coreutils.git` | |
@@ -113,6 +175,8 @@ Patches live beside the recipe as `packages/<name>/*.patch` (applied by
 | tar | savannah `tar.git` | |
 | tls-engine | `Mbed-TLS/mbedtls` | tags `mbedtls-X.Y.Z` |
 | tzdata | `data.iana.org/time-zones/releases/` | `custom.tzdata` (html listing, `versioning=loose`): releases are `2026f`; npm gets `2026.6.0-N` (docs/versioning.md) |
+| wasix-openssl, wasix-openssl-cli | `openssl/openssl` | github-releases, tags `openssl-3.5.Z` (the 3.5 LTS line); one branch bumps both recipes. wasix-openssl-cli's roots follow `curl-cacert` with tls-engine's |
+| wasi-fastly | `fastly/cli` | github-releases, tags `vX.Y.Z` (`extractVersion=^v(?<version>.*)$`); the source is the tag's commit archive (`tag: v{{version}}`), which the refresh re-pins |
 | wasi-quickjs | `quickjs-ng/quickjs` | github-releases, tags `vX.Y.Z` (`extractVersion=^v(?<version>.*)$`) |
 | xxd | `vim/vim` | tags `vX.Y.Z` (vim patch level) |
 | zlib | `madler/zlib` | github-releases |

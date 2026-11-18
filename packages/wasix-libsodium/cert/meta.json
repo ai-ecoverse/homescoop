@@ -1,0 +1,38 @@
+{
+  "harness": "host-node",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.189.2",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "host": "node scripts/wasix-lib-cert.mjs wasix-libsodium --tarball <package.tgz>: links test/sodiumprobe.c against lib/ (static-main) and lib-pic/ (dynamic-main) with the pinned wasixcc (toolchain.wasix_sysroot) and runs cert/*.mjs on the kernel's Node entry; test/upstream-tests.mjs does the same for libsodium's own test suite. A dev package has no commands of its own.",
+  "probes": [
+    {
+      "name": "sodiumprobe",
+      "src": "test/sodiumprobe.c",
+      "pkg": [
+        "libsodium"
+      ]
+    }
+  ],
+  "checklist": [
+    "both flavours compile with only pkg-config libsodium (that flavour's .pc) and link with -Wl,--fatal-warnings, then run; sodium_version_string() is the recipe version; sodium_library_minimal() is 0",
+    "randombytes: implementation sysrandom (arc4random_buf, which wasix-libc fills from WASI random_get); two 32-byte draws non-zero and different; randombytes_uniform in range; fork() is ENOSYS on the kernel, and if it ever works the child and parent must draw different bytes (wasix-libc arc4random has no fork reseed); randombytes_buf_deterministic (ChaCha20) known answer. build.sh refuses an archive that mentions /dev/urandom or doesn't call arc4random_buf",
+    "SHA-256/SHA-512('abc'), BLAKE2b-512('abc') and keyed BLAKE2b (Node crypto), SipHash-2-4 known answers",
+    "X25519 RFC 7748 (both public keys, the shared secret); crypto_box and crypto_secretbox (XSalsa20-Poly1305) known answers from a native libsodium, open, and a flipped byte fails",
+    "sealed box (PyNaCl's nacl.public.SealedBox, az's GitHub secret path): a box sealed off-target opens to the plaintext, fails with the wrong key; seal/open round trip",
+    "Ed25519 RFC 8032 tests 1 and 2 (public key, signature, detached and combined), sign_open, a tampered message fails; ed25519 pk to curve25519",
+    "ChaCha20-Poly1305 IETF RFC 8439 2.8.2 encrypt and decrypt",
+    "pwhash: Argon2id and Argon2i at 8 MiB/3 passes and Argon2id OPSLIMIT/MEMLIMIT_INTERACTIVE (64 MiB) against Node's crypto.argon2 (through libsodium's wasm32 SIMD fill_segment, which build.sh requires); scrypt RFC 7914 (N=1024, r=8, p=16); pwhash_str/str_verify",
+    "secretstream XChaCha20-Poly1305 push/pull with TAG_FINAL",
+    "threads: sodium_init and 50 Ed25519 sign+verify rounds in each of 4 pthreads give RFC 8032's signature",
+    "test/upstream-tests.mjs: libsodium 1.0.22's test/default suite, every test that has an .exp, built against both flavours, each output equal to its .exp"
+  ],
+  "ci": [
+    "node scripts/wasix-lib-cert.mjs wasix-libsodium --tarball .homescoop-out/package.tgz",
+    "node packages/wasix-libsodium/test/upstream-tests.mjs --tarball .homescoop-out/package.tgz"
+  ],
+  "patches": {
+    "libsodium-argon2-wasm32-fblamka.patch": "upstream 1b37a23c55: the wasm32 SIMD fBlaMka multiplies the low 32 bits of each 64-bit lane. cert/probe.mjs's Argon2id/Argon2i known answers and upstream-tests.mjs's pwhash_argon2i/pwhash_argon2id fail without it (NEGATIVE.md)"
+  }
+}

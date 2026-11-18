@@ -17,6 +17,7 @@
     "detect /home/site (dirty+clean) → findings name dirty.html only, exit 2",
     "non-root cwd: detect dirty.html from /home/site and generate-image (IMPECCABLE_IMAGE_GEN_FAKE) --out comps/fake.png from /home/site/sub land relative to the cwd, not /",
     "cert/cwd.mjs (0.1.18-2): detect --json dirty.html from /home/impcwd/site → exit 2, overused-font, the file reported as /home/impcwd/site/dirty.html, with PWD the cwd, /tmp, /nonexistent, site, the cwd spelt with .., and /; with the cwd / and PWD naming the site, Warning: cannot access dirty.html",
+    "cert/agents.mjs (0.1.21-1): agents plan / apply / apply again / status / list / undo / list --spec for a Claude Code instruction under $HOME/claude: rc 0 and ok:true each time, CLAUDE.md carries the instruction after apply and not after undo, list shows one installation then none, and no temp file in the root or agents.lock in ~/.impeccable/agents is left behind (upstream's std::process::id() temp names panicked on wasm32-wasip1)",
     "missing path → exit 1 + Warning: cannot access …",
     "unknown verb → exit 1",
     "ignores add-rule overused-font → that id disappears, others remain",

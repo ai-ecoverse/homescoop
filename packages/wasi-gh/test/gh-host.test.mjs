@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createHost, createImports, envObject, fromBase64, PROBE, responseHeaders, toBase64 } from '../package/host/gh-host.mjs'
+import { createAsyncHost, createAsyncImports, createHost, createImports, envObject, fromBase64, PROBE, responseHeaders, toBase64 } from '../package/host/gh-host.mjs'
 
 const bytes = text => new TextEncoder().encode(text)
 const b64 = text => toBase64(bytes(text))
@@ -152,4 +152,66 @@ test('createImports exchanges JSON through call and take', () => {
 test('base64 round trip', () => {
   assert.equal(text(b64('gh')), 'gh')
   assert.equal(fromBase64('').length, 0)
+})
+
+// The async process host's ctx: every call that reaches the kernel answers a
+// promise, and a failure is a rejection.
+function asyncCtx (ctx) {
+  const later = fn => (...args) => {
+    try {
+      return Promise.resolve(fn(...args))
+    } catch (error) {
+      return Promise.reject(error)
+    }
+  }
+  const wrap = table => Object.fromEntries(Object.entries(table).map(([name, fn]) => [name, typeof fn === 'function' ? later(fn) : fn]))
+  return {
+    ...ctx,
+    cwd: later(ctx.cwd),
+    fs: wrap(ctx.fs),
+    spawn: later(ctx.spawn),
+    wait: later(ctx.wait),
+    syscall: later(ctx.syscall),
+    async: wrap(ctx.async),
+  }
+}
+
+test('createAsyncHost answers the same operations over a ctx of promises', async () => {
+  const host = createAsyncHost(asyncCtx(fakeCtx({ files: ['/usr/bin/git'], children: { git: { status: 3, stdout: ['out'], stderr: ['err'] } } })))
+  assert.equal(await host({ op: 'which', name: 'git' }), '/usr/bin/git')
+  assert.equal(await host({ op: 'which', name: '/usr/bin/git' }), '/usr/bin/git')
+  const ran = await host({ op: 'run', argv: ['git', 'status'], stdin: b64('in') })
+  assert.equal(ran.status, 3)
+  assert.equal(text(ran.stdout), 'out')
+  assert.equal(text(ran.stderr), 'err')
+  await assert.rejects(host({ op: 'run', argv: ['nope'] }), /executable file not found/)
+  await assert.rejects(host({ op: 'nope' }), /unknown gh_host operation nope/)
+})
+
+test('createAsyncHost reads an HTTP body and reports an unreachable host', async () => {
+  const host = createAsyncHost(asyncCtx(fakeCtx({ net: { chunks: ['{"full_name":"cli/cli"}'] } })))
+  const head = await host({ op: 'http', method: 'GET', url: 'https://api.github.com/repos/cli/cli', headers: [['Authorization', 'token placeholder']] })
+  assert.equal(head.status, 200)
+  assert.equal(text(await host({ op: 'http.read', handle: head.handle })), '{"full_name":"cli/cli"}')
+  assert.equal(await host({ op: 'http.close', handle: head.handle }), null)
+  const down = createAsyncHost(asyncCtx(fakeCtx({ net: { fail: 'ENETUNREACH' } })))
+  await assert.rejects(down({ op: 'http', url: 'https://api.github.com/' }), /could not reach api\.github\.com \(ENETUNREACH\)/)
+})
+
+test('createAsyncImports gives gh_host.call as an async function, so the kernel suspends gh.wasm', async () => {
+  const ctx = asyncCtx(fakeCtx())
+  const { gh_host: host } = createAsyncImports(ctx)
+  assert.equal(host.call.constructor.name, 'AsyncFunction')
+  assert.equal(host.probe(), PROBE)
+  const request = new TextEncoder().encode(JSON.stringify({ op: 'which', name: '' }))
+  const memory = new Uint8Array(ctx.memory().buffer)
+  memory.set(request, 64)
+  const size = await host.call(64, request.length)
+  host.take(0)
+  assert.deepEqual(JSON.parse(new TextDecoder().decode(memory.slice(0, size))), { ok: true, value: '' })
+  const bad = new TextEncoder().encode('{"op":"nope"}')
+  memory.set(bad, 64)
+  const failed = await host.call(64, bad.length)
+  host.take(0)
+  assert.deepEqual(JSON.parse(new TextDecoder().decode(memory.slice(0, failed))), { ok: false, error: 'unknown gh_host operation nope' })
 })

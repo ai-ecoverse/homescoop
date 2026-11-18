@@ -1,0 +1,31 @@
+homescoop: upstream commit 1b37a23c55 (master, 2026-10-09), after 1.0.22.
+The wasm32 SIMD Argon2 multiplied u32 lanes 0 and 1 instead of the low
+half of each 64-bit lane (0 and 2), so every Argon2i/Argon2id hash built
+with simd128 (which wasixcc always enables) was wrong. Drop it when the
+recipe moves to a release that has it.
+
+From 1b37a23c5540000d3f07808db0db654234758bcd Mon Sep 17 00:00:00 2001
+From: Frank Denis <github@pureftpd.org>
+Date: Fri, 9 Oct 2026 11:34:05 +0200
+Subject: [PATCH] fBlaMka webassembly: properly multiply the low 32-bits of
+ each lane
+
+---
+ src/libsodium/crypto_pwhash/argon2/blamka-round-wasm32.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/libsodium/crypto_pwhash/argon2/blamka-round-wasm32.h b/src/libsodium/crypto_pwhash/argon2/blamka-round-wasm32.h
+index ee3349776f..98faed9350 100644
+--- a/src/libsodium/crypto_pwhash/argon2/blamka-round-wasm32.h
++++ b/src/libsodium/crypto_pwhash/argon2/blamka-round-wasm32.h
+@@ -7,7 +7,9 @@
+ static inline v128_t
+ fBlaMka_wasm(v128_t x, v128_t y)
+ {
+-    const v128_t z = wasm_u64x2_extmul_low_u32x4(x, y);
++    const v128_t x_low = wasm_i32x4_shuffle(x, x, 0, 2, 0, 2);
++    const v128_t y_low = wasm_i32x4_shuffle(y, y, 0, 2, 0, 2);
++    const v128_t z = wasm_u64x2_extmul_low_u32x4(x_low, y_low);
+     return wasm_i64x2_add(wasm_i64x2_add(x, y), wasm_i64x2_add(z, z));
+ }
+ 

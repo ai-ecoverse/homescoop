@@ -1,5 +1,5 @@
 /**
- * Keeps packages/wasi-uv/homescoop-pydata-map.json aligned with native py-*
+ * Keeps scripts/homescoop-pydata-map.json aligned with native py-*
  * packages (those that declare slicc.python.requires.abi) and with
  * wasix-python's `_slicc_pip.HOMESCOOP_PIP_NATIVE` (same PyPI keys).
  */
@@ -11,8 +11,19 @@ import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
-const mapPath = join(root, 'packages/wasi-uv/homescoop-pydata-map.json');
+const mapPath = join(root, 'scripts/homescoop-pydata-map.json');
 const pipMod = join(root, 'packages/wasix-python/stdlib/_slicc_pip.py');
+
+/**
+ * PyPI keys that are in the shared map (their py-* package exists) but not
+ * yet in wasix-python's `_slicc_pip.HOMESCOOP_PIP_NATIVE`, because adding
+ * them there is a wasix-python release. One wasix-python PR adds them all
+ * and empties this set (the native-crypto chain: py-cffi, py-pynacl,
+ * py-cryptography, py-bcrypt; homescoop#2119). Like check-exact-pins.mjs's
+ * PENDING: reported, not failed, and a key that is in `_slicc_pip` or not
+ * in the map must leave it.
+ */
+export const PIP_PENDING = new Set(['cffi']);
 
 /** PyPI distribution name for a homescoop py-* recipe dir. */
 function pypiName(dir) {
@@ -94,8 +105,19 @@ print(json.dumps({k: {"npm": v["npm"], "catalog": v["catalog"]} for k, v in g.HO
   assert.equal(r.status, 0, r.stderr || r.stdout);
   const pip = JSON.parse(r.stdout.trim());
   const map = JSON.parse(readFileSync(mapPath, 'utf8')).packages;
-  assert.deepEqual(Object.keys(pip).sort(), Object.keys(map).sort(), 'PyPI key sets differ');
+  for (const name of PIP_PENDING) {
+    assert.ok(name in map, `PIP_PENDING has ${name}, which is not in homescoop-pydata-map.json: remove it`);
+    assert.ok(!(name in pip), `${name} is in _slicc_pip.HOMESCOOP_PIP_NATIVE now: remove it from PIP_PENDING`);
+  }
+  const pending = Object.keys(map).filter((k) => PIP_PENDING.has(k)).sort();
+  if (pending.length) console.log(`pending (map only, not yet in _slicc_pip.py): ${pending.join(', ')}`);
+  assert.deepEqual(
+    Object.keys(pip).sort(),
+    Object.keys(map).filter((k) => !PIP_PENDING.has(k)).sort(),
+    'PyPI key sets differ (a map key that is not in _slicc_pip.py yet goes in PIP_PENDING)',
+  );
   for (const [name, entry] of Object.entries(map)) {
+    if (PIP_PENDING.has(name)) continue;
     assert.deepEqual(pip[name], { npm: entry.npm, catalog: entry.catalog }, name);
   }
 });

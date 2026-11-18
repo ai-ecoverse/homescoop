@@ -1,0 +1,22 @@
+name: py-pycparser
+builder: host
+# renovate: datasource=pypi depName=pycparser
+version: "3.12"
+npm: "@ai-ecoverse/py-pycparser"
+summary: "pycparser, a C parser in pure Python (cffi's cdef parser), for slicc WASIX CPython"
+source:
+  url: "https://files.pythonhosted.org/packages/py3/p/pycparser/pycparser-{{version}}-py3-none-any.whl"
+  sha256: "a076f3f489b39b43ed13563a1dafe42447445bec2e294154ec5c57fcdda4c85e"
+inputs:
+  - scripts/stage-pure-wheel.sh
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  license: BSD-3-Clause
+  notes: |
+    Pure-Python wheel staged into the version-neutral lib/python3/site-packages
+    (homescoop#1283), with no .pyc, like py-six. py-cffi depends on it: cffi's
+    ffi.cdef() parses declarations with it (ABI mode, and ffibuilder scripts).
+    slicc.python.sitePackages only (no abi/platform requires).
