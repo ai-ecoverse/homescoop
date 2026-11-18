@@ -19,6 +19,9 @@ const lock = lockText.split('\n').filter((l) => l && !l.startsWith('#')).map((l)
   return { name, version, pin, kind, sha256, url };
 });
 const excluded = [...lockText.matchAll(/^# excluded (\S+) (\S+): (.+)$/gm)].map((m) => m[1]);
+// # homescoop <dist> <PyPI version> <npm>@<pin> upstream <upstream's pin | ->
+const native = [...lockText.matchAll(/^# homescoop (\S+) (\S+) (@ai-ecoverse\/py-[a-z0-9-]+)@(\S+) upstream (\S+)$/gm)]
+  .map((m) => ({ name: m[1], version: m[2], npm: m[3], pin: m[4], upstream: m[5] }));
 
 function* walk(dir) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -51,13 +54,33 @@ test('the lock is for the recipe release and installs exactly its distributions'
   }
 });
 
-test('the native packages and what needs them at import are left out', () => {
-  assert.deepEqual(excluded.sort(), ['bcrypt', 'cffi', 'cryptography', 'fabric', 'paramiko', 'psutil', 'pynacl', 'pyopenssl', 'scp', 'sshtunnel']);
+test('the native packages come from the py-* packages package.json pins, and only psutil is left out', () => {
+  assert.deepEqual(excluded, ['psutil']);
+  assert.deepEqual(native.map((n) => n.name).sort(), ['bcrypt', 'cffi', 'cryptography', 'pycparser', 'pynacl', 'pyopenssl']);
+  // Every @ai-ecoverse/py-* dependency is one of the lock's, at its pin, and
+  // the PyPI version is the pin's upstream (2.1.1-2 is cffi 2.1.1; py-pycparser
+  // pads 3.12 to 3.12.0-1).
+  const deps = Object.entries(manifest.dependencies).filter(([n]) => n.startsWith('@ai-ecoverse/py-'));
+  assert.deepEqual(deps.map(([n, v]) => `${n}@${v}`).sort(), native.map((n) => `${n.npm}@${n.pin}`).sort());
+  for (const n of native) {
+    const base = n.pin.replace(/-[0-9.]+$/, '');
+    assert.ok(base === n.version || base === `${n.version}.0`, `${n.name} ${n.version} from ${n.npm}@${n.pin}`);
+    assert.equal(n.npm, `@ai-ecoverse/py-${n.name}`);
+  }
+  // Upstream's own pins, recorded as such: azure-cli 2.93.0 pins older ones.
+  assert.deepEqual(Object.fromEntries(native.map((n) => [n.name, n.upstream])), {
+    bcrypt: '3.2.0', cffi: '2.0.0', cryptography: '48.0.1', pycparser: '-', pynacl: '1.6.2', pyopenssl: '26.2.0',
+  });
   const dists = distInfos();
-  for (const n of [...excluded, 'pycparser']) assert.ok(!dists.has(n), `${n} is installed`);
-  for (const d of ['cryptography', 'OpenSSL', 'nacl', 'bcrypt', 'psutil', 'paramiko', 'fabric', 'scp.py', 'sshtunnel.py', '_cffi_backend']) {
+  for (const n of [...excluded, ...native.map((x) => x.name)]) {
+    assert.ok(!dists.has(n), `${n} is installed in lib/azure-cli`);
+    assert.ok(!lock.some((e) => e.name === n), `${n} is fetched from PyPI`);
+  }
+  for (const d of ['cryptography', 'OpenSSL', 'nacl', 'bcrypt', 'psutil', 'cffi', 'pycparser', '_cffi_backend']) {
     assert.ok(!existsSync(join(site, d)), `${d} is staged`);
   }
+  // The pure-Python ones that need them at import are az's own again.
+  for (const n of ['paramiko', 'fabric', 'invoke', 'scp', 'sshtunnel']) assert.ok(dists.has(n), `${n} is missing`);
 });
 
 test('no bytecode, no native code, no links, no wheel scripts', () => {
@@ -88,12 +111,12 @@ test('can-launch-browser-wasi.patch is applied to azure-cli-core', () => {
   assert.doesNotMatch(util, /^ {4}if platform_name != 'linux':$/m);
 });
 
-test('storage-encryption-without-cryptography.patch is applied to the storage SDKs', () => {
+test('the storage SDKs are unpatched: they import cryptography at module level', () => {
+  assert.ok(!existsSync(join(recipeDir, 'storage-encryption-without-cryptography.patch')));
   for (const f of ['azure/storage/blob/_encryption.py', 'azure/storage/queue/_encryption.py', 'azure/storage/common/_encryption.py']) {
     const src = readFileSync(join(site, f), 'utf8');
-    assert.match(src, /^try:\n {4}from cryptography\.hazmat\.backends import default_backend$/m, f);
-    assert.match(src, /^except ImportError: {2}# homescoop#2112: no cryptography on wasix-python$/m, f);
-    assert.doesNotMatch(src, /^from cryptography/m, f);
+    assert.match(src, /^from cryptography\.hazmat\.backends import default_backend$/m, f);
+    assert.doesNotMatch(src, /homescoop/, f);
   }
 });
 
@@ -127,7 +150,14 @@ test('LICENSE is azure-cli\'s, and the notices list every distribution', () => {
     const sec = notices.split(/^## /m).find((x) => x.startsWith(`${name} ${version} (${spdx})\n`));
     assert.ok(sec, `no notices section for ${name}`);
     assert.match(sec, new RegExp(`^License: ${spdx}$`, 'm'));
-    assert.match(sec, spdx === 'MIT' ? /Permission is hereby granted, free of charge/ : /Redistribution and use in source and binary forms[\s\S]*Neither (the )?name of/, name);
+    const text = {
+      MIT: /Permission is hereby granted, free of charge/,
+      'BSD-3-Clause': /Redistribution and use in source and binary forms[\s\S]*Neither (the )?name of/,
+      // scp: its LGPL notice, then the LGPL 2.1 itself.
+      'LGPL-2.1-or-later': /version 2\.1 of the License, or \(at your option\) any later version[\s\S]*GNU LESSER GENERAL PUBLIC LICENSE\n\t\t {7}Version 2\.1, February 1999[\s\S]*END OF TERMS AND CONDITIONS/,
+    }[spdx];
+    assert.ok(text, `licenses.map ${name}: no check for ${spdx}`);
+    assert.match(sec, text, name);
   }
   const yaml = lock.find((e) => e.name === 'pyyaml');
   assert.ok(existsSync(join(site, `pyyaml-${yaml.version}.dist-info/licenses/LICENSE`)), "PyYAML's LICENSE from its sdist");

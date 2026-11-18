@@ -4,16 +4,17 @@
 Upstream's az is a shell script that runs `python -Im azure.cli "$@"` with the
 Python its package bundles. This script does the same on wasix-python, the
 interpreter it runs on, so the command needs no shell, with the package's
-own tree (lib/azure-cli, the closure upstream pins) as the only place Python
-packages come from.
+own tree (lib/azure-cli, the closure upstream pins) and the py-* packages it
+depends on as the only places Python packages come from.
 
 What it does:
-  - sys.path is the standard library and lib/azure-cli, as under python -S:
-    the site-packages directories (wasix-python's, py-* packages', a user's)
-    are taken off, and any module a .pth there already imported is dropped,
-    so az runs on its pinned closure and nothing installed beside it shadows
-    a module of it. AZURE_CLI_SITEPACKAGES=1 keeps them on sys.path, after
-    lib/azure-cli (az's own modules still win).
+  - sys.path is lib/azure-cli, the standard library and az's own py-*
+    packages (below), as under python -S: the site-packages directories
+    (wasix-python's, other py-* packages', a user's) are taken off, and any
+    module a .pth there already imported is dropped, so az runs on its
+    pinned closure and nothing installed beside it shadows a module of it.
+    AZURE_CLI_SITEPACKAGES=1 puts them back on sys.path, after those (az's
+    own modules still win).
   - The kernel's proxy terminates TLS with its own CA, which it names in
     SSL_CERT_FILE. requests (azure-core's transport, and MSAL's) ignores
     SSL_CERT_FILE and trusts certifi unless REQUESTS_CA_BUNDLE says
@@ -224,13 +225,13 @@ def own_packages():
             if dep != python_dir and got != python.get("version") and not (dep is None and in_range(python.get("version"), got)):
                 REFUSED[npm] = f"{npm} {pin} is for wasix-python {got}, this python is {python.get('version')}"
         if npm not in REFUSED:
-            found[npm] = (d, deps)
+            found[npm] = (d, deps, os.path.join(d, py["sitePackages"]))
     # A py-* package's own py-* dependencies must be the copies az takes (one
     # _cffi_backend for everything), and az must take them.
     changed = True
     while changed:
         changed = False
-        for npm, (d, deps) in list(found.items()):
+        for npm, (d, deps, _) in list(found.items()):
             for dep in deps:
                 if not dep.startswith("@ai-ecoverse/py-"):
                     continue
@@ -244,7 +245,7 @@ def own_packages():
                 del found[npm]
                 changed = True
                 break
-    return [os.path.join(d, manifest(d)["slicc"]["python"]["sitePackages"]) for d, _ in found.values()]
+    return [sp for _, _, sp in found.values()]
 
 
 def env_name(section, option):

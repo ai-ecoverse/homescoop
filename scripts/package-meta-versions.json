@@ -3,6 +3,7 @@
   "leads": {
     "*": ["slicc-kernel ", "slicc-kernel ≥ ", "slicc-kernel >= ", "slicc-kernel` ≥ ", "slicc-kernel` >= ", "Apache-", "GPL-", "LGPL-", "MPL-"],
     "py-*": ["CPython "],
+    "azure-cli": ["cffi "],
     "libheif": ["libde265 ", "dav1d "],
     "tls-engine": ["OpenSSL "],
     "wasix-python": ["OpenSSL ", "`sqlite3` ("],

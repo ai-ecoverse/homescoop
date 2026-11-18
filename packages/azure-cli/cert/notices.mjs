@@ -9,9 +9,12 @@ import { checkNotices, NOTICES_FILE } from '../../../scripts/browser-cert/notice
 // distributions staged unmodified, not code linked into a wasm, and the
 // third-party-notices test reads "notices" as linked components that a
 // homescoop_notice line in build.sh must name.
-// ANTLR's BSD-3-Clause text reads "Neither name of", not the usual phrase.
+// ANTLR's BSD-3-Clause text reads "Neither name of", not the usual phrase;
+// scp's section is its LGPL notice, then the LGPL 2.1 itself (LGPL-2.1-or-later
+// has no built-in phrase).
 const TEXT = {
   'antlr4-python3-runtime': 'Neither name of copyright holders nor the names of its contributors may be used to endorse or promote products',
+  scp: 'This license, the Lesser General Public License, applies to some specially designated software packages',
 };
 
 export default async function notices(ctx) {

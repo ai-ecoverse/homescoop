@@ -144,7 +144,7 @@ Patches live beside the recipe as `packages/<name>/*.patch` (applied by
 | package | upstream | notes |
 | --- | --- | --- |
 | aws-cli | `aws/aws-cli` | github-tags, `2.x` only (renovate.json: the repo tags v1 too); the recipe pins AWS's source distribution, and build.sh checks the recipe's wheels against its `system-sandbox-lock.txt`, so a bump that moves a dependency fails until the wheel `sources:` follow |
-| azure-cli | PyPI `azure-cli` | `pypi`; the recipe pins upstream's `requirements.py3.Linux.txt` and `trim_sdk.py` at the release tag (the sha256 refresh fills both). A bump also needs `python3 packages/azure-cli/src/lock.py` (uv and the network) to rewrite `wheels.lock`: build.sh refuses a lock made for another release, and the refresh automation doesn't run it. The two `.patch` files may need a refresh too |
+| azure-cli | PyPI `azure-cli` | `pypi`; the recipe pins upstream's `requirements.py3.Linux.txt` and `trim_sdk.py` at the release tag (the sha256 refresh fills both). A bump also needs `python3 packages/azure-cli/src/lock.py` (uv and the network) to rewrite `wheels.lock`: build.sh refuses a lock made for another release, and the refresh automation doesn't run it. The native packages (cryptography, PyNaCl, bcrypt, pyOpenSSL, cffi, pycparser) are the `@ai-ecoverse/py-*` pins in its `package.json`, not PyPI files: the lock names them, so a bump fetches no wheel for them, and moving one of those pins needs `lock.py` again too. `can-launch-browser-wasi.patch` may need a refresh |
 | bash | savannah `bash.git` | tags `bash-X.Y` |
 | cmake | `Kitware/CMake` | github-releases |
 | coreutils | savannah `coreutils.git` | |
