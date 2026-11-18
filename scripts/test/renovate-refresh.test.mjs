@@ -164,3 +164,29 @@ test("ladder-build's renovate-refresh job runs main's script with the App's toke
   const ci = jobs.find((j) => j.startsWith('  ci:\n'));
   assert.doesNotMatch(ci.match(/^ {4}needs: (.+)$/m)[1], /renovate-refresh/, 'ci does not wait on the refresh');
 });
+
+function pipelineRenovateBots(yaml) {
+  const jobs = yaml.slice(yaml.indexOf('\njobs:\n')).split(/\n(?= {2}[a-z][a-z0-9-]*:\n)/).slice(1);
+  const job = jobs.find((j) => j.startsWith('  pipeline:\n'));
+  assert.ok(job, 'no pipeline job');
+  const pin = job.match(/^ {4}uses: ai-ecoverse\/slicc-shared-web\/\.github\/workflows\/pipeline\.yml@v(\d+)\.(\d+)\.(\d+)$/m);
+  assert.ok(pin, 'pipeline.yml pinned to a vX.Y.Z tag');
+  const [major, minor] = pin.slice(1).map(Number);
+  assert.ok(major > 2 || (major === 2 && minor >= 16), `pipeline.yml@v${pin.slice(1).join('.')} has no renovate-bots input (v2.16.0+)`);
+  const line = job.match(/^ {6}renovate-bots: (.+)$/m);
+  assert.ok(line, 'pipeline gets no renovate-bots');
+  return line[1].split(',').map((bot) => bot.trim().replace(/\[bot\]$/, '').toLowerCase());
+}
+
+test("the pipeline counts the refresh App's pushes to renovate/ branches as Renovate's, so both reviewers accept them", () => {
+  const yaml = readFileSync(join(scripts, '..', '.github/workflows/ladder-build.yml'), 'utf8');
+  assert.ok(pipelineRenovateBots(yaml).includes('homescoop-renovate-refresh'));
+});
+
+test('NEGATIVE: main before this change (pipeline.yml@v2.14.4, no renovate-bots) fails the spec', () => {
+  const yaml = readFileSync(join(scripts, '..', '.github/workflows/ladder-build.yml'), 'utf8');
+  const old = yaml.replace(/pipeline\.yml@v\d+\.\d+\.\d+$/m, 'pipeline.yml@v2.14.4').replace(/^ {6}renovate-bots: .+\n/m, '');
+  assert.throws(() => pipelineRenovateBots(old), /no renovate-bots input/);
+  assert.throws(() => pipelineRenovateBots(yaml.replace(/^ {6}renovate-bots: .+\n/m, '')), /gets no renovate-bots/);
+  assert.throws(() => pipelineRenovateBots(old.replace(/pipeline\.yml@v2\.14\.4/, 'pipeline.yml@v2.16.0')), /gets no renovate-bots/);
+});
