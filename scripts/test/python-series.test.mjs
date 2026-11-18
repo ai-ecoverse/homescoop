@@ -94,21 +94,19 @@ test('pinErrors: a py-* outside PYTHON_SERIES_PENDING may not take wasix-python 
   const pkg = (name, spec) => ({ name, version: '1.0.0-1', dependencies: { [PYTHON]: spec } });
   assert.deepEqual(pinErrors(pkg('@ai-ecoverse/py-newpkg', SERIES)), []);
   assert.equal(pinErrors(pkg('@ai-ecoverse/py-newpkg', '>=3.15.0-1 <3.15.1')).length, 1);
-  assert.deepEqual(pinErrors(pkg('@ai-ecoverse/py-numpy', '>=3.15.0-1 <3.15.1')), []);
+  assert.equal(pinErrors(pkg('@ai-ecoverse/py-numpy', '>=3.15.0-1 <3.15.1')).length, 1);
+  assert.equal(pinErrors(pkg('@ai-ecoverse/wasm-emscripten', '>=3.15.0-2 <3.15.1')).length, 1);
   assert.deepEqual(pinErrors(pkg('@ai-ecoverse/py-numpy', SERIES)), []);
   assert.equal(pinErrors(pkg('@ai-ecoverse/py-newpkg', '>=3.15.0-1 <3.16.0')).length, 1);
 });
 
-test('seriesState: pending while on the patch range, repinned after it', () => {
-  assert.equal(seriesState({ name: '@ai-ecoverse/py-numpy', dependencies: { [PYTHON]: '>=3.15.0-1 <3.15.1' } }), 'pending');
-  assert.equal(seriesState({ name: '@ai-ecoverse/py-numpy', dependencies: { [PYTHON]: SERIES } }), 'repinned');
-  assert.equal(seriesState({ name: '@ai-ecoverse/py-newpkg', dependencies: { [PYTHON]: SERIES } }), null);
-  assert.equal(PYTHON_SERIES_PENDING.size, 16);
-  for (const name of PYTHON_SERIES_PENDING) {
-    const dir = name === '@ai-ecoverse/wasm-emscripten' ? 'wasm-emscripten' : name.slice('@ai-ecoverse/'.length);
-    const pj = JSON.parse(readFileSync(new URL(`../../packages/${dir}/package/package.json`, import.meta.url), 'utf8'));
-    assert.equal(pj.name, name);
-  }
+test('seriesState: pending while on the patch range, repinned after it; the wave has emptied the list', () => {
+  const listed = new Set(['@ai-ecoverse/py-numpy']);
+  assert.equal(seriesState({ name: '@ai-ecoverse/py-numpy', dependencies: { [PYTHON]: '>=3.15.0-1 <3.15.1' } }, listed), 'pending');
+  assert.equal(seriesState({ name: '@ai-ecoverse/py-numpy', dependencies: { [PYTHON]: SERIES } }, listed), 'repinned');
+  assert.equal(seriesState({ name: '@ai-ecoverse/py-newpkg', dependencies: { [PYTHON]: SERIES } }, listed), null);
+  assert.equal(seriesState({ name: '@ai-ecoverse/py-numpy', dependencies: { [PYTHON]: '>=3.15.0-1 <3.15.1' } }), null);
+  assert.equal(PYTHON_SERIES_PENDING.size, 0);
 });
 
 test('seriesProbes: the next patch line and the last one', () => {
@@ -119,7 +117,7 @@ test('seriesProbes: the next patch line and the last one', () => {
 
 const CLI = new URL('../check-exact-pins.mjs', import.meta.url).pathname;
 
-test('check-exact-pins CLI: a listed py-* that already takes the series range passes with a notice; a patch range is pending; a wider range fails', () => {
+test('check-exact-pins CLI: a py-* takes wasix-python as the series range; the patch range and a wider range fail', () => {
   const work = mkdtempSync(join(tmpdir(), 'python-series-cli-'));
   try {
     const run = (spec) => {
@@ -127,16 +125,16 @@ test('check-exact-pins CLI: a listed py-* that already takes the series range pa
       writeFileSync(file, JSON.stringify({ ...PUBLISHED, version: '2.5.4-5', dependencies: { ...PUBLISHED.dependencies, [PYTHON]: spec } }));
       return spawnSync(process.execPath, [CLI, '--file', file], { encoding: 'utf8' });
     };
-    const repinned = run(SERIES);
-    assert.equal(repinned.status, 0, repinned.stderr);
-    assert.match(repinned.stdout, /notice .*py-numpy@2\.5\.4-5\): re-pinned to the series range/);
-    assert.match(repinned.stdout, /check-exact-pins: PASS 1 package\.json/);
-    const pending = run('>=3.15.0-1 <3.15.1');
-    assert.equal(pending.status, 0, pending.stderr);
-    assert.match(pending.stdout, /pending .*until its re-pin to pythonSeries\('3\.15\.0-1'\)/);
-    const wide = run('>=3.15.0-1 <3.16.0');
-    assert.equal(wide.status, 1);
-    assert.match(wide.stderr, /check-exact-pins: FAIL/);
+    const series = run(SERIES);
+    assert.equal(series.status, 0, series.stderr);
+    assert.doesNotMatch(series.stdout, /notice|pending/);
+    assert.match(series.stdout, /check-exact-pins: PASS 1 package\.json/);
+    for (const spec of ['>=3.15.0-1 <3.15.1', '>=3.15.0-1 <3.16.0']) {
+      const r = run(spec);
+      assert.equal(r.status, 1, spec);
+      assert.match(r.stderr, /is not an exact version/, spec);
+      assert.match(r.stderr, /check-exact-pins: FAIL/, spec);
+    }
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

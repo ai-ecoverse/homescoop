@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { inPythonRange, pinErrors, pythonRange, rangeAllowed } from '../check-exact-pins.mjs';
+import { inPythonRange, pinErrors, pythonRange, pythonSeries, rangeAllowed } from '../check-exact-pins.mjs';
 import { diffPackageJson } from '../diff-published.mjs';
 import { lockErrors, newestFrom, peerTarballs } from '../browser-cert/python-range.mjs';
 
 const PY = '@ai-ecoverse/wasix-python';
 const RANGE = '>=3.14.2-16 <3.14.3';
+const SERIES = pythonSeries('3.14.2-16');
 const numpy = (spec, field = 'dependencies') => ({ name: '@ai-ecoverse/py-numpy', version: '2.3.2-10', [field]: { [PY]: spec } });
 
 test('pythonRange: >=X.Y.Z-N <X.Y.Z+1 only', () => {
@@ -23,10 +24,10 @@ test('inPythonRange: the X.Y.Z-N line from the floor, as npm semver', () => {
 });
 
 test('pinErrors: the range passes for wasix-python and py-* in a py-* dependencies, nowhere else', () => {
-  assert.deepEqual(pinErrors(numpy(RANGE)), []);
+  assert.deepEqual(pinErrors(numpy(SERIES)), []);
   assert.deepEqual(pinErrors(numpy('3.14.2-24')), []);
-  assert.equal(pinErrors(numpy(RANGE, 'peerDependencies')).length, 1);
-  assert.equal(pinErrors(numpy(RANGE, 'optionalDependencies')).length, 1);
+  assert.equal(pinErrors(numpy(SERIES, 'peerDependencies')).length, 1);
+  assert.equal(pinErrors(numpy(SERIES, 'optionalDependencies')).length, 1);
   assert.equal(pinErrors(numpy('>=3.14.2-16')).length, 1);
   assert.equal(pinErrors(numpy('^3.14.2-16')).length, 1);
   assert.equal(pinErrors({ name: '@ai-ecoverse/wasix-uv-shim', dependencies: { [PY]: RANGE } }).length, 1);
@@ -41,12 +42,12 @@ test('pinErrors: the range passes for wasix-python and py-* in a py-* dependenci
 test('diffPackageJson: an exact python pin may become the range in a py-*, nothing wider', () => {
   const base = numpy('3.14.2-16');
   base.version = '2.3.2-9';
-  const ok = diffPackageJson(base, numpy(RANGE));
+  const ok = diffPackageJson(base, numpy(SERIES));
   assert.deepEqual(ok.errors, []);
-  assert.ok(ok.changes.includes(`dependencies["${PY}"]: 3.14.2-16 → ${RANGE}`), ok.changes.join('\n'));
+  assert.ok(ok.changes.includes(`dependencies["${PY}"]: 3.14.2-16 → ${SERIES}`), ok.changes.join('\n'));
   assert.equal(diffPackageJson(base, numpy('>=3.14.2-16')).errors.length, 1);
-  assert.equal(diffPackageJson({ ...base, name: '@ai-ecoverse/wasm-git' }, { ...numpy(RANGE), name: '@ai-ecoverse/wasm-git' }).errors.length, 1);
-  assert.deepEqual(diffPackageJson({ ...base, name: '@ai-ecoverse/wasm-emscripten' }, { ...numpy(RANGE), name: '@ai-ecoverse/wasm-emscripten' }).errors, [], 'wasm-emscripten runs emcc on wasix-python (PYTHON_CONSUMERS)');
+  assert.equal(diffPackageJson({ ...base, name: '@ai-ecoverse/wasm-git' }, { ...numpy(SERIES), name: '@ai-ecoverse/wasm-git' }).errors.length, 1);
+  assert.deepEqual(diffPackageJson({ ...base, name: '@ai-ecoverse/wasm-emscripten' }, { ...numpy(SERIES), name: '@ai-ecoverse/wasm-emscripten' }).errors, [], 'wasm-emscripten runs emcc on wasix-python (PYTHON_CONSUMERS)');
 });
 
 test('lockErrors: one python, at the top level, at that version', () => {
@@ -65,9 +66,10 @@ test('newestFrom: the wasix-python of cert/meta.json needsInstall', () => {
   assert.equal(newestFrom({ needsInstall: [`${PY}-x@1.0.0`] }), null);
 });
 
-test('wasm-emscripten, which runs emcc on wasix-python, may take wasix-python as the range too, and nothing else', () => {
+test('wasm-emscripten, which runs emcc on wasix-python, may take wasix-python as the series range too, and nothing else', () => {
   const em = (deps) => ({ name: '@ai-ecoverse/wasm-emscripten', dependencies: deps });
-  assert.deepEqual(pinErrors(em({ [PY]: '>=3.15.0-2 <3.15.1' })), []);
+  assert.deepEqual(pinErrors(em({ [PY]: pythonSeries('3.15.0-2') })), []);
+  assert.equal(pinErrors(em({ [PY]: '>=3.15.0-2 <3.15.1' })).length, 1);
   assert.equal(pinErrors(em({ [PY]: '>=3.15.0-2 <3.16.0' })).length, 1);
   assert.equal(pinErrors(em({ '@ai-ecoverse/wasm-clang': '>=24.0.0-22 <24.0.1' })).length, 1);
   assert.equal(pinErrors(em({ '@ai-ecoverse/py-numpy': '>=2.3.2-10 <2.3.3' })).length, 1);
