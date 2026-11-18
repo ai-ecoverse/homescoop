@@ -99,9 +99,9 @@ test('pinErrors: a py-* outside PYTHON_SERIES_PENDING may not take wasix-python 
   assert.equal(pinErrors(pkg('@ai-ecoverse/py-newpkg', '>=3.15.0-1 <3.16.0')).length, 1);
 });
 
-test('seriesState: pending while on the patch range, stale after the re-pin', () => {
+test('seriesState: pending while on the patch range, repinned after it', () => {
   assert.equal(seriesState({ name: '@ai-ecoverse/py-numpy', dependencies: { [PYTHON]: '>=3.15.0-1 <3.15.1' } }), 'pending');
-  assert.equal(seriesState({ name: '@ai-ecoverse/py-numpy', dependencies: { [PYTHON]: SERIES } }), 'stale');
+  assert.equal(seriesState({ name: '@ai-ecoverse/py-numpy', dependencies: { [PYTHON]: SERIES } }), 'repinned');
   assert.equal(seriesState({ name: '@ai-ecoverse/py-newpkg', dependencies: { [PYTHON]: SERIES } }), null);
   assert.equal(PYTHON_SERIES_PENDING.size, 16);
   for (const name of PYTHON_SERIES_PENDING) {
@@ -115,6 +115,31 @@ test('seriesProbes: the next patch line and the last one', () => {
   assert.deepEqual(seriesProbes(SERIES), ['3.15.1-1', '3.15.29-1']);
   assert.deepEqual(seriesProbes(pythonSeries('3.15.2-1')), ['3.15.3-1', '3.15.29-1']);
   assert.deepEqual(seriesProbes('>=3.15.0-1 <3.15.1'), []);
+});
+
+const CLI = new URL('../check-exact-pins.mjs', import.meta.url).pathname;
+
+test('check-exact-pins CLI: a listed py-* that already takes the series range passes with a notice; a patch range is pending; a wider range fails', () => {
+  const work = mkdtempSync(join(tmpdir(), 'python-series-cli-'));
+  try {
+    const run = (spec) => {
+      const file = join(work, `${Math.random().toString(36).slice(2)}.json`);
+      writeFileSync(file, JSON.stringify({ ...PUBLISHED, version: '2.5.4-5', dependencies: { ...PUBLISHED.dependencies, [PYTHON]: spec } }));
+      return spawnSync(process.execPath, [CLI, '--file', file], { encoding: 'utf8' });
+    };
+    const repinned = run(SERIES);
+    assert.equal(repinned.status, 0, repinned.stderr);
+    assert.match(repinned.stdout, /notice .*py-numpy@2\.5\.4-5\): re-pinned to the series range/);
+    assert.match(repinned.stdout, /check-exact-pins: PASS 1 package\.json/);
+    const pending = run('>=3.15.0-1 <3.15.1');
+    assert.equal(pending.status, 0, pending.stderr);
+    assert.match(pending.stdout, /pending .*until its re-pin to pythonSeries\('3\.15\.0-1'\)/);
+    const wide = run('>=3.15.0-1 <3.16.0');
+    assert.equal(wide.status, 1);
+    assert.match(wide.stderr, /check-exact-pins: FAIL/);
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
 });
 
 function pyTarball(work, manifest) {

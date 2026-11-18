@@ -105,7 +105,7 @@ export const PYTHON_SERIES_PENDING = new Set([
 
 export function seriesState(pkg) {
   if (!PYTHON_SERIES_PENDING.has(pkg?.name)) return null;
-  return pythonRange(pkg.dependencies?.[PYTHON]) ? 'pending' : 'stale';
+  return pythonRange(pkg.dependencies?.[PYTHON]) ? 'pending' : 'repinned';
 }
 
 /** Packages besides py-* whose code runs on wasix-python and takes it as a range: emcc (homescoop#859). */
@@ -197,9 +197,8 @@ function main() {
     if (series) seenSeries.add(pkg.name);
     if (series === 'pending') {
       console.log(`pending ${t.label} (${pkg.name}@${pkg.version}): ${PYTHON} ${pkg.dependencies[PYTHON]} until its re-pin to pythonSeries('${pythonRange(pkg.dependencies[PYTHON]).floor}') (homescoop#1939)`);
-    } else if (series === 'stale') {
-      failed = true;
-      console.error(`${t.label}: ${pkg.name} no longer takes ${PYTHON} as a patch range; remove it from PYTHON_SERIES_PENDING in scripts/check-exact-pins.mjs`);
+    } else if (series === 'repinned') {
+      console.log(`notice ${t.label} (${pkg.name}@${pkg.version}): re-pinned to the series range; drop it from PYTHON_SERIES_PENDING once the wave has published (homescoop#1939)`);
     }
   }
   if (all) {

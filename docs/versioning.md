@@ -178,8 +178,11 @@ and every py-\*'s tarball must resolve one python with stand-ins of the next
 patch line and of `X.Y.29`
 ([ci-cert.md](ci-cert.md#py-python-range)). `PYTHON_SERIES_PENDING` lists
 the packages that still take the patch-line range until their series
-re-pin; they are reported, not failed, and an entry that no longer has the
-patch range fails the check. The same series is allowed for wasm-emscripten,
+re-pin; they are reported, not failed. An entry that already takes the
+series range is a notice, not a failure, so the re-pin releases never edit
+`check-exact-pins.mjs`, which is on the publish path (#1712: a PR that
+changes it releases nothing); a cleanup PR drops the entries once the wave
+has published. A name that no package has fails. The same series is allowed for wasm-emscripten,
 which runs emcc on wasix-python (`PYTHON_CONSUMERS`), and nowhere else.
 
 A py-\* takes another py-\* as the patch-line range, e.g.
