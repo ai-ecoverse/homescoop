@@ -7,7 +7,7 @@
   ],
   "needsInstall": [
     "@ai-ecoverse/wasix-python@3.15.0-8",
-    "@ai-ecoverse/py-cffi@2.1.1-1",
+    "@ai-ecoverse/py-cffi@2.1.1-2",
     "@ai-ecoverse/py-pycparser@3.12.0-1"
   ],
   "runTimeoutMs": 300000,
