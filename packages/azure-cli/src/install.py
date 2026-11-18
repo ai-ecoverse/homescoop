@@ -133,28 +133,34 @@ def license_map(path, sources, root, lock):
         if line.startswith("#") or not line.strip():
             continue
         name, version, spdx, src = line.split()
-        if src.startswith("sources."):
-            key = src.split(".", 1)[1]
-            if key not in sources:
-                die(f"licenses.map: {name}: build.sh passed no file for {src}")
-            file = sources[key]
-        elif src.startswith("tree:"):
-            file = os.path.join(root, safe(src[5:]))
-        else:
-            die(f"licenses.map: {name}: unknown source {src}")
         if name not in lock:
             die(f"licenses.map: {name} is not in wheels.lock; drop the line")
         if lock[name] != version:
             die(f"licenses.map: {name} {version}, wheels.lock has {lock[name]}: check its license text and update the line")
-        with open(file, encoding="utf-8") as f:
-            text = f.read().strip("\n")
-        if src.startswith("tree:"):
-            # The file's leading comment block, not its code.
-            lines = text.split("\n")
-            n = next((i for i, l in enumerate(lines) if not l.startswith("#")), len(lines))
-            text = "\n".join(lines[:n])
-        if not text:
-            die(f"licenses.map: {name}: {src} is empty")
+        # <part>[+<part>]: the texts one after the other (scp's LGPL notice,
+        # then the LGPL it names).
+        texts = []
+        for part in src.split("+"):
+            if part.startswith("sources."):
+                key = part.split(".", 1)[1]
+                if key not in sources:
+                    die(f"licenses.map: {name}: build.sh passed no file for {part}")
+                file = sources[key]
+            elif part.startswith("tree:"):
+                file = os.path.join(root, safe(part[5:]))
+            else:
+                die(f"licenses.map: {name}: unknown source {part}")
+            with open(file, encoding="utf-8") as f:
+                text = f.read().strip("\n")
+            if part.startswith("tree:"):
+                # The file's leading comment block, not its code.
+                lines = text.split("\n")
+                n = next((i for i, l in enumerate(lines) if not l.startswith("#")), len(lines))
+                text = "\n".join(lines[:n])
+            if not text:
+                die(f"licenses.map: {name}: {part} is empty")
+            texts.append(text)
+        text = "\n\n".join(texts)
         out[name] = (version, spdx, src, text)
     return out
 
@@ -211,7 +217,10 @@ def notices(root, out, version, extra):
         if files:
             continue
         _v, spdx, src, text = extra[canon(name)]
-        where = f"the leading comment of `lib/azure-cli/{src[5:]}`" if src.startswith("tree:") else "the project's LICENSE"
+        first = src.split("+")[0]
+        where = f"the leading comment of `lib/azure-cli/{first[5:]}`" if first.startswith("tree:") else "the project's LICENSE"
+        if "+" in src:
+            where += f", then the full text of the license it names ({spdx})"
         lines += ["", f"## {name} {ver} ({spdx})", "", f"License: {spdx}", "",
                   f"Its wheel ships no license file. This is {where}:", "", "```text", text, "```"]
     with open(out, "w", encoding="utf-8") as f:

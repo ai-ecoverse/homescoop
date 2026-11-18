@@ -5,10 +5,11 @@
 # line whose version isn't the lock's (check the text again after a bump), and
 # for a line the lock doesn't need.
 #
-# <distribution> <version> <SPDX license> <text: sources.<key> of recipe.yaml, or tree:<path under lib/azure-cli>>
+# <distribution> <version> <SPDX license> <text: sources.<key> of recipe.yaml, or tree:<path under lib/azure-cli>, or several joined by +>
 antlr4-python3-runtime 4.13.1 BSD-3-Clause sources.license_antlr4
 asn1crypto 0.24.0 MIT sources.license_asn1crypto
 isodate 0.6.1 BSD-3-Clause tree:isodate/__init__.py
+scp 0.13.2 LGPL-2.1-or-later sources.license_scp+sources.license_lgpl21
 wcwidth 0.1.7 MIT sources.license_wcwidth
 azure-common 1.1.22 MIT sources.license_azure_sdk
 azure-mgmt-advisor 9.0.0 MIT sources.license_azure_sdk

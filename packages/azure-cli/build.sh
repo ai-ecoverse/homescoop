@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # azure-cli build.sh: the Azure CLI and its closure, as upstream pins it,
 # staged as a pure-Python tree for wasix-python (homescoop#2112). Nothing is
-# compiled.
+# compiled: the native packages (cffi, pycparser, cryptography, PyNaCl,
+# bcrypt, pyOpenSSL) are homescoop's py-* npm packages, which package.json
+# depends on and bin/az puts on sys.path; none of them is staged here.
 #
 # The recipe pins upstream's requirements.py3.Linux.txt for the release by
 # sha256. wheels.lock (written by src/lock.py) records that sha256 and gives
-# every file of the closure with PyPI's sha256; build.sh refuses a lock made
-# from other bytes, and fetches and checks each file against the lock. After
-# a version bump, run src/lock.py (needs uv and the network).
+# every PyPI file of the closure with PyPI's sha256, and the npm pin of each
+# native package; build.sh refuses a lock made from other bytes or other npm
+# pins, and fetches and checks each file against the lock. After a version
+# bump, or a bump of a py-* pin in package.json, run src/lock.py (needs uv and
+# the network).
 #
 # Needs curl, shasum and a python3 >= 3.10 on the build machine (to unpack the
 # wheels and to run upstream's trim_sdk.py on the staged tree).
@@ -19,7 +23,7 @@ export HOMESCOOP_ROOT="$ROOT"
 source "$ROOT/scripts/build-common.sh"
 homescoop_load_recipe azure-cli
 homescoop_load_recipe azure-cli --source trim
-LICENSE_SOURCES=(license_antlr4 license_asn1crypto license_wcwidth license_azure_sdk)
+LICENSE_SOURCES=(license_antlr4 license_asn1crypto license_scp license_lgpl21 license_wcwidth license_azure_sdk)
 for key in "${LICENSE_SOURCES[@]}"; do
   homescoop_load_recipe azure-cli --source "$key"
 done
@@ -36,11 +40,12 @@ echo "== azure-cli: wheels.lock is for azure-cli $VERSION and upstream's pins"
 # The lock names the release and the sha256 of the requirements file it was
 # made from; every exact upstream pin is in the lock at that version, or in
 # its excluded list.
-"$PY" -S -B - "$LOCK" "$REQS" "$VERSION" "$SRC_SHA" <<'EOF'
-import re, sys
-lock, reqs, version, sha = sys.argv[1:]
+"$PY" -S -B - "$LOCK" "$REQS" "$VERSION" "$SRC_SHA" "$HERE/package/package.json" <<'EOF'
+import json, re, sys
+lock, reqs, version, sha, manifest = sys.argv[1:]
 canon = lambda n: re.sub(r"[-_.]+", "-", n).lower()
-head, rows, excluded = {}, {}, {}
+deps = json.load(open(manifest, encoding="utf-8"))["dependencies"]
+head, rows, excluded, native = {}, {}, {}, {}
 for line in open(lock, encoding="utf-8"):
     if line.startswith("# azure-cli "):
         head["version"] = line.split()[2]
@@ -48,6 +53,13 @@ for line in open(lock, encoding="utf-8"):
         head["sha"] = line.split()[2]
     elif line.startswith("# excluded "):
         excluded[line.split()[2]] = line.split()[3].rstrip(":")
+    elif line.startswith("# homescoop "):
+        # <dist> <PyPI version> <npm>@<pin> upstream <upstream's pin | ->
+        _, _, name, ver, spec, _, up = line.split()
+        npm, _, pin = spec.rpartition("@")
+        if deps.get(npm) != pin:
+            sys.exit(f"azure-cli: wheels.lock takes {name} from {spec}, package.json pins {npm} {deps.get(npm)}: run python3 packages/azure-cli/src/lock.py")
+        native[name] = up
     elif line.strip() and not line.startswith("#"):
         name, ver, pin, kind, s, url = line.split()
         if not re.fullmatch(r"[0-9a-f]{64}", s) or not url.startswith("https://files.pythonhosted.org/packages/"):
@@ -67,14 +79,25 @@ for line in open(reqs, encoding="utf-8"):
     if not m:
         sys.exit(f"azure-cli: can't read upstream pin {line!r}")
     c, op, v = canon(m.group(1)), m.group(2), m.group(3)
-    if c in excluded:
+    if c in native:
+        # homescoop's build, whose version the lock's resolution checked
+        # against every range of the closure; it records upstream's pin.
+        if native[c] != v:
+            sys.exit(f"azure-cli: upstream pins {c}{op}{v}, wheels.lock recorded {native[c]}: run python3 packages/azure-cli/src/lock.py")
+    elif c in excluded:
         if op == "==" and excluded[c] != v:
             sys.exit(f"azure-cli: upstream pins {c}=={v}, wheels.lock excluded {excluded[c]}")
     elif c not in rows:
         sys.exit(f"azure-cli: upstream pins {c}, wheels.lock has no {c}")
     elif op == "==" and rows[c] != v:
         sys.exit(f"azure-cli: upstream pins {c}=={v}, wheels.lock has {rows[c]}")
-print(f"  {len(rows)} distributions, {len(excluded)} excluded")
+unpinned = sorted(n for n in deps if n.startswith("@ai-ecoverse/py-") and n not in {l.split()[4].rpartition("@")[0] for l in open(lock, encoding="utf-8") if l.startswith("# homescoop ")})
+if unpinned:
+    sys.exit(f"azure-cli: package.json depends on {', '.join(unpinned)}, which wheels.lock doesn't name: run python3 packages/azure-cli/src/lock.py")
+for c in native:
+    if c in rows:
+        sys.exit(f"azure-cli: wheels.lock takes {c} both from PyPI and from homescoop")
+print(f"  {len(rows)} distributions from PyPI, {len(native)} from homescoop's py-* packages, {len(excluded)} excluded")
 EOF
 
 # The license texts licenses.map names for the distributions whose wheel
@@ -104,9 +127,6 @@ PYTHONDONTWRITEBYTECODE=1 "$PY" -S -B "$HERE/src/install.py" "$STAGE" "$LOCK" "$
 echo "== azure-cli: patches"
 # can-launch-browser-wasi.patch: plain az login falls back to the device code
 # flow on WASI, as on a headless Linux, instead of waiting for a browser.
-# storage-encryption-without-cryptography.patch: azure-storage-blob, -queue
-# and -common load without cryptography (client-side encryption needs it),
-# so az storage works.
 for p in "$HERE"/*.patch; do
   echo "  $(basename "$p")"
   if ! patch -s -d "$STAGE" -p1 <"$p"; then
@@ -150,8 +170,13 @@ echo "== azure-cli: checks"
 bad="$(find "$PKG/lib" \( -name '*.pyc' -o -name '*.so' -o -name '*.dylib' -o -name '*.dll' -o -name '*.exe' -o -name '*.pyd' -o -name __pycache__ \) | head -5)"
 [[ -z "$bad" ]] || { echo "azure-cli: native or bytecode files staged:" >&2; echo "$bad" >&2; exit 1; }
 for f in azure/cli/__main__.py azure/cli/core/__init__.py knack/cli.py msal/application.py requests/__init__.py certifi/cacert.pem yaml/__init__.py \
+  paramiko/__init__.py fabric/__init__.py invoke/__init__.py scp.py sshtunnel.py \
   "azure_cli-$VERSION.dist-info/METADATA" "azure_cli_core-$VERSION.dist-info/METADATA"; do
   [[ -f "$PKG/lib/azure-cli/$f" ]] || { echo "azure-cli: missing $f" >&2; exit 1; }
+done
+# The native packages come from the py-* npm packages, never from this tree.
+for d in cryptography OpenSSL nacl bcrypt cffi pycparser psutil; do
+  [[ ! -e "$PKG/lib/azure-cli/$d" ]] || { echo "azure-cli: $d is staged; it must come from its py-* package" >&2; exit 1; }
 done
 homescoop_assert_no_package_links "$PKG"
 files="$(find "$PKG/lib" -type f | wc -l | tr -d ' ')"

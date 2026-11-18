@@ -1,6 +1,7 @@
 # The Azure CLI (az) for slicc, on wasix-python (homescoop#2112).
 # Pure Python: azure-cli and its closure as upstream pins it, every file a
-# py3-none-any wheel from PyPI checked against wheels.lock. Nothing compiles.
+# py3-none-any wheel from PyPI checked against wheels.lock. Nothing compiles:
+# the native packages are homescoop's py-* npm packages (package.json).
 name: azure-cli
 builder: host
 # renovate: datasource=pypi depName=azure-cli
@@ -31,6 +32,14 @@ sources:
   license_asn1crypto:
     url: "https://raw.githubusercontent.com/wbond/asn1crypto/0.24.0/LICENSE"
     sha256: "7871ddf1918d53fd549943aad007cd4ad674b0e1da732a9aea4a79e1436d1eb5"
+  # scp's LICENSE.txt is the LGPL notice; the LGPL 2.1 text it names is
+  # paramiko's LICENSE at the tag of the paramiko in wheels.lock.
+  license_scp:
+    url: "https://raw.githubusercontent.com/jbardin/scp.py/v0.13.2/LICENSE.txt"
+    sha256: "2455cf0fc78e13772bf10ef5f209e7eb8625706d671b2f420cc8add37d548c1c"
+  license_lgpl21:
+    url: "https://raw.githubusercontent.com/paramiko/paramiko/5.0.0/LICENSE"
+    sha256: "5fa25bf5f395fd26e701c2e1de4ca7d162816986dc791c22f8f4226857ad1bb2"
   license_wcwidth:
     url: "https://raw.githubusercontent.com/jquast/wcwidth/0.1.7/LICENSE.txt"
     sha256: "0eddcc52cd3ef5d30798b8d43a14d3f0f1dcf0a6e4c1d0f2e177c44ce85bb69c"
@@ -48,11 +57,22 @@ about:
   notes: |
     Source: PyPI, the closure upstream pins in requirements.py3.Linux.txt at
     the release tag, resolved by src/lock.py into wheels.lock (uv, Linux,
-    CPython 3.15, nothing newer than the release). Left out: the native
-    packages (cffi, cryptography, PyNaCl, bcrypt, psutil) and the pure ones
-    that import them at module level (pyOpenSSL, paramiko, fabric, scp,
-    sshtunnel); the lock's header gives each reason. PyYAML has no pure
-    wheel on PyPI, so its pure-Python package is copied from the sdist.
-    Staged under lib/azure-cli with no __pycache__ (version neutral), then
-    trimmed with upstream's own scripts/trim_sdk.py. bin/az is a Python
-    launcher (src/launcher.py) in place of upstream's shell one.
+    CPython 3.15, nothing newer than the release). The native packages come
+    from homescoop's npm packages instead, which package/package.json pins
+    exactly: @ai-ecoverse/py-cryptography 50.0.2-1, py-pynacl 1.6.2-1,
+    py-bcrypt 5.0.0-1, py-pyopenssl 26.4.0-1, py-cffi 2.1.1-2 and
+    py-pycparser 3.12.0-1. The lock records each as a "homescoop" line, with
+    its npm pin and upstream's own pin (cryptography 48.0.1, bcrypt 3.2.0,
+    pyOpenSSL 26.2.0, cffi 2.0.0, PyNaCl 1.6.2), and fetches nothing from PyPI
+    for them; uv resolves the closure with their versions as requirements, so
+    every declared range holds them. bin/az (src/launcher.py) puts exactly
+    those py-* packages on sys.path, found from its own directory as Node
+    would and checked against the pins, and no other site-packages. paramiko,
+    fabric, invoke, scp and sshtunnel, which import them at module level, are
+    in the lock again. Left out: psutil (native, no wasix build; az imports it
+    in a try). PyYAML has no pure wheel on PyPI, so its pure-Python package is
+    copied from the sdist. The storage SDKs are unpatched (2.93.0-1 patched
+    their cryptography import into a try). Staged under lib/azure-cli with no
+    __pycache__ (version neutral), then trimmed with upstream's own
+    scripts/trim_sdk.py. bin/az is a Python launcher in place of upstream's
+    shell one.

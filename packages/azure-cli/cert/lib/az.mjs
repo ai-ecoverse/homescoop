@@ -1,7 +1,8 @@
 // Shared by the azure-cli cert specs: where the package is, a run that fails
 // the spec with the command's output when it exits otherwise, and a stand-in
-// for Microsoft Entra ID (login.microsoftonline.com) and Azure Resource
-// Manager (management.azure.com) behind the kernel's proxy.
+// for Microsoft Entra ID (login.microsoftonline.com), Azure Resource Manager
+// (management.azure.com), blob storage and Key Vault behind the kernel's
+// proxy.
 export const PKG = '/node_modules/@ai-ecoverse/azure-cli';
 export const SITE = `${PKG}/lib/azure-cli`;
 export const TENANT = '72f988bf-0000-4000-8000-00000000c0de';
@@ -41,11 +42,15 @@ export async function served(ctx) {
 }
 
 // ctx.serve() responder (self-contained: it runs in the cert page). It answers
-// Entra ID's instance and OIDC discovery, device code, and token endpoint (device_code,
-// refresh_token and client_credentials grants, with a secret or a federated
-// token) for any tenant, and ARM's
-// tenant, subscription, resource group and storage account lists, and blob
-// storage for one account, and records every request.
+// Entra ID's instance and OIDC discovery, device code, and token endpoint
+// (device_code, refresh_token and client_credentials grants, with a secret,
+// a federated token or a certificate's client assertion; a token for the
+// scope https://vault.azure.net/.default ends in -kv) for any tenant; ARM's
+// tenant, subscription, resource group and storage account lists, a
+// DevTestLab (certlab), creates in cert-rg (the resource as sent), and an
+// empty list for any other list; blob storage for one account (certacct);
+// and Key Vault's data plane for one vault (certvault: the bearer challenge,
+// then secrets set and get, and a key import, with a -kv token). It records every request.
 // Anything else is a 404 that names the URL.
 export function entraAndArm({ url, method, headers, body }) {
   const TENANT = '72f988bf-0000-4000-8000-00000000c0de';
@@ -101,11 +106,26 @@ export function entraAndArm({ url, method, headers, body }) {
     const grant = form.get('grant_type');
     const token = `cert-at-${grant.split(':').pop()}-${tid}-${log.length}`;
     if (grant === 'client_credentials') {
-      if (form.get('client_assertion') === 'cert-federated-token' && form.get('client_assertion_type') === 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer') {
-        return reply({ token_type: 'Bearer', expires_in: 3599, ext_expires_in: 3599, access_token: `${token}-federated` });
+      // A token for Key Vault's data plane says so, and the vault stand-in
+      // takes no other.
+      const kv = /^https:\/\/vault\.azure\.net\/\.default$/.test(form.get('scope') || '') ? '-kv' : '';
+      const jwtBearer = form.get('client_assertion_type') === 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
+      if (jwtBearer && form.get('client_assertion') === 'cert-federated-token') {
+        return reply({ token_type: 'Bearer', expires_in: 3599, ext_expires_in: 3599, access_token: `${token}-federated${kv}` });
+      }
+      // A certificate's client assertion: a JWT whose header names RS256 and
+      // an x5t. Its signature, claims and thumbprint are checked by
+      // cert/certificate.mjs in Node, from this log.
+      if (jwtBearer) {
+        let head = {};
+        try {
+          head = JSON.parse(atob((form.get('client_assertion') || '').split('.')[0].replace(/-/g, '+').replace(/_/g, '/')));
+        } catch {}
+        if (head.alg !== 'RS256' || !head.x5t) return reply({ error: 'invalid_client', error_description: 'AADSTS700027: Client assertion contains an invalid signature.' }, 401);
+        return reply({ token_type: 'Bearer', expires_in: 3599, ext_expires_in: 3599, access_token: `${token}-certificate${kv}` });
       }
       if (form.get('client_secret') !== 'cert-secret') return reply({ error: 'invalid_client', error_description: 'AADSTS7000215: Invalid client secret provided.' }, 401);
-      return reply({ token_type: 'Bearer', expires_in: 3599, ext_expires_in: 3599, access_token: token });
+      return reply({ token_type: 'Bearer', expires_in: 3599, ext_expires_in: 3599, access_token: `${token}${kv}` });
     }
     if (grant !== 'urn:ietf:params:oauth:grant-type:device_code' && grant !== 'refresh_token') return reply({ error: 'unsupported_grant_type', url }, 400);
     const idToken = [
@@ -137,6 +157,63 @@ export function entraAndArm({ url, method, headers, body }) {
     }
     if (u.pathname.toLowerCase() === `/subscriptions/${SUB}/resourcegroups`) {
       return reply({ value: [{ id: `/subscriptions/${SUB}/resourceGroups/cert-rg`, name: 'cert-rg', type: 'Microsoft.Resources/resourceGroups', location: 'westeurope', tags: { from: 'cert' }, properties: { provisioningState: 'Succeeded' } }] });
+    }
+    if (u.pathname.toLowerCase() === `/subscriptions/${SUB}/resourcegroups/cert-rg`) {
+      return reply({ id: `/subscriptions/${SUB}/resourceGroups/cert-rg`, name: 'cert-rg', type: 'Microsoft.Resources/resourceGroups', location: 'westeurope', properties: { provisioningState: 'Succeeded' } });
+    }
+    // A DevTestLab, certlab, with one gallery image and one virtual network
+    // (az lab vm create --generate-ssh-keys).
+    const lab = `/subscriptions/${SUB}/resourcegroups/cert-rg/providers/microsoft.devtestlab/labs/certlab`;
+    if (method === 'GET' && u.pathname.toLowerCase() === lab) {
+      return reply({ id: lab, name: 'certlab', type: 'Microsoft.DevTestLab/labs', location: 'westeurope', properties: { provisioningState: 'Succeeded' } });
+    }
+    if (method === 'GET' && u.pathname.toLowerCase() === `${lab}/galleryimages`) {
+      return reply({ value: [{ id: `${lab}/galleryimages/Ubuntu`, name: 'Ubuntu Server 22.04 LTS', properties: { enabled: true, imageReference: { offer: '0001-com-ubuntu-server-jammy', publisher: 'Canonical', osType: 'Linux', sku: '22_04-lts', version: 'latest' } } }] });
+    }
+    if (method === 'GET' && u.pathname.toLowerCase() === `${lab}/virtualnetworks`) {
+      return reply({ value: [{ id: `${lab}/virtualnetworks/certvnet`, name: 'certvnet', properties: { subnetOverrides: [{ labSubnetName: 'certsubnet', resourceId: `/subscriptions/${SUB}/resourceGroups/cert-rg/providers/Microsoft.Network/virtualNetworks/certvnet/subnets/certsubnet`, useInVmCreationPermission: 'Allow', usePublicIpAddressPermission: 'Allow' }] } }] });
+    }
+    if (method === 'POST' && u.pathname.toLowerCase() === `${lab}/createenvironment`) return { status: 200, headers: [], body: '' };
+    // A create in cert-rg (az aks create): the resource as
+    // sent, provisioned at once.
+    const created = u.pathname.match(new RegExp(`^/subscriptions/${SUB}/resourceGroups/cert-rg/providers/(.+)$`, 'i'));
+    if (method === 'PUT' && created) {
+      let b = {};
+      try { b = JSON.parse(text); } catch {}
+      return reply({ ...b, id: u.pathname, name: u.pathname.split('/').pop(), type: created[1].split('/').slice(0, -1).filter((_, i) => i % 2 === 0).join('/'), properties: { ...(b.properties || {}), provisioningState: 'Succeeded' } }, 201);
+    }
+    // Any other list (az keyvault list, az webapp list, ...): empty.
+    if (method === 'GET' && !/\/(resourceGroups\/[^/]+\/providers\/[^/]+\/[^/]+\/[^/]+)$/i.test(u.pathname)) return reply({ value: [] });
+  }
+  // Key Vault's data plane, vault certvault: a request without a token gets
+  // the bearer challenge (the SDK's first request, with no body), then
+  // secrets set and get with a Key Vault token.
+  if (u.hostname === 'certvault.vault.azure.net') {
+    if (!/^Bearer cert-at-.*-kv$/.test(auth)) {
+      return { status: 401, headers: [['Content-Type', 'application/json; charset=utf-8'], ['WWW-Authenticate', `Bearer authorization="https://login.microsoftonline.com/${TENANT}", resource="https://vault.azure.net"`]], body: JSON.stringify({ error: { code: 'Unauthorized', message: 'AKV10000: Request is missing a Bearer or PoP token.' } }) };
+    }
+    const secrets = (globalThis.azureCliCertSecrets ||= {});
+    // az keyvault key import: the key as a JWK (the public half back).
+    const k = u.pathname.match(/^\/keys\/([A-Za-z0-9-]+)$/);
+    if (k && method === 'PUT' && u.searchParams.get('api-version')) {
+      let b = {};
+      try { b = JSON.parse(text); } catch {}
+      if (!b.key || b.key.kty !== 'RSA' || !b.key.d) return reply({ error: { code: 'BadParameter', message: 'no RSA private key' } }, 400);
+      return reply({ key: { kid: `https://certvault.vault.azure.net/keys/${k[1]}/0cafe${String(log.length).padStart(27, '0')}`, kty: 'RSA', key_ops: ['encrypt', 'decrypt', 'sign', 'verify', 'wrapKey', 'unwrapKey'], n: b.key.n, e: b.key.e }, attributes: { enabled: true, created: 1794823200, updated: 1794823200, recoveryLevel: 'Recoverable+Purgeable', recoverableDays: 90, exportable: false }, tags: {} });
+    }
+    const m = u.pathname.match(/^\/secrets\/([A-Za-z0-9-]+)\/?([0-9a-f]*)$/);
+    if (!m || !u.searchParams.get('api-version')) return reply({ error: { code: 'BadParameter', message: `cert stand-in: ${method} ${url}` } }, 400);
+    const bundle = (s) => ({ value: s.value, id: `https://certvault.vault.azure.net/secrets/${m[1]}/${s.version}`, attributes: { enabled: true, created: 1794823200, updated: 1794823200, recoveryLevel: 'Recoverable+Purgeable', recoverableDays: 90 }, ...(s.contentType ? { contentType: s.contentType } : {}), tags: s.tags || {} });
+    if (method === 'PUT' && !m[2]) {
+      let b = {};
+      try { b = JSON.parse(text); } catch {}
+      if (typeof b.value !== 'string') return reply({ error: { code: 'BadParameter', message: 'no value' } }, 400);
+      secrets[m[1]] = { value: b.value, contentType: b.contentType, tags: b.tags, version: `0cafe${String(log.length).padStart(27, '0')}` };
+      return reply(bundle(secrets[m[1]]));
+    }
+    if (method === 'GET') {
+      if (!secrets[m[1]]) return reply({ error: { code: 'SecretNotFound', message: `A secret with (name/id) ${m[1]} was not found in this key vault.` } }, 404);
+      return reply(bundle(secrets[m[1]]));
     }
   }
   // Blob storage, account certacct, container c: list, upload (Put Blob)

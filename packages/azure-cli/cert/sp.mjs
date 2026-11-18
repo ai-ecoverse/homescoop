@@ -6,14 +6,12 @@ const APP = 'cafe0000-0000-4000-8000-00000000a99a';
 // client secret (the client_credentials grant, no native code), then a call
 // with that token (az group list) and az account get-access-token, and with
 // a federated token (the client_assertion grant). A wrong
-// secret is Entra ID's error, cleanly. The parts of az that need native code
-// fail with one ERROR line that names the missing package and exit 1, no
-// traceback: certificate login (pyOpenSSL), az keyvault (cryptography),
-// az webapp (PyNaCl).
+// secret is Entra ID's error, cleanly. A certificate is cert/certificate.mjs.
 export default async function (ctx) {
   const { assert } = ctx;
   await ctx.serve(entraAndArm);
   const cfg = fresh('sp');
+  await ok(ctx, 'rm -rf /root/.azure-cert-sp /root/.azure-cert-sp-federated');
 
   const bad = await sh(ctx, `${cfg} az login --service-principal -u ${APP} -p wrong --tenant ${TENANT}`);
   assert.equal(bad.status, 1, `wrong secret: rc=${bad.status}\n${bad.stderr}`);
@@ -48,18 +46,5 @@ export default async function (ctx) {
   assert.equal(fed[0]?.id, SUBSCRIPTION, JSON.stringify(fed));
   assert.match((await json(ctx, `${fcfg} az account get-access-token`)).accessToken, /^cert-at-client_credentials-.*-federated$/);
 
-  await ctx.write('/root/cert.pem', '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n');
-  const native = [
-    [`az login --service-principal -u ${APP} --certificate /root/cert.pem --tenant ${TENANT}`, "pyOpenSSL \\(it needs cryptography, native code\\)", 'OpenSSL'],
-    ['az keyvault list', 'cryptography \\(native code: Rust and OpenSSL\\)', 'cryptography'],
-    ['az webapp list', 'PyNaCl \\(native code: libsodium\\)', 'nacl'],
-  ];
-  for (const [cmd, what, mod] of native) {
-    const r = await sh(ctx, `${cfg} ${cmd}`);
-    assert.equal(r.status, 1, `${cmd}: rc=${r.status}\n${r.stdout}\n${r.stderr}`);
-    assert.match(r.stderr, new RegExp(`^ERROR: This command needs ${what}\\. @ai-ecoverse/azure-cli has only pure-Python code, so that it runs on wasix-python, and doesn't include it \\(No module named '${mod}'\\)\\.$`, 'm'), `${cmd}:\n${r.stderr}`);
-    assert.match(r.stderr, /packages\/azure-cli\/package#whats-not-available/, r.stderr);
-    assert.doesNotMatch(r.stderr, /Traceback|unexpected error/, `${cmd}:\n${r.stderr}`);
-  }
-  console.log(`az login --service-principal (client secret): client_credentials grant, az group list with the token, az account get-access-token; a federated token; a wrong secret is AADSTS7000215; certificate login, az keyvault list and az webapp list stop with one ERROR line naming pyOpenSSL, cryptography, PyNaCl`);
+  console.log(`az login --service-principal (client secret): client_credentials grant, az group list with the token, az account get-access-token; a federated token; a wrong secret is AADSTS7000215`);
 }
