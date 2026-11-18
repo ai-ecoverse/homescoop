@@ -1,0 +1,20 @@
+diff --git a/awscli/help.py b/awscli/help.py
+index a29f6af..c4affd7 100644
+--- a/awscli/help.py
++++ b/awscli/help.py
+@@ -251,7 +251,14 @@ class PosixHelpRenderer(PosixPagingHelpRenderer):
+         elif self._exists_on_path('mandoc'):
+             cmdline = ['mandoc', '-T', 'ascii']
+         else:
+-            raise ExecutableNotFoundError('groff or mandoc')
++            # homescoop (slicc): no groff or mandoc here, so render plain
++            # text with the CLI's own docutils writer, as on Windows.
++            LOG.debug("No groff or mandoc on PATH, rendering text help.")
++            return publish_string(
++                contents,
++                writer=TextWriter(),
++                settings_overrides=self._DEFAULT_DOCUTILS_SETTINGS_OVERRIDES,
++            )
+         LOG.debug("Running command: %s", cmdline)
+         p3 = self._popen(cmdline, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+         output = p3.communicate(input=man_contents)[0]

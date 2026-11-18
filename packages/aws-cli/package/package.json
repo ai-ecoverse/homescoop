@@ -1,0 +1,53 @@
+{
+  "name": "@ai-ecoverse/aws-cli",
+  "version": "2.40.4-1",
+  "description": "The AWS Command Line Interface v2: aws, to manage AWS services from slicc.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/aws-cli/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/aws-cli",
+  "keywords": [
+    "aws",
+    "aws-cli",
+    "awscli",
+    "amazon-web-services",
+    "s3",
+    "wasix",
+    "slicc",
+    "homescoop"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@ai-ecoverse/wasix-python": "3.15.0-8"
+  },
+  "engines": {
+    "slicc-kernel": ">=1.122.3"
+  },
+  "homescoop": {
+    "recipe": "aws-cli",
+    "upstream": "2.40.4"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "aws": {
+        "script": "bin/aws"
+      },
+      "aws_completer": {
+        "script": "bin/aws_completer"
+      }
+    }
+  }
+}

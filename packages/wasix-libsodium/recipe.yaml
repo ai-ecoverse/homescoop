@@ -1,0 +1,50 @@
+# libsodium for slicc WASIX: a dev package (static libsodium.a, headers,
+# pkg-config) that py-pynacl's nacl._sodium links, and any other WASIX
+# program or side module that wants libsodium.
+name: wasix-libsodium
+builder: host
+runner: pool
+reproducible: true
+# renovate: datasource=github-releases depName=jedisct1/libsodium extractVersion=^(?<version>\d+\.\d+\.\d+)-RELEASE$
+version: "1.0.22"
+npm: "@ai-ecoverse/wasix-libsodium"
+summary: "libsodium for slicc WASIX: static libsodium.a (lib/) and PIC (lib-pic/), headers, pkg-config"
+source:
+  url: "https://github.com/jedisct1/libsodium/releases/download/{{version}}-RELEASE/libsodium-{{version}}.tar.gz"
+  sha256: "adbdd8f16149e81ac6078a03aca6fc03b592b89ef7b5ed83841c086191be3349"
+  mirrors:
+    - "https://download.libsodium.org/libsodium/releases/libsodium-{{version}}.tar.gz"
+toolchain:
+  wasix_sysroot: "2025.9.30-40"
+  wasix_sysroot_sha256: "9960846c81c78d40a8dfdd58009e66d5ad671a6469947517661b486a4a3d3336"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-libsodium
+  license: ISC
+  notes: |
+    libsodium's own configure (full build, not --enable-minimal) with the pinned
+    wasixcc on wasix-sysroot -40 (toolchain.wasix_sysroot, the sysroot
+    wasix-python 3.15.0-8 is built on): --host=wasm32-wasi --disable-shared
+    --disable-asm --disable-ssp --disable-pie, pthreads on (WASIX has them;
+    sodium_init's lock). Built twice: lib/ (no PIC, no wasm EH: static-main
+    programs on the asyncify sysroot) and lib-pic/ (-fPIC, legacy EH: python's
+    dynamic main and its side modules). WASIX defines __wasi__, so
+    randombytes' sysrandom is arc4random_buf, wasix-libc's per-thread ChaCha20
+    keyed from WASI random_get (getentropy); there is no /dev/urandom open.
+    That generator has no fork reseed; slicc-kernel has no fork (ENOSYS), and
+    the probe fails if a forked child ever repeats its parent's bytes. wasixcc enables simd128
+    for every WASIX build (python.wasm included), so Argon2 takes libsodium's
+    wasm32 SIMD fill_segment, which 1.0.22 gets wrong: every Argon2 hash
+    differs (upstream fixed it after the release, 1b37a23c55;
+    libsodium-argon2-wasm32-fblamka.patch is that commit, drop it when a
+    release has it). The cert's Argon2 KATs run through it. Upstream master
+    removed its own WASI target after 1.0.22 (ee2972b83e); a later release
+    may need --host and sysrandom attention.
+    ED25519_NONDETERMINISTIC is not set: Ed25519 signatures are RFC 8032's.
+    Cert: scripts/wasix-lib-cert.mjs links test/sodiumprobe.c against both
+    flavours, and test/upstream-tests.mjs runs libsodium's own test suite
+    (test/default, every .exp compared) against both, on slicc-kernel's Node
+    entry.

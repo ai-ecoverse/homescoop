@@ -1,0 +1,58 @@
+# The Azure CLI (az) for slicc, on wasix-python (homescoop#2112).
+# Pure Python: azure-cli and its closure as upstream pins it, every file a
+# py3-none-any wheel from PyPI checked against wheels.lock. Nothing compiles.
+name: azure-cli
+builder: host
+# renovate: datasource=pypi depName=azure-cli
+version: "2.93.0"
+npm: "@ai-ecoverse/azure-cli"
+summary: "The Azure CLI: az, to manage Azure resources from slicc."
+source:
+  # Upstream's pinned closure for this release, the file Microsoft's deb and
+  # rpm builds install. wheels.lock (src/lock.py) is made from it and records
+  # its sha256; build.sh refuses a lock made from other bytes, then fetches
+  # every wheel in the lock and checks it against the lock's sha256.
+  url: "https://raw.githubusercontent.com/Azure/azure-cli/azure-cli-{{version}}/src/azure-cli/requirements.py3.Linux.txt"
+  sha256: "11d0f42401c801a7bf53b7fe62593af8871875292ed606715ff2afedba4212a9"
+sources:
+  trim:
+    # Upstream's scripts/trim_sdk.py, which its deb, rpm and docker builds run
+    # after the install: drops the mgmt SDKs' aio/ trees and the API versions
+    # no profile uses.
+    url: "https://raw.githubusercontent.com/Azure/azure-cli/azure-cli-{{version}}/scripts/trim_sdk.py"
+    sha256: "2e6292f5285b4fcedbe8efd77309fade550667d1c502a6ffa078f1aa97942c64"
+  # License texts for the distributions whose wheel ships none
+  # (licenses.map): each project's own LICENSE at the tag of the version in
+  # wheels.lock. The Azure SDK packages are all from azure-sdk-for-python,
+  # whose LICENSE (MIT, Microsoft) is the license their metadata declares.
+  license_antlr4:
+    url: "https://raw.githubusercontent.com/antlr/antlr4/4.13.1/LICENSE.txt"
+    sha256: "3db1fb3ee79a4b4f9918fc4d0f6133bf18a3cf787f126cd22f8aa9b862281c0c"
+  license_asn1crypto:
+    url: "https://raw.githubusercontent.com/wbond/asn1crypto/0.24.0/LICENSE"
+    sha256: "7871ddf1918d53fd549943aad007cd4ad674b0e1da732a9aea4a79e1436d1eb5"
+  license_wcwidth:
+    url: "https://raw.githubusercontent.com/jquast/wcwidth/0.1.7/LICENSE.txt"
+    sha256: "0eddcc52cd3ef5d30798b8d43a14d3f0f1dcf0a6e4c1d0f2e177c44ce85bb69c"
+  license_azure_sdk:
+    url: "https://raw.githubusercontent.com/Azure/azure-sdk-for-python/azure-core_1.39.0/LICENSE"
+    sha256: "7c77a44a8acd9b41fdc209864a8016b3d430b5d0e09309818d5b7444336df744"
+dependencies:
+  build: []
+  host: []
+  run:
+    - wasix-python
+about:
+  homepage: https://github.com/Azure/azure-cli
+  license: MIT
+  notes: |
+    Source: PyPI, the closure upstream pins in requirements.py3.Linux.txt at
+    the release tag, resolved by src/lock.py into wheels.lock (uv, Linux,
+    CPython 3.15, nothing newer than the release). Left out: the native
+    packages (cffi, cryptography, PyNaCl, bcrypt, psutil) and the pure ones
+    that import them at module level (pyOpenSSL, paramiko, fabric, scp,
+    sshtunnel); the lock's header gives each reason. PyYAML has no pure
+    wheel on PyPI, so its pure-Python package is copied from the sdist.
+    Staged under lib/azure-cli with no __pycache__ (version neutral), then
+    trimmed with upstream's own scripts/trim_sdk.py. bin/az is a Python
+    launcher (src/launcher.py) in place of upstream's shell one.

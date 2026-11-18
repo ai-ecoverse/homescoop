@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { inPythonRange, pinErrors, pythonRange, rangeAllowed } from '../check-exact-pins.mjs';
 import { diffPackageJson } from '../diff-published.mjs';
-import { lockErrors, newestFrom } from '../browser-cert/python-range.mjs';
+import { lockErrors, newestFrom, peerTarballs } from '../browser-cert/python-range.mjs';
 
 const PY = '@ai-ecoverse/wasix-python';
 const RANGE = '>=3.14.2-16 <3.14.3';
@@ -86,4 +86,10 @@ test('pythonRange: a post-release upstream takes >=X.Y.Z-postP.N <X.Y.Z+1 (dateu
   assert.deepEqual(pinErrors(pandas), []);
   assert.equal(pinErrors({ ...pandas, dependencies: { '@ai-ecoverse/py-python-dateutil': '>=2.9.0-post0 <2.9.1' } }).length, 1);
   assert.equal(pinErrors({ name: '@ai-ecoverse/wasm-x', dependencies: { '@ai-ecoverse/py-python-dateutil': POST } }).length, 1);
+});
+
+test('peerTarballs: a cert/meta.json peer built in this run stands in for its registry version; one that is not stays out', () => {
+  const found = { 'py-pycparser': '/w/.homescoop-out/peers/host-py-pycparser-pr9/package.tgz', 'py-six': '@ai-ecoverse/py-six@1.17.0-5' };
+  assert.deepEqual(peerTarballs({ peers: ['py-pycparser', 'py-six'] }, (p) => found[p]), [found['py-pycparser']]);
+  assert.deepEqual(peerTarballs({}, () => assert.fail('no peers, no lookup')), []);
 });

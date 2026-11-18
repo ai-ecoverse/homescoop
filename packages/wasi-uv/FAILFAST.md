@@ -17,7 +17,7 @@ work on the same PyPI→catalog map.
 | What works | Pure-Python wheels/sdists (`six`, `idna`, …), `uv venv` / `add` / `sync` / `run` of those |
 | What hangs | `uv add` / `uv pip install` / `uv sync` of numpy/scipy/… (or transitive, e.g. `formulas` → numpy): sdist + cmake/ninja, same class of failure as pip |
 
-Map of packages to refuse: [`homescoop-pydata-map.json`](./homescoop-pydata-map.json).
+Map of packages to refuse: [`scripts/homescoop-pydata-map.json`](../../scripts/homescoop-pydata-map.json) (moved out of this directory so that adding a native py-* to it doesn't rebuild wasi-uv, homescoop#2119).
 Host test: `scripts/test/wasi-uv-pydata-map.test.mjs` keeps it aligned with
 `packages/py-*` that declare a CPython ABI.
 
@@ -65,7 +65,7 @@ works if regenerating the patch on every Renovate bump is acceptable.
 
 Bake the `packages` table into the Rust patch as a `const` match/phf on
 normalized names (`numpy`, not `Numpy` / `NumPy`). Keep
-`homescoop-pydata-map.json` as the source of truth; the host test fails if the
+`scripts/homescoop-pydata-map.json` as the source of truth; the host test fails if the
 patch’s names drift (same pattern as crate-version checks in
 `scripts/test/wasi-uv-cert.test.mjs`).
 

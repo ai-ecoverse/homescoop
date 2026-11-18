@@ -1,0 +1,86 @@
+# The AWS CLI v2 (aws) for slicc, on wasix-python (homescoop#2115).
+# Pure Python: AWS's source distribution with its pure-Python dependencies
+# from PyPI, staged as one tree with a Python launcher. Nothing compiles.
+name: aws-cli
+builder: host
+# AWS CLI v2 tags are plain versions (2.40.4); v1 tags (1.x) are in the same
+# repo, and renovate.json keeps this pin on 2.x.
+# renovate: datasource=github-tags depName=aws/aws-cli
+version: "2.40.4"
+npm: "@ai-ecoverse/aws-cli"
+summary: "The AWS Command Line Interface v2: aws, to manage AWS services from slicc."
+source:
+  # AWS's source distribution, what `pip install` of the GitHub tag builds
+  # from. requirements/download-deps/system-sandbox-lock.txt in it pins every
+  # dependency with its sha256; build.sh checks each wheel below against it.
+  url: "https://awscli.amazonaws.com/awscli-{{version}}.tar.gz"
+  sha256: "4a702e3b623f7d6fc558ac7ac10e597370f70591ac2eb79af4cfe03c936644e5"
+# The pure-Python dependencies (the .whl sources), the versions the source
+# distribution's lock file pins (awscrt and ruamel.yaml.clib are native; see
+# about.notes). A version bump whose lock moves one of them fails the build
+# until these follow it.
+sources:
+  colorama:
+    url: "https://files.pythonhosted.org/packages/py2.py3/c/colorama/colorama-0.4.6-py2.py3-none-any.whl"
+    sha256: "4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"
+  distro:
+    url: "https://files.pythonhosted.org/packages/py3/d/distro/distro-1.8.0-py3-none-any.whl"
+    sha256: "99522ca3e365cac527b44bde033f64c6945d90eb9f769703caaec52b09bbd3ff"
+  docutils:
+    url: "https://files.pythonhosted.org/packages/py3/d/docutils/docutils-0.19-py3-none-any.whl"
+    sha256: "5e1de4d849fee02c63b040a4a3fd567f4ab104defd8a5511fbbc24a8a017efbc"
+  jmespath:
+    url: "https://files.pythonhosted.org/packages/py3/j/jmespath/jmespath-1.0.1-py3-none-any.whl"
+    sha256: "02e2e4cc71b5bcab88332eebf907519190dd9e6e82107fa7f83b1003a6252980"
+  prompt_toolkit:
+    url: "https://files.pythonhosted.org/packages/py3/p/prompt_toolkit/prompt_toolkit-3.0.51-py3-none-any.whl"
+    sha256: "52742911fde84e2d423e2f9a4cf1de7d7ac4e51958f648d9540e0fb8db077b07"
+  python_dateutil:
+    url: "https://files.pythonhosted.org/packages/py2.py3/p/python_dateutil/python_dateutil-2.9.0-py2.py3-none-any.whl"
+    sha256: "cbf2f1da5e6083ac2fbfd4da39a25f34312230110440f424a14c7558bb85d82e"
+  ruamel_yaml:
+    url: "https://files.pythonhosted.org/packages/py3/r/ruamel_yaml/ruamel_yaml-0.19.1-py3-none-any.whl"
+    sha256: "27592957fedf6e0b62f281e96effd28043345e0e66001f97683aa9a40c667c93"
+  six:
+    url: "https://files.pythonhosted.org/packages/py2.py3/s/six/six-1.17.0-py2.py3-none-any.whl"
+    sha256: "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"
+  urllib3:
+    url: "https://files.pythonhosted.org/packages/py3/u/urllib3/urllib3-2.6.3-py3-none-any.whl"
+    sha256: "bf272323e553dfb2e87d9bfd225ca7b0f467b919d7bbd355436d3fd37cb0acd4"
+  wcwidth:
+    url: "https://files.pythonhosted.org/packages/py2.py3/w/wcwidth/wcwidth-0.2.14-py2.py3-none-any.whl"
+    sha256: "a7bb560c8aee30f9957e5f9895805edd20602f2d7f720186dfd906e82b4982e1"
+  # AWS's LICENSE.txt is a notice that names the Apache License 2.0; the
+  # package's LICENSE is that notice followed by the license text.
+  apache_license:
+    url: "https://www.apache.org/licenses/LICENSE-2.0.txt"
+    sha256: "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+dependencies:
+  build: []
+  host: []
+  run:
+    - wasix-python
+about:
+  homepage: https://aws.amazon.com/cli/
+  license: Apache-2.0
+  notes: |
+    AWS CLI v2, not v1: v1 is in maintenance mode and has no `aws sso login`.
+    v2 isn't on PyPI; this is AWS's source distribution (awscli.amazonaws.com),
+    whose awscli/ is the package AWS's own pep517 backend puts in the wheel,
+    plus the autocomplete index (awscli/data/ac.index) that backend
+    generates, generated here the same way with the build machine's python3.
+    Its dependencies are the pure-Python wheels of the versions its lock file
+    pins, unpacked beside it in lib/aws-cli with their dist-info (licenses,
+    and the metadata prompt_toolkit reads its version from), without their
+    .data scripts. Not included: awscrt (the AWS Common Runtime, a native
+    extension with no WASIX build) and ruamel.yaml.clib (optional C speedups;
+    ruamel.yaml falls back to pure Python).
+    awscrt-optional.patch makes awscrt optional again, as it is in standalone
+    botocore (botocore.compat.HAS_CRT): CRC32C and CRC64NVME checksums are
+    pure Python (botocore/crc.py), the default request checksum is CRC32
+    (zlib), and s3 uses the classic transfer client. SigV4a, the xxhash
+    checksums, `aws login`, EC2 Instance Connect's tunnel and key generation,
+    `aws cloudfront sign`, CloudTrail signature validation and
+    `get-password-data --priv-launch-key` need awscrt and say so.
+    help-text.patch renders help as plain text when there is no groff or
+    mandoc, as the CLI does on Windows.

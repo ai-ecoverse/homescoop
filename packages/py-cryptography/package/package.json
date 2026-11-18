@@ -1,0 +1,49 @@
+{
+  "name": "@ai-ecoverse/py-cryptography",
+  "version": "50.0.2-1",
+  "description": "cryptography, cryptographic recipes and primitives for Python, with OpenSSL.",
+  "license": "Apache-2.0 OR BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/py-cryptography/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/py-cryptography",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "python",
+    "cryptography",
+    "openssl"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@ai-ecoverse/wasix-python": ">=3.15.0-8 <3.15.1",
+    "@ai-ecoverse/py-cffi": ">=2.1.1-1 <2.1.2"
+  },
+  "homescoop": {
+    "recipe": "py-cryptography",
+    "upstream": "50.0.2",
+    "platform": "wasix_wasm32"
+  },
+  "slicc": {
+    "python": {
+      "sitePackages": "lib/python3.15/site-packages",
+      "requires": {
+        "abi": "cp315",
+        "platform": "wasix_wasm32"
+      }
+    }
+  }
+}

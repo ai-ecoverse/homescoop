@@ -1,0 +1,15 @@
+--- a/src/c/_cffi_backend.c
++++ b/src/c/_cffi_backend.c
+@@ -117,7 +117,11 @@
+ # define CFFI_CHECK_FFI_PREP_CIF_VAR __builtin_available(macos 10.15, ios 13, watchos 6, tvos 13, *)
+ # define CFFI_CHECK_FFI_PREP_CIF_VAR_MAYBE 1
+ 
+-#elif defined(__EMSCRIPTEN__)
++#elif defined(__EMSCRIPTEN__) || defined(__wasi__)
++/* homescoop (WASIX): wasm has no writable+executable pages, so there is no
++   malloc_closure.h trampoline. libffi's wasm32 backend makes each closure a
++   new function in the indirect table (WASIX closure_allocate/prepare), as on
++   Emscripten; the varargs patch of wasix-python's libffi gives prep_cif_var. */
+ 
+ # define CFFI_CHECK_FFI_CLOSURE_ALLOC 1
+ # define CFFI_CHECK_FFI_CLOSURE_ALLOC_MAYBE 1

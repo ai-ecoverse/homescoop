@@ -46,6 +46,18 @@
       "catalog": null,
       "kind": "native",
       "note": "matplotlib dependency"
+    },
+    "cffi": {
+      "npm": "@ai-ecoverse/py-cffi",
+      "catalog": null,
+      "kind": "native",
+      "note": "_cffi_backend for PyNaCl, cryptography and other cffi extensions"
+    },
+    "cryptography": {
+      "npm": "@ai-ecoverse/py-cryptography",
+      "catalog": null,
+      "kind": "native",
+      "note": "Rust (pyo3) _rust with OpenSSL; azure-cli, msal, pyOpenSSL, paramiko"
     }
   }
 }

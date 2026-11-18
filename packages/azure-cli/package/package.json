@@ -1,0 +1,49 @@
+{
+  "name": "@ai-ecoverse/azure-cli",
+  "version": "2.93.0-1",
+  "description": "The Azure CLI: az, to manage Azure resources from slicc.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/azure-cli/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/azure-cli",
+  "keywords": [
+    "az",
+    "azure",
+    "azure-cli",
+    "microsoft-azure",
+    "wasix",
+    "slicc",
+    "homescoop"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@ai-ecoverse/wasix-python": "3.15.0-8"
+  },
+  "engines": {
+    "slicc-kernel": ">=1.122.3"
+  },
+  "homescoop": {
+    "recipe": "azure-cli",
+    "upstream": "2.93.0"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "az": {
+        "script": "bin/az"
+      }
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "harness": "slicc-kernel",
+  "needs": [
+    "@ai-ecoverse/wasix-python",
+    "@ai-ecoverse/py-cffi"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasix-python@3.15.0-8",
+    "@ai-ecoverse/py-cffi@2.1.1-2"
+  ],
+  "users": "enforce",
+  "checklist": [
+    "cert/import.mjs: import cryptography 50.0.2 from /node_modules/@ai-ecoverse/py-cryptography, found by discovery without PYTHONPATH, no nested python, importlib.metadata names 50.0.2; its side module cryptography.hazmat.bindings._rust imports (with _openssl inside, which imports py-cffi's _cffi_backend)",
+    "cert/primitives.mjs: backend.openssl_version_text() is the bundled 'OpenSSL 3.5.9 …'; SHA-256, SHA-512, SHA3-256, BLAKE2b, HMAC-SHA256 and PBKDF2 give the known answers; AES-GCM, ChaCha20-Poly1305, AES-CBC and Fernet round-trip; the error paths raise Python exceptions, not a panic=abort trap: a bad HMAC InvalidSignature, a flipped AES-GCM tag InvalidTag, a Fernet token under another key InvalidToken, a broken PEM key ValueError; the cffi Binding pyOpenSSL uses calls OpenSSL_version(_num)",
+    "cert/keys.mjs: azure/cli/core/keys.py's generate_ssh_keys as az vm create --generate-ssh-keys runs it (RSA 2048, PEM TraditionalOpenSSL private key written 0600, OpenSSH ssh-rsa public key) and its reload of the existing private key; RS256 (msal's client assertion), PSS and OAEP; an encrypted PKCS8 key refuses a wrong password with ValueError; P-256 ECDSA with an ecdsa-sha2-nistp256 OpenSSH key, P-384 ECDH, Ed25519 with an OpenSSH private key round trip, X25519; every wrong signature raises InvalidSignature",
+    "cert/x509.mjs: a P-256 CA signs the leaf of an RSA CSR (SAN, EKU clientAuth, AKI); the key+certificate PEM az's certificate service-principal login reads loads (key and certificate match), the leaf verifies against its CA, its SHA-1 thumbprint is the SHA-1 of its DER (what auth/identity.py takes through pyOpenSSL), DER and PKCS12 with the CA chain round-trip, a broken certificate raises ValueError",
+    "cert/threads.mjs: 4 Python threads hash (equal to hashlib) and sign/verify with Ed25519 at once, so the side module's thread-local state works on each kernel thread; python.wasm's ssl.OPENSSL_VERSION and _rust's openssl_version_text() are the same OpenSSL 3.5.9, and ssl.create_default_context() still works with both copies loaded",
+    "cert/notices.mjs: THIRD-PARTY-NOTICES.md names OpenSSL (Apache-2.0), cffi (MIT-0, its headers are in the generated _openssl.c) and the wasix-org Rust standard library, each with its licence text, and (scripts/rust-crate-notices.mjs, checked against cargo tree by check-rust-notices.mjs at build) every crate _rust links",
+    "build.sh (scripts/rust-pyext/check-side-module.mjs): _rust has dylink.0, exports PyModExport__rust and the TLS entry points, every env/GOT import is exported by wasix-python 3.15.0-8's python.wasm, no import of an OpenSSL name (its own copy binds to itself, -Bsymbolic), and wasm-opt --metrics counts no Try/TryTable/Throw/ThrowRef/Rethrow (python.wasm is legacy EH)",
+    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.15.0-8 <3.15.1"
+  ],
+  "ci": [
+    "node scripts/browser-cert/python-range.mjs py-cryptography"
+  ],
+  "notices": [
+    {
+      "name": "OpenSSL",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "cffi",
+      "license": "MIT-0",
+      "text": "MIT No Attribution"
+    },
+    {
+      "name": "Rust standard library",
+      "license": "MIT OR Apache-2.0"
+    }
+  ]
+}
