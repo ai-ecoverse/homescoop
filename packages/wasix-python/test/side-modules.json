@@ -1,5 +1,5 @@
 {
-  "comment": "Published py-* packages that load into wasix-python (homescoop#181): side-abi.mjs checks their native extensions' imports, the cert imports them all. Pinned by tarball sha256. Since 3.15.0-4 the cp315 wave (npm latest), so a -N on the 3.15.0 line is checked against the stack it must keep loading.",
+  "comment": "Published py-* packages that load into wasix-python (homescoop#181): side-abi.mjs checks their native extensions' imports, the cert imports them all. Pinned by tarball sha256. Since 3.15.0-4 the cp315 wave (npm latest), so a -N on the 3.15 line is checked against the stack it must keep loading; since 3.15.2-1 the series re-pin (#1939), whose side modules are the -N before's bytes.",
   "thread_local": [
     "errno"
   ],
@@ -7,69 +7,69 @@
   "packages": [
     {
       "name": "@ai-ecoverse/py-numpy",
-      "version": "2.5.4-4",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-numpy/-/py-numpy-2.5.4-4.tgz",
-      "sha256": "4712cdbe785cc1d783674f4bc3dce6f788f59554ba52c7f32ff0e3708c551fda"
+      "version": "2.5.4-5",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-numpy/-/py-numpy-2.5.4-5.tgz",
+      "sha256": "2d539b00e8748ec49ed937e1efac91d0ee23f595899f3df5074426749099be25"
     },
     {
       "name": "@ai-ecoverse/py-pandas",
-      "version": "3.0.6-4",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-pandas/-/py-pandas-3.0.6-4.tgz",
-      "sha256": "5a6c4c2319a3860cfbdf4374b5e769e00b57f8402b9a178cfdcf4a189de33d95"
+      "version": "3.0.6-5",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-pandas/-/py-pandas-3.0.6-5.tgz",
+      "sha256": "260f24b11fc0af43c601d38723d1d6856a994e2fa2fc7c8b95eda80b4b3584fb"
     },
     {
       "name": "@ai-ecoverse/py-scipy",
-      "version": "1.18.1-3",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-scipy/-/py-scipy-1.18.1-3.tgz",
-      "sha256": "90000f195894296de91a340c51062b751e2cf1a7cbeade51d990fbd4876238e6"
+      "version": "1.18.1-4",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-scipy/-/py-scipy-1.18.1-4.tgz",
+      "sha256": "c698f3bb7864d91692ff9b8cce27fc81d21120adbd759ab6d5876480b5e40b08"
     },
     {
       "name": "@ai-ecoverse/py-matplotlib",
-      "version": "3.11.2-14",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-matplotlib/-/py-matplotlib-3.11.2-14.tgz",
-      "sha256": "cd83e7ae4bc38bc648a444999b7297bb518450964b430958124e2d49418599d0"
+      "version": "3.11.2-15",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-matplotlib/-/py-matplotlib-3.11.2-15.tgz",
+      "sha256": "3c1e67616b6609d14e878c6da543675e2a730c530ba1e5ea40305eaa0fa87f85"
     },
     {
       "name": "@ai-ecoverse/py-contourpy",
-      "version": "1.4.0-12",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-contourpy/-/py-contourpy-1.4.0-12.tgz",
-      "sha256": "fa580943694359f565fd15686a643c4cff2a361ff10aca6ee5cb06c6b43d7643"
+      "version": "1.4.0-13",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-contourpy/-/py-contourpy-1.4.0-13.tgz",
+      "sha256": "5a6e27eb71867f0d073065865acd689fb6627d200298730663c405b2cc3d9e82"
     },
     {
       "name": "@ai-ecoverse/py-kiwisolver",
-      "version": "1.5.1-12",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-kiwisolver/-/py-kiwisolver-1.5.1-12.tgz",
-      "sha256": "6ced3ba5c974af160217b6d330c86f37945b0222d285966d31c65d8949db9251"
+      "version": "1.5.1-13",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-kiwisolver/-/py-kiwisolver-1.5.1-13.tgz",
+      "sha256": "3f1813063a296597225babfba0f479ce16d11a4edbc0acc81880f995832c4575"
     },
     {
       "name": "@ai-ecoverse/py-pillow",
-      "version": "13.0.0-3",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-pillow/-/py-pillow-13.0.0-3.tgz",
-      "sha256": "0da071b790144692a5c1814b03102b11be138a46831c866a805b15c127ab568e"
+      "version": "13.0.0-4",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-pillow/-/py-pillow-13.0.0-4.tgz",
+      "sha256": "52ec31114e06b991a998e0a820e2213853e228576ec644f588498d2801d2c1e4"
     },
     {
       "name": "@ai-ecoverse/py-fonttools",
-      "version": "4.66.1-11",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-fonttools/-/py-fonttools-4.66.1-11.tgz",
-      "sha256": "ec1dbb43f55361a7aeccaf8316faeec9eb85c7e6348c84dd53a22d8738d352ad"
+      "version": "4.66.1-12",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-fonttools/-/py-fonttools-4.66.1-12.tgz",
+      "sha256": "539219daebffbe28c3ed4d10ca5568655a2e65b02fce3a0392147c7be4def547"
     },
     {
       "name": "@ai-ecoverse/py-cycler",
-      "version": "0.12.1-10",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-cycler/-/py-cycler-0.12.1-10.tgz",
-      "sha256": "598ae6ff6efe4b2ee97e88901d9dc16d3a2f1dfd19b33dbfe069901b2dce60bc"
+      "version": "0.12.1-11",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-cycler/-/py-cycler-0.12.1-11.tgz",
+      "sha256": "72b65ce18f8c2068e0f7f77f4671addf12611599e2c1e0dd60c6835adbc22afd"
     },
     {
       "name": "@ai-ecoverse/py-packaging",
-      "version": "26.3.0-10",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-packaging/-/py-packaging-26.3.0-10.tgz",
-      "sha256": "c200a2d9eadfda48c9a54cf82606a8f984cea964b46819ec49639937ba8ee14e"
+      "version": "26.3.0-11",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-packaging/-/py-packaging-26.3.0-11.tgz",
+      "sha256": "c9c85ed5323caa9da5c199d0ed881905045bc0014b3ff248bcb7c32720f29b16"
     },
     {
       "name": "@ai-ecoverse/py-pyparsing",
-      "version": "3.3.3-10",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-pyparsing/-/py-pyparsing-3.3.3-10.tgz",
-      "sha256": "d0a72bb0a0624bf38d486b098597ef3275d0c446d5f3adab5a4142025d8f3827"
+      "version": "3.3.3-11",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-pyparsing/-/py-pyparsing-3.3.3-11.tgz",
+      "sha256": "a3fd2ce9d2c3e2eac5bb82306ef7043716b15cf168a1e1d349fcddb6b6d9ec38"
     },
     {
       "name": "@ai-ecoverse/py-python-dateutil",
@@ -97,9 +97,9 @@
     },
     {
       "name": "@ai-ecoverse/py-cffi",
-      "version": "2.1.1-2",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-cffi/-/py-cffi-2.1.1-2.tgz",
-      "sha256": "cced8d22f63f47463133cdb74a021b5472081ea19803a204b35af81e8687279e"
+      "version": "2.1.1-3",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-cffi/-/py-cffi-2.1.1-3.tgz",
+      "sha256": "ecd35706fd0d665faded94e942f6112b58327b685bb1a973a69eb9c74d7f56b7"
     },
     {
       "name": "@ai-ecoverse/py-pycparser",
@@ -109,21 +109,21 @@
     },
     {
       "name": "@ai-ecoverse/py-cryptography",
-      "version": "50.0.2-1",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-cryptography/-/py-cryptography-50.0.2-1.tgz",
-      "sha256": "57f0b9ed4b26cad86fc8c8eb7ed104b1438b2de673bd07b8720b72d0a1b41fdd"
+      "version": "50.0.2-2",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-cryptography/-/py-cryptography-50.0.2-2.tgz",
+      "sha256": "9f87ef464ae62891f52144cc5da7d84a561f2cb2c313a48b78b0b352ce147dc7"
     },
     {
       "name": "@ai-ecoverse/py-pynacl",
-      "version": "1.6.2-1",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-pynacl/-/py-pynacl-1.6.2-1.tgz",
-      "sha256": "035f62a168eeaa0d02f659bb7e0c4dd0dd93b0973d26a869b7980fdb6e259334"
+      "version": "1.6.2-2",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-pynacl/-/py-pynacl-1.6.2-2.tgz",
+      "sha256": "a44a92ec7951ca56bff00fb7a5dcc08e3b1acd0be2bf0957cbd4bd02a45db026"
     },
     {
       "name": "@ai-ecoverse/py-bcrypt",
-      "version": "5.0.0-1",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-bcrypt/-/py-bcrypt-5.0.0-1.tgz",
-      "sha256": "78e7b0ca7576921baee946f205d6182890a92312298c97b409321096f03134a4"
+      "version": "5.0.0-2",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-bcrypt/-/py-bcrypt-5.0.0-2.tgz",
+      "sha256": "fc4ecd1413e0c40ab217fbbe983e272cf47061333695250a55e1e809b73c7935"
     },
     {
       "name": "@ai-ecoverse/py-pyopenssl",

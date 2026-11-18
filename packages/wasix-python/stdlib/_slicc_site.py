@@ -297,9 +297,7 @@ def system_site():
     site.addsitedir(d)
 
 
-def _in_range(version, spec):
-    if not isinstance(spec, str) or not isinstance(version, str) or not spec.startswith(">="):
-        return False
+def _in_patch_line(version, spec):
     low, _, high = spec[2:].partition(" <")
     try:
         base, _, n = low.partition("-")
@@ -312,6 +310,15 @@ def _in_range(version, spec):
         return not vn or int(vn) >= int(n)
     except ValueError:
         return False
+
+
+def _in_range(version, spec):
+    if not isinstance(spec, str) or not isinstance(version, str):
+        return False
+    lines = spec.split(" || ")
+    if not all(line.startswith(">=") for line in lines):
+        return False
+    return any(_in_patch_line(version, line) for line in lines)
 
 
 def _scan(real, found):

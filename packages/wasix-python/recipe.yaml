@@ -3,12 +3,12 @@
 name: wasix-python
 builder: host
 # renovate: datasource=python-version
-version: "3.15.0"
+version: "3.15.2"
 npm: "@ai-ecoverse/wasix-python"
 summary: "CPython 3.15 for slicc WASIX (commands python, python3)"
 source:
   url: "https://www.python.org/ftp/python/{{version}}/Python-{{version}}.tgz"
-  sha256: "438596cac081036d3c1d532ab7e7335eeb35567bc961749a0d5797176db0db68"
+  sha256: "f74e1db0eabd651cd01e4e2a00201bd41866abe74869ab716f9bf33cbbaa0943"
 sources:
   # homescoop#181 cross-build inputs. Dev packages pinned by the certified
   # tarball sha; lib-pic/ is linked into the dynamic-main python.wasm

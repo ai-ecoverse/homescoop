@@ -1,3 +1,17 @@
+## The no-repin guard: the patch-range py-* nest 3.15.0-10 under 3.15.2-1 (3.15.2-1; homescoop#1939; 2026-11-18)
+
+`npm install --package-lock-only` of a stand-in `@ai-ecoverse/wasix-python` 3.15.2-1 with the 21 py-* of main's `cert/meta.json` needsInstall (py-numpy 2.5.4-4, py-cffi 2.1.1-2, …, the patch-range releases) resolves a second python, `node_modules/@ai-ecoverse/<pkg>/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10, under each of the 15 that take wasix-python. With `noRepin: true`, `cert/fixtures/repin.mjs` throws `no-repin cert: … is wasix-python 3.15.0-10, not 3.15.2-1` on that layout, as codex's review of #1932 found (#1939). With this release's needsInstall (the #2151 series repacks) the same install resolves one python, at the top level.
+
+## series-range.mjs: 3.15.0-10 can't read the series range (3.15.2-1; homescoop#1939; 2026-11-18)
+
+`lib/python3.15/_slicc_site.py` from npm `@ai-ecoverse/wasix-python@3.15.0-10`, imported by a host python 3: `_in_range('3.15.0-10', pythonSeries('3.15.0-1'))` is `False`, and so is `_in_range('3.15.2-1', …)`. `_in_range('3.15.0-10', '>=3.15.0-1 <3.15.1')` is `True`. -10's `_in_range` splits the spec at its first ` <` and reads the rest as one version, so ` || ` makes it fail. On 3.15.0-10, a re-pinned py-\* whose python can't be resolved would be refused. `cert/series-range.mjs` expects `True` for this python's own series and agreement with npm semver (`scripts/cert-kernel-floor.mjs` `satisfies`) on every pair.
+
+## 3.15.0-6: the old CPython; two configure hunks on the wrong case (3.15.2-1; #1932; 2026-11-01)
+
+`cert/version.mjs` with the published 3.15.0-6 on slicc-kernel 1.125.0 (`run.mjs --spec version.mjs --users enforce`): FAIL at `python_version vs package.json homescoop.upstream`, `'3.15.0' !== '3.15.2'`.
+
+The spec also requires `_multiprocessing`, `_posixshmem`, `fcntl`, `grp`, `mmap`, `pwd`, `resource` and `termios`. All eight are `MODULE_*_STATE: yes` in 3.15.0-6's `_sysconfigdata`. This case was seen on the source, not on a built package: with 3.15.0's patch line numbers on 3.15.2, `git apply -v` lands `cpython-configure-wasix.patch`'s grp/pwd/resource hunk and `cpython-multiprocessing-wasix.patch` at offset 92, in the Emscripten case, instead of 120, in the WASI case, and `patch -F0` accepts it. No package was built that way, so this assertion has no failing run.
+
 ## pip-crypto.mjs: 3.15.0-9 has no fail-fast for the native-crypto packages (3.15.0-10; homescoop#2119; 2026-11-18)
 
 npm `@ai-ecoverse/wasix-python@3.15.0-9` on slicc-kernel 1.189.2 (browser cert, users enforce, `run.mjs --spec pip-crypto.mjs`), with py-cffi 2.1.1-2, py-cryptography 50.0.2-1, py-pynacl 1.6.2-1 and py-bcrypt 5.0.0-1 installed: FAIL.
