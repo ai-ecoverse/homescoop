@@ -49,6 +49,8 @@ export function pythonRange(spec) {
 }
 
 export function inPythonRange(version, spec) {
+  const s = seriesRange(spec);
+  if (s) return s.lines.some((line) => inPythonRange(version, line));
   const r = pythonRange(spec);
   if (!r) return version === spec;
   const v = VERSION.exec(String(version));
@@ -62,14 +64,61 @@ export function inPythonRange(version, spec) {
   return vp > fp || (vp === fp && vn >= fn);
 }
 
+export const SERIES_LAST = 29;
+
+export function pythonSeries(floor, last = SERIES_LAST) {
+  const m = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-(0|[1-9]\d*)$/.exec(String(floor));
+  if (!m) return null;
+  const [x, y, z] = m.slice(1, 4).map(Number);
+  if (z >= last) return null;
+  const lines = [`>=${floor} <${x}.${y}.${z + 1}`];
+  for (let p = z + 1; p <= last; p++) lines.push(`>=${x}.${y}.${p}-1 <${x}.${y}.${p + 1}`);
+  return lines.join(' || ');
+}
+
+export function seriesRange(spec) {
+  if (typeof spec !== 'string' || !spec.includes(' || ')) return null;
+  const first = pythonRange(spec.slice(0, spec.indexOf(' || ')));
+  if (!first || pythonSeries(first.floor) !== spec) return null;
+  const [x, y] = first.floor.split('.').map(Number);
+  return { floor: first.floor, last: `${x}.${y}.${SERIES_LAST}`, below: `${x}.${y}.${SERIES_LAST + 1}`, lines: spec.split(' || ') };
+}
+
+export const PYTHON_SERIES_PENDING = new Set([
+  '@ai-ecoverse/py-bcrypt',
+  '@ai-ecoverse/py-cffi',
+  '@ai-ecoverse/py-contourpy',
+  '@ai-ecoverse/py-cryptography',
+  '@ai-ecoverse/py-cycler',
+  '@ai-ecoverse/py-fonttools',
+  '@ai-ecoverse/py-kiwisolver',
+  '@ai-ecoverse/py-matplotlib',
+  '@ai-ecoverse/py-numpy',
+  '@ai-ecoverse/py-packaging',
+  '@ai-ecoverse/py-pandas',
+  '@ai-ecoverse/py-pillow',
+  '@ai-ecoverse/py-pynacl',
+  '@ai-ecoverse/py-pyparsing',
+  '@ai-ecoverse/py-scipy',
+  '@ai-ecoverse/wasm-emscripten',
+]);
+
+export function seriesState(pkg) {
+  if (!PYTHON_SERIES_PENDING.has(pkg?.name)) return null;
+  return pythonRange(pkg.dependencies?.[PYTHON]) ? 'pending' : 'stale';
+}
+
 /** Packages besides py-* whose code runs on wasix-python and takes it as a range: emcc (homescoop#859). */
 export const PYTHON_CONSUMERS = new Set(['@ai-ecoverse/wasm-emscripten']);
 
 export function rangeAllowed(pkg, field, dep, spec) {
   if (field === 'peerDependencies' && spec === '*' && typeof dep === 'string' && dep.startsWith(SCOPE)) return true;
-  if (field !== 'dependencies' || typeof pkg.name !== 'string' || pythonRange(spec) === null) return false;
-  if (pkg.name.startsWith(PY_SCOPE)) return dep === PYTHON || dep.startsWith(PY_SCOPE);
-  return PYTHON_CONSUMERS.has(pkg.name) && dep === PYTHON;
+  if (field !== 'dependencies' || typeof pkg.name !== 'string') return false;
+  const takesPython = pkg.name.startsWith(PY_SCOPE) || PYTHON_CONSUMERS.has(pkg.name);
+  if (dep === PYTHON && takesPython && seriesRange(spec)) return true;
+  if (pythonRange(spec) === null) return false;
+  if (dep === PYTHON && takesPython) return PYTHON_SERIES_PENDING.has(pkg.name);
+  return pkg.name.startsWith(PY_SCOPE) && dep.startsWith(PY_SCOPE);
 }
 
 /** Recipes (packages/<name>) still waiting for their exact-pin re-release. */
@@ -122,6 +171,7 @@ function main() {
 
   let failed = false;
   let checked = 0;
+  const seenSeries = new Set();
   for (const t of targets) {
     if (!existsSync(t.path)) {
       console.error(`missing ${t.path}`);
@@ -143,12 +193,26 @@ function main() {
       failed = true;
       console.error(`${t.label}: all @ai-ecoverse deps are exact; remove it from PENDING in scripts/check-exact-pins.mjs`);
     }
+    const series = seriesState(pkg);
+    if (series) seenSeries.add(pkg.name);
+    if (series === 'pending') {
+      console.log(`pending ${t.label} (${pkg.name}@${pkg.version}): ${PYTHON} ${pkg.dependencies[PYTHON]} until its re-pin to pythonSeries('${pythonRange(pkg.dependencies[PYTHON]).floor}') (homescoop#1939)`);
+    } else if (series === 'stale') {
+      failed = true;
+      console.error(`${t.label}: ${pkg.name} no longer takes ${PYTHON} as a patch range; remove it from PYTHON_SERIES_PENDING in scripts/check-exact-pins.mjs`);
+    }
   }
   if (all) {
     for (const name of PENDING) {
       if (!existsSync(join(root, 'packages', name, 'package', 'package.json'))) {
         failed = true;
         console.error(`PENDING names unknown package ${name}`);
+      }
+    }
+    for (const name of PYTHON_SERIES_PENDING) {
+      if (!seenSeries.has(name)) {
+        failed = true;
+        console.error(`PYTHON_SERIES_PENDING names ${name}, which no packages/*/package/package.json is`);
       }
     }
   }
