@@ -44,7 +44,10 @@ but 4000 take about 40 s and 8000 several minutes (a native build: 15 s and
 83 s). Real pages rarely nest past a few hundred; generated markup can.
 
 **Not in this build:** URL / Chrome scans, `detect --cdp` (attaching to a
-running app's DevTools port), `serve-question` and the capture verbs refuse
-with `not available in this build yet` instead of `Unknown command`. Use
+running app's DevTools port), `serve-question`, the capture verbs and, since
+0.1.22, the account verbs (`login`, `logout`, `whoami`, `health`) refuse
+with `not available in this build yet` instead of `Unknown command`. Without
+sign-in, `detect` never uploads a design health scan and never hands a scan
+to Impeccable Pro. `loop install` refuses as upstream does off macOS. Use
 upstream [`impeccable`](https://www.npmjs.com/package/impeccable) /
 [pbakaus/impeccable](https://github.com/pbakaus/impeccable) for those.

@@ -91,3 +91,11 @@ about:
     stays in main.rs. The new agents crate (the agents verb) named its temp
     files after std::process::id(), which panics on wasm32-wasip1; 0001 uses
     impeccable_common::process_id() there too (cert/agents.mjs).
+    0.1.22-1: 0001 rebased onto engine-v0.1.22. The cli now depends on
+    the new account crate (login, logout, whoami, health, pro-refresh,
+    design health uploads after detect and Pro dispatch), which needs ring,
+    a loopback OAuth listener and the OS keychain; 0001 keeps it native
+    (the cli's dependency, main.rs's Pro dispatch and router.rs's account
+    arms and health upload), so on WASI those verbs refuse with "not
+    available in this build yet" and detect never uploads. The new loop
+    verb builds as is and refuses off macOS (cert/account.mjs).
