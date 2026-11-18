@@ -1,0 +1,42 @@
+name: py-pynacl
+builder: host
+reproducible: true
+# renovate: datasource=pypi depName=pynacl
+version: "1.6.2"
+npm: "@ai-ecoverse/py-pynacl"
+summary: "PyNaCl for slicc WASIX CPython 3.15"
+source:
+  url: "https://files.pythonhosted.org/packages/source/p/pynacl/pynacl-{{version}}.tar.gz"
+  sha256: "018494d6d696ae03c7e656e5e74cdfd8ea1326962cc401bcf018f1ed8436811c"
+sources:
+  wasix_libsodium:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-libsodium/-/wasix-libsodium-1.0.22-1.tgz"
+    sha256: "3421747122e2ee922cd0a60ca4d36a197cfb5e0161d79dcb8c607053787234e3"
+  wasix_python:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.15.0-1.tgz"
+    sha256: "f96dde95f183dbc4b48a46bf70f6f616b823f5b9bafa75fa5e1334d1f96f4481"
+  cpython:
+    url: "https://www.python.org/ftp/python/3.15.0/Python-3.15.0.tgz"
+    sha256: "438596cac081036d3c1d532ab7e7335eeb35567bc961749a0d5797176db0db68"
+inputs:
+  - packages/py-kiwisolver/test/wasm-call-signatures.mjs
+  - scripts/cffi-wasix.sh
+  - scripts/cffi-emit.py
+  - packages/py-cffi/recipe.yaml
+  - packages/py-pycparser/recipe.yaml
+dependencies:
+  build: [wasix-python]
+  host: []
+  run: [wasix-python]
+about:
+  license: Apache-2.0
+  notes: |
+    Cross-built from the PyPI sdist (SODIUM_INSTALL=system: the sdist's bundled
+    libsodium is not used) as one dylink.0 side module,
+    nacl/_sodium.cpython-315-wasm32-wasix.so: scripts/cffi-wasix.sh runs the
+    cffi that py-cffi ships (2.1.1; pure Python on its ctypes backend, on the
+    host) on PyNaCl's src/bindings/build.py to emit the module as C, compiled with wasixcc (PIC, legacy wasm EH) against wasix-python
+    3.15.0-1's headers (wasix-sysroot -38) and linked with
+    @ai-ecoverse/wasix-libsodium 1.0.22-1's lib-pic/libsodium.a. At run time
+    the module imports _cffi_backend from @ai-ecoverse/py-cffi. Every import of
+    the side module must be an export of python.wasm (build.sh checks).

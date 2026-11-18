@@ -23,7 +23,7 @@ const pipMod = join(root, 'packages/wasix-python/stdlib/_slicc_pip.py');
  * PENDING: reported, not failed, and a key that is in `_slicc_pip` or not
  * in the map must leave it.
  */
-export const PIP_PENDING = new Set(['cffi', 'cryptography']);
+export const PIP_PENDING = new Set(['cffi', 'cryptography', 'pynacl']);
 
 /** PyPI distribution name for a homescoop py-* recipe dir. */
 function pypiName(dir) {
