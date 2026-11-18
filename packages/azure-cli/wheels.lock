@@ -1,18 +1,15 @@
-# azure-cli's pure-Python closure, written by src/lock.py; build.sh reads it.
+# azure-cli's closure, written by src/lock.py; build.sh reads it. The "homescoop" lines come from npm (package.json), the rest from PyPI.
 # Do not edit by hand: after a version bump, run python3 packages/azure-cli/src/lock.py.
 # azure-cli 2.93.0
 # requirements 11d0f42401c801a7bf53b7fe62593af8871875292ed606715ff2afedba4212a9 https://raw.githubusercontent.com/Azure/azure-cli/azure-cli-2.93.0/src/azure-cli/requirements.py3.Linux.txt
 # exclude-newer 2026-11-15T23:22:49.243308Z
-# excluded bcrypt 3.2.0: native (Rust); only paramiko uses it
-# excluded cffi 2.0.0: native (C)
-# excluded cryptography 48.0.1: native (Rust, OpenSSL); az keyvault, az iot, az sf, certificate login and --generate-ssh-keys need it
-# excluded fabric 3.2.2: imports paramiko at module level
-# excluded paramiko 5.0.0: imports cryptography, bcrypt and nacl at module level (az vm ssh, az aks command, az container exec)
-# excluded psutil 6.1.0: native (C); az uses it only to describe the parent process in telemetry, which is off
-# excluded pynacl 1.6.2: native (C, libsodium); az webapp, az functionapp and paramiko need it
-# excluded pyopenssl 26.2.0: imports cryptography at module level
-# excluded scp 0.13.2: imports paramiko at module level
-# excluded sshtunnel 0.1.5: imports paramiko at module level
+# excluded psutil 6.1.0: native (C), no wasix build; az imports it in a try, only to name the parent process (telemetry, which is off, and a PowerShell quoting hint)
+# homescoop bcrypt 5.0.0 @ai-ecoverse/py-bcrypt@5.0.0-1 upstream 3.2.0
+# homescoop cffi 2.1.1 @ai-ecoverse/py-cffi@2.1.1-2 upstream 2.0.0
+# homescoop cryptography 50.0.2 @ai-ecoverse/py-cryptography@50.0.2-1 upstream 48.0.1
+# homescoop pycparser 3.12 @ai-ecoverse/py-pycparser@3.12.0-1 upstream -
+# homescoop pynacl 1.6.2 @ai-ecoverse/py-pynacl@1.6.2-1 upstream 1.6.2
+# homescoop pyopenssl 26.4.0 @ai-ecoverse/py-pyopenssl@26.4.0-1 upstream 26.2.0
 # <name> <version> <pin: upstream pins it | dep: resolved> <wheel | sdist:<dir>> <sha256> <url>
 antlr4-python3-runtime 4.13.1 pin wheel 78ec57aad12c97ac039ca27403ad61cb98aaec8a3f9bb8144f889aa0fa28b943 https://files.pythonhosted.org/packages/57/09/0c2874e3e8c53250b40afa7399c70acf7d23cac80138f1792ea3797f7452/antlr4_python3_runtime-4.13.1-py3-none-any.whl
 applicationinsights 0.11.9 pin wheel b88bc5a41385d8e516489128d5e63f8c52efe597a3579b1718d1ab2f7cf150a2 https://files.pythonhosted.org/packages/a1/53/234c53004f71f0717d8acd37876e0b65c121181167057b9ce1b1795f96a0/applicationinsights-0.11.9-py2.py3-none-any.whl
@@ -119,8 +116,10 @@ certifi 2026.10.23 pin wheel e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf9
 chardet 5.2.0 pin wheel e1cf59446890a00105fe7b7912492ea04b6e6f06d4b742b2c788469e34c82970 https://files.pythonhosted.org/packages/38/6f/f5fbc992a329ee4e0f288c1fe0e2ad9485ed064cac731ed2fe47dcc38cbf/chardet-5.2.0-py3-none-any.whl
 charset-normalizer 3.5.2 dep wheel b6b751274acb69d77b3323d6b7dbaa3c7fdfc1eb829b7eb61d262f32e1af9685 https://files.pythonhosted.org/packages/fc/ad/d07d7862a62ffa6d79d68074d14823243dd235a77c45262acbf6adeb28bf/charset_normalizer-3.5.2-py3-none-any.whl
 colorama 0.4.6 pin wheel 4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6 https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl
+decorator 5.3.1 dep wheel f47fe6fdbd2edd623ecfe36875d37aba411624e2670dd395dddae1358689bb3c https://files.pythonhosted.org/packages/05/7f/798705f5296a58ca505d600456748d1be48078eac8a7050d8a98bc9edb89/decorator-5.3.1-py3-none-any.whl
 deprecated 3.0.1 dep wheel eda314c115e8bc0fe52b90a6869e19240ac3cedb7449adfdba5981cf9ef693e1 https://files.pythonhosted.org/packages/82/f0/07de837adfa09d592747b82fd74316e88285d2d7057551f30e4b5ef81bd8/deprecated-3.0.1-py3-none-any.whl
 distro 1.6.0 pin wheel c8713330ab31a034623a9515663ed87696700b55f04556b97c39cd261aa70dc7 https://files.pythonhosted.org/packages/b3/8d/a0a5c389d76f90c766e956515d34c3408a1e18f60fbaa08221d1f6b87490/distro-1.6.0-py2.py3-none-any.whl
+fabric 3.2.2 pin wheel 91c47c0be68b14936c88b34da8a1f55e5710fd28397dac5d4ff2e21558113a6f https://files.pythonhosted.org/packages/d6/1f/e99e23ee01847147fa194e8d41cfcf2535a2dbfcb51414c541cadb15c5d7/fabric-3.2.2-py3-none-any.whl
 humanfriendly 10.0 pin wheel 1697e1a8a8f550fd43c2865cd84542fc175a61dcb779b6fee18cf6b6ccba1477 https://files.pythonhosted.org/packages/f0/0f/310fb31e39e2d734ccaa2c0fb981ee41f7bd5056ce9bc29b2248bd569169/humanfriendly-10.0-py2.py3-none-any.whl
 idna 3.15 pin wheel 048adeaf8c2d788c40fee287673ccaa74c24ffd8dcf09ffa555a2fbb59f10ac8 https://files.pythonhosted.org/packages/d2/23/408243171aa9aaba178d3e2559159c24c1171a641aa83b67bdd3394ead8e/idna-3.15-py3-none-any.whl
 invoke 2.2.0 pin wheel 6ea924cc53d4f78e3d98bc436b08069a03077e6f85ad1ddaa8a116d7dad15820 https://files.pythonhosted.org/packages/0a/66/7f8c48009c72d73bc6bbe6eb87ac838d6a526146f7dab14af671121eb379/invoke-2.2.0-py3-none-any.whl
@@ -135,6 +134,7 @@ msal-extensions 1.3.1 pin wheel 96d3de4d034504e969ac5e85bae8106c8373b5c6568e4c8f
 msrest 0.7.1 pin wheel 21120a810e1233e5e6cc7fe40b474eeb4ec6f757a15d7cf86702c369f9567c32 https://files.pythonhosted.org/packages/15/cf/f2966a2638144491f8696c27320d5219f48a072715075d168b31d3237720/msrest-0.7.1-py3-none-any.whl
 oauthlib 3.2.2 pin wheel 8139f29aac13e25d502680e9e19963e83f16838d48a0d71c287fe40e7067fbca https://files.pythonhosted.org/packages/7e/80/cab10959dc1faead58dc8384a781dfbf93cb4d33d50988f7a69f1b7c9bbe/oauthlib-3.2.2-py3-none-any.whl
 packaging 26.3 pin wheel d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl
+paramiko 5.0.0 pin wheel b7044611c30140d9a75261653210e2002977b71a0497ff3ba0d98d7edbf62f7c https://files.pythonhosted.org/packages/82/5b/eadf6d45de38d30ab603f49393b6cd2cbe7e233af8cf90197e32782b68a9/paramiko-5.0.0-py3-none-any.whl
 pbr 7.0.3 pin wheel ff223894eb1cd271a98076b13d3badff3bb36c424074d26334cd25aebeecea6b https://files.pythonhosted.org/packages/c0/db/61efa0d08a99f897ef98256b03e563092d36cc38dc4ebe4a85020fe40b31/pbr-7.0.3-py2.py3-none-any.whl
 pkginfo 1.12.1.2 pin wheel c783ac885519cab2c34927ccfa6bf64b5a704d7c69afaea583dd9b7afe969343 https://files.pythonhosted.org/packages/fa/3d/f4f2ba829efb54b6cd2d91349c7463316a9cc55a43fc980447416c88540f/pkginfo-1.12.1.2-py3-none-any.whl
 portalocker 3.2.0 pin wheel 3cdc5f565312224bc570c49337bd21428bba0ef363bbcf58b9ef4a9f11779968 https://files.pythonhosted.org/packages/4b/a6/38c8e2f318bf67d338f4d629e93b0b4b9af331f455f0390ea8ce4a099b26/portalocker-3.2.0-py3-none-any.whl
@@ -148,9 +148,11 @@ python-dateutil 2.8.0 pin wheel 7e6584c74aeed623791615e26efd690f29817a27c73085b7
 pyyaml 6.0.3 dep sdist:lib/yaml d76623373421df22fb4cf8817020cbb7ef15c725b9d5e45f17e189bfc384190f https://files.pythonhosted.org/packages/05/8e/961c0007c59b8dd7729d542c61a4d537767a59645b82a0b521206e1e25c2/pyyaml-6.0.3.tar.gz
 requests 2.33.0 pin wheel 3324635456fa185245e24865e810cecec7b4caf933d7eb133dcde67d48cee69b https://files.pythonhosted.org/packages/56/5d/c814546c2333ceea4ba42262d8c4d55763003e767fa169adc693bd524478/requests-2.33.0-py3-none-any.whl
 requests-oauthlib 1.2.0 pin wheel d3ed0c8f2e3bbc6b344fa63d6f933745ab394469da38db16bdddb461c7e25140 https://files.pythonhosted.org/packages/c2/e2/9fd03d55ffb70fe51f587f20bcf407a6927eb121de86928b34d162f0b1ac/requests_oauthlib-1.2.0-py2.py3-none-any.whl
+scp 0.13.2 pin wheel 26c0bbc7ea29c30ec096ae67b0afa7a6b7c557b2ce8f740109ee72a0d52af7d1 https://files.pythonhosted.org/packages/4d/7a/3d76dc5ad8deea79642f50a572e1c057cb27e8b427f83781a2c05ce4e5b6/scp-0.13.2-py2.py3-none-any.whl
 semver 3.0.4 pin wheel 9c824d87ba7f7ab4a1890799cec8596f15c1241cb473404ea1cb0c55e4b04746 https://files.pythonhosted.org/packages/a6/24/4d91e05817e92e3a61c8a21e08fd0f390f5301f1c448b137c57c4bc6e543/semver-3.0.4-py3-none-any.whl
 setuptools 84.2.1 dep wheel ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2 https://files.pythonhosted.org/packages/ef/55/6dc6d6bb953bdfc52519a0059592c52b6e3b8ad51cf8256dffceb55b0610/setuptools-84.2.1-py3-none-any.whl
 six 1.16.0 pin wheel 8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254 https://files.pythonhosted.org/packages/d9/5a/e7c31adbe875f2abbb91bd84cf2dc52d792b5a01506781dbcf25c91daf11/six-1.16.0-py2.py3-none-any.whl
+sshtunnel 0.1.5 pin wheel 5eee2e414c3fd9e9ef5d058bebece272a6aae928849ef7f2d9561b7fffab7aea https://files.pythonhosted.org/packages/38/7d/6f19be1ee49cee9593c5ac3aa1fb38fe30eaf1520114e08dee2ab2a45855/sshtunnel-0.1.5-py2.py3-none-any.whl
 tabulate 0.8.9 pin wheel d7c013fe7abbc5e491394e10fa845f8f32fe54f8dc60c6622c6cf482d25d47e4 https://files.pythonhosted.org/packages/ca/80/7c0cad11bd99985cfe7c09427ee0b4f9bd6b048bd13d4ffb32c6db237dfb/tabulate-0.8.9-py3-none-any.whl
 typing-extensions 4.16.0 dep wheel 481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8 https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl
 urllib3 2.7.0 pin wheel 9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897 https://files.pythonhosted.org/packages/7f/3e/5db95bcf282c52709639744ca2a8b149baccf648e39c8cc87553df9eae0c/urllib3-2.7.0-py3-none-any.whl

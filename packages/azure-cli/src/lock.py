@@ -16,9 +16,21 @@ PyYAML and pygments, ...) is resolved by uv for Linux and CPython 3.15, with
 nothing newer than the azure-cli release on PyPI (--exclude-newer its upload
 time), so running this again for the same release gives the same lock.
 
-Left out, each with its reason in the lock's header: the packages that are
-native code (no pure-Python form) and the pure-Python ones that import them
-at module level. uv drops whatever only they needed (pycparser, invoke, ...).
+Native code comes from homescoop's npm packages, not from PyPI: cffi,
+pycparser, cryptography, PyNaCl, bcrypt and pyOpenSSL are the @ai-ecoverse/
+py-* packages package/package.json depends on (HOMESCOOP below), built for
+wasix-python, and bin/az puts exactly those on sys.path (src/launcher.py).
+Their PyPI versions are the ones those npm pins were built from (the
+homescoop.upstream of each published package.json), not upstream's pins:
+uv resolves the closure with them as plain requirements, so every declared
+range of the closure (azure-cli-core's, msal's, paramiko's, ...) must accept
+them, and the lock lists them in its header ("# homescoop ...") instead of as
+files to fetch. A Renovate bump of azure-cli re-runs this and still fetches no
+PyPI wheel for them; moving one is a bump of its npm pin in package.json.
+
+Left out with its reason in the lock's header: psutil, native code with no
+wasix build. az imports it only in a try (the parent process's name, for
+telemetry and a PowerShell quoting hint).
 
 Each remaining package is the one py3-none-any wheel PyPI has for that
 version, or, for the packages in SDIST (no pure wheel on PyPI, but a
@@ -41,20 +53,21 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PKG = os.path.dirname(HERE)
 LOCK = os.path.join(PKG, "wheels.lock")
 
-# Native code, and pure Python that imports it at module level. az's own
-# imports of psutil, cryptography and OpenSSL are lazy (in functions), so
-# the commands that don't need them work without them.
+# Native code with no wasix build: left out. az imports psutil in a try,
+# only to name the parent process.
 EXCLUDE = {
-    "bcrypt": "native (Rust); only paramiko uses it",
-    "cffi": "native (C)",
-    "cryptography": "native (Rust, OpenSSL); az keyvault, az iot, az sf, certificate login and --generate-ssh-keys need it",
-    "psutil": "native (C); az uses it only to describe the parent process in telemetry, which is off",
-    "pynacl": "native (C, libsodium); az webapp, az functionapp and paramiko need it",
-    "pyopenssl": "imports cryptography at module level",
-    "paramiko": "imports cryptography, bcrypt and nacl at module level (az vm ssh, az aks command, az container exec)",
-    "fabric": "imports paramiko at module level",
-    "scp": "imports paramiko at module level",
-    "sshtunnel": "imports paramiko at module level",
+    "psutil": "native (C), no wasix build; az imports it in a try, only to name the parent process (telemetry, which is off, and a PowerShell quoting hint)",
+}
+
+# From homescoop's npm packages instead of PyPI: the distribution, and the
+# npm package package/package.json pins for it.
+HOMESCOOP = {
+    "bcrypt": "@ai-ecoverse/py-bcrypt",
+    "cffi": "@ai-ecoverse/py-cffi",
+    "cryptography": "@ai-ecoverse/py-cryptography",
+    "pycparser": "@ai-ecoverse/py-pycparser",
+    "pynacl": "@ai-ecoverse/py-pynacl",
+    "pyopenssl": "@ai-ecoverse/py-pyopenssl",
 }
 
 # No pure wheel on PyPI, a pure-Python fallback in the sdist: the package
@@ -76,6 +89,23 @@ def recipe():
     if not url:
         sys.exit("lock.py: recipe.yaml has no source.url")
     return version, url.group(1).replace("{{version}}", version)
+
+
+def homescoop():
+    """{dist: (npm name, npm pin, PyPI version)} from package/package.json's pins."""
+    deps = json.load(open(os.path.join(PKG, "package", "package.json"), encoding="utf-8")).get("dependencies", {})
+    out = {}
+    for dist, npm in sorted(HOMESCOOP.items()):
+        pin = deps.get(npm)
+        if not pin or not re.fullmatch(r"[0-9][0-9A-Za-z.]*-[0-9.]+", pin):
+            sys.exit(f"lock.py: package/package.json has no exact pin of {npm} (for {dist})")
+        # The published manifest names the PyPI release it was built from.
+        meta = json.loads(get(f"https://registry.npmjs.org/{npm}/{pin}"))
+        upstream = (meta.get("homescoop") or {}).get("upstream")
+        if not upstream:
+            sys.exit(f"lock.py: {npm}@{pin} has no homescoop.upstream")
+        out[dist] = (npm, pin, upstream)
+    return out
 
 
 def get(url):
@@ -129,8 +159,9 @@ def main():
     pins = pins_of(req.decode("utf-8"))
     if pins.get("azure-cli", (None, None, None))[1:] != ("==", version):
         sys.exit(f"lock.py: {req_url} doesn't pin azure-cli=={version}")
-    for name in EXCLUDE:
-        if name not in pins:
+    native = homescoop()
+    for name in [*EXCLUDE, *HOMESCOOP]:
+        if name not in pins and name != "pycparser":
             print(f"lock.py: note: {name} is no longer in upstream's pins", file=sys.stderr)
     # The newest file of any exact pin: the release's own wheels (azure-cli,
     # azure-cli-core, azure-cli-telemetry) are uploaded last.
@@ -143,8 +174,11 @@ def main():
         inp = os.path.join(tmp, "in.txt")
         over = os.path.join(tmp, "overrides.txt")
         out = os.path.join(tmp, "out.txt")
-        keep = [f"{n}{op}{v}" for c, (n, op, v) in sorted(pins.items()) if c not in EXCLUDE]
-        open(inp, "w").write("\n".join(keep) + "\n")
+        keep = [f"{n}{op}{v}" for c, (n, op, v) in sorted(pins.items()) if c not in EXCLUDE and c not in HOMESCOOP]
+        # homescoop's versions are requirements, not overrides, so every
+        # range the closure declares for them must hold.
+        ours = [f"{c}=={native[c][2]}" for c in sorted(native)]
+        open(inp, "w").write("\n".join(keep + ours) + "\n")
         # An override with a marker that never holds removes the package from
         # every dependency list, so what only it needed goes too.
         open(over, "w").write("\n".join(keep + [f'{n} ; python_version < "0"' for n in sorted(EXCLUDE)]) + "\n")
@@ -158,8 +192,11 @@ def main():
                 n, v = line.split("==")
                 resolved[canon(n)] = (n, v)
 
+    for c, (npm, pin, v) in native.items():
+        if resolved.pop(c, (None, None))[1] != v:
+            sys.exit(f"lock.py: the closure doesn't take {c}=={v} ({npm}@{pin})")
     for c, (n, op, v) in pins.items():
-        if c in EXCLUDE:
+        if c in EXCLUDE or c in HOMESCOOP:
             continue
         if c not in resolved:
             sys.exit(f"lock.py: upstream pins {n}{op}{v}, the closure has no {n}")
@@ -180,17 +217,19 @@ def main():
         print(f"  {c}=={v} {kind} {filename}", file=sys.stderr)
 
     head = [
-        "# azure-cli's pure-Python closure, written by src/lock.py; build.sh reads it.",
+        "# azure-cli's closure, written by src/lock.py; build.sh reads it. The \"homescoop\" lines come from npm (package.json), the rest from PyPI.",
         "# Do not edit by hand: after a version bump, run python3 packages/azure-cli/src/lock.py.",
         f"# azure-cli {version}",
         f"# requirements {req_sha} {req_url}",
         f"# exclude-newer {upload}",
     ]
     head += [f"# excluded {n} {pins[n][2] if n in pins else '-'}: {why}" for n, why in sorted(EXCLUDE.items())]
+    # <dist> <PyPI version> <npm name>@<npm pin> <what upstream pins, or ->
+    head += [f"# homescoop {c} {v} {npm}@{pin} upstream {pins[c][2] if c in pins else '-'}" for c, (npm, pin, v) in sorted(native.items())]
     head.append("# <name> <version> <pin: upstream pins it | dep: resolved> <wheel | sdist:<dir>> <sha256> <url>")
     with open(LOCK, "w", encoding="utf-8") as f:
         f.write("\n".join(head + rows) + "\n")
-    print(f"lock.py: {len(rows)} packages, {len(EXCLUDE)} excluded -> {os.path.relpath(LOCK)}", file=sys.stderr)
+    print(f"lock.py: {len(rows)} packages, {len(native)} from homescoop, {len(EXCLUDE)} excluded -> {os.path.relpath(LOCK)}", file=sys.stderr)
 
 
 if __name__ == "__main__":

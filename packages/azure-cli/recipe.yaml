@@ -31,6 +31,14 @@ sources:
   license_asn1crypto:
     url: "https://raw.githubusercontent.com/wbond/asn1crypto/0.24.0/LICENSE"
     sha256: "7871ddf1918d53fd549943aad007cd4ad674b0e1da732a9aea4a79e1436d1eb5"
+  # scp's LICENSE.txt is the LGPL notice; the LGPL 2.1 text it names is
+  # paramiko's LICENSE at the tag of the paramiko in wheels.lock.
+  license_scp:
+    url: "https://raw.githubusercontent.com/jbardin/scp.py/v0.13.2/LICENSE.txt"
+    sha256: "2455cf0fc78e13772bf10ef5f209e7eb8625706d671b2f420cc8add37d548c1c"
+  license_lgpl21:
+    url: "https://raw.githubusercontent.com/paramiko/paramiko/5.0.0/LICENSE"
+    sha256: "5fa25bf5f395fd26e701c2e1de4ca7d162816986dc791c22f8f4226857ad1bb2"
   license_wcwidth:
     url: "https://raw.githubusercontent.com/jquast/wcwidth/0.1.7/LICENSE.txt"
     sha256: "0eddcc52cd3ef5d30798b8d43a14d3f0f1dcf0a6e4c1d0f2e177c44ce85bb69c"
