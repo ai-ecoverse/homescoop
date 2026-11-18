@@ -30,23 +30,36 @@ test('the AWS CLI is the recipe release', () => {
 
 test('the patches are applied', () => {
   const compat = readFileSync(join(lib, 'awscli/botocore/compat.py'), 'utf8');
-  assert.match(compat, /^    HAS_CRT = os\.environ\.get\('BOTO_DISABLE_CRT'/m, 'awscrt-optional.patch');
+  assert.match(compat, /^    HAS_CRT = not getattr\(awscrt, '_HOMESCOOP_CRYPTO_ONLY', False\)/m, 'awscrt-optional.patch');
   assert.ok(existsSync(join(lib, 'awscli/botocore/crc.py')), 'awscrt-optional.patch: botocore/crc.py');
-  for (const f of ['awscli/botocore/utils.py', 'awscli/botocore/credentials.py', 'awscli/botocore/httpchecksum.py', 'awscli/logger.py', 'awscli/customizations/s3/factory.py', 'awscli/customizations/cloudfront/sign.py']) {
+  assert.match(readFileSync(join(lib, 'awscli/botocore/sigv4a.py'), 'utf8'), /^SIGV4A_AUTH_TYPE_MAPS = \{/m, 'awscrt-optional.patch: botocore/sigv4a.py');
+  assert.match(readFileSync(join(lib, 'awscli/botocore/auth.py'), 'utf8'), /^    AUTH_TYPE_MAPS\.update\(botocore\.sigv4a\.SIGV4A_AUTH_TYPE_MAPS\)$/m, 'awscrt-optional.patch: SigV4a registered');
+  // Only awscrt.crypto and awscrt.exceptions (homescoop's, src/awscrt) are
+  // imported at module level; the rest of awscrt only behind HAS_CRT.
+  for (const f of ['awscli/botocore/httpchecksum.py', 'awscli/logger.py', 'awscli/customizations/s3/factory.py', 'awscli/s3transfer/checksums.py', 'awscli/customizations/ec2instanceconnect/websocket.py', 'awscli/botocore/auth.py']) {
     assert.doesNotMatch(readFileSync(join(lib, f), 'utf8'), /^(import awscrt|from awscrt)/m, `${f} imports awscrt at module level`);
   }
+  for (const f of ['awscli/botocore/utils.py', 'awscli/botocore/credentials.py', 'awscli/customizations/cloudfront/sign.py', 'awscli/customizations/login/login.py']) {
+    assert.match(readFileSync(join(lib, f), 'utf8'), /^from awscrt\.crypto import /m, `${f}: upstream's awscrt.crypto import, unchanged`);
+  }
+  assert.match(readFileSync(join(lib, 'awscli/customizations/login/login.py'), 'utf8'), /'name': 'remote',\n\s+'action': 'store_true',\n(?:\s+#.*\n)+\s+'default': True,/, 'login-remote.patch');
   assert.match(readFileSync(join(lib, 'awscli/help.py'), 'utf8'), /writer=TextWriter\(\),\n\s+settings_overrides=self\._DEFAULT_DOCUTILS_SETTINGS_OVERRIDES,\n\s+\)\n\s+LOG\.debug\("Running command/, 'help-text.patch');
   assert.match(readFileSync(join(lib, 'awscli/customizations/sso/utils.py'), 'utf8'), /'name': 'use-device-code',\n\s+'action': 'store_true',\n(?:\s+#.*\n)+\s+'default': True,/, 'sso-device-code.patch');
 });
 
-test('no awscrt, bytecode, native code or links; no wheel scripts or RECORDs', () => {
+test('no awscrt but the crypto shim, no bytecode, native code or links; no wheel scripts or RECORDs', () => {
   const bad = [];
   for (const f of walk(join(pkg, 'lib'))) {
     if (/__pycache__|\.(pyc|so|dylib|dll|exe|pyd|orig|rej)$|\.data\/|\.dist-info\/RECORD$|\/\.homescoop-patched-/.test(f)) bad.push(f);
     if (lstatSync(f).isSymbolicLink() || statSync(f).nlink !== 1) bad.push(f);
   }
   assert.deepEqual(bad, []);
-  assert.ok(!existsSync(join(lib, 'awscrt')), 'awscrt');
+  // The only awscrt is src/awscrt: awscrt.crypto on cryptography.
+  assert.deepEqual(readdirSync(join(lib, 'awscrt')).sort(), ['__init__.py', 'crypto.py', 'exceptions.py']);
+  for (const f of ['__init__.py', 'crypto.py', 'exceptions.py']) {
+    assert.equal(readFileSync(join(lib, 'awscrt', f), 'utf8'), readFileSync(join(here, '..', 'src', 'awscrt', f), 'utf8'), `awscrt/${f}`);
+  }
+  assert.ok(!existsSync(join(lib, 'cryptography')) && !existsSync(join(lib, '_cffi_backend.py')), 'cryptography is py-cryptography\'s, not in lib/aws-cli');
   assert.ok(!existsSync(join(lib, 'ruamel', 'yaml', 'clib')), 'ruamel.yaml.clib');
 });
 
@@ -74,6 +87,14 @@ test('bin/aws and bin/aws_completer are the launcher, executable, and the only c
     assert.equal(manifest.slicc.commands[t].script, `bin/${t}`);
   }
   assert.deepEqual(Object.keys(manifest.slicc.commands).sort(), ['aws', 'aws_completer']);
+});
+
+test('py-cryptography and py-cffi are exact dependencies', () => {
+  const deps = manifest.dependencies;
+  for (const name of ['@ai-ecoverse/py-cryptography', '@ai-ecoverse/py-cffi', '@ai-ecoverse/wasix-python']) {
+    assert.match(deps[name] || '', /^\d+\.\d+\.\d+-\d+$/, `${name}: ${deps[name]}`);
+  }
+  assert.deepEqual(Object.keys(deps).filter((n) => n.startsWith('@ai-ecoverse/py-')).sort(), ['@ai-ecoverse/py-cffi', '@ai-ecoverse/py-cryptography']);
 });
 
 test('LICENSE is AWS\'s notice and the Apache License 2.0', () => {

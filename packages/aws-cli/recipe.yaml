@@ -78,9 +78,20 @@ about:
     awscrt-optional.patch makes awscrt optional again, as it is in standalone
     botocore (botocore.compat.HAS_CRT): CRC32C and CRC64NVME checksums are
     pure Python (botocore/crc.py), the default request checksum is CRC32
-    (zlib), and s3 uses the classic transfer client. SigV4a, the xxhash
-    checksums, `aws login`, EC2 Instance Connect's tunnel and key generation,
-    `aws cloudfront sign`, CloudTrail signature validation and
-    `get-password-data --priv-launch-key` need awscrt and say so.
+    (zlib), and s3 uses the classic transfer client. The crypto the CLI did
+    with awscrt.crypto (cloudfront sign, get-password-data
+    --priv-launch-key, cloudtrail validate-logs and verify-query-results,
+    ec2-instance-connect ssh's key, aws login) runs unchanged on
+    src/awscrt, staged as lib/aws-cli/awscrt: awscrt 0.38.1's awscrt.crypto
+    API on cryptography (@ai-ecoverse/py-cryptography, a dependency), and
+    nothing else of awscrt, so HAS_CRT stays False. SigV4a is the patch's
+    botocore/sigv4a.py, botocore's SigV4 signers with SigV4a's scope and
+    ECDSA key on cryptography. The xxhash checksums, the CRT transfer
+    client and EC2 Instance Connect's websocket tunnel need awscrt and say
+    so. The launcher puts the site-packages of exactly the py-* packages
+    package.json pins (py-cryptography, py-cffi) after the standard
+    library (src/launcher.py).
+    login-remote.patch makes `aws login` take its cross-device (--remote)
+    flow by default, since the other one waits for a callback on 127.0.0.1.
     help-text.patch renders help as plain text when there is no groff or
     mandoc, as the CLI does on Windows.

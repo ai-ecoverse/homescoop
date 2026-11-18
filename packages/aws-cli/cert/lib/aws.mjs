@@ -34,3 +34,23 @@ export async function clearLog(ctx) {
 }
 
 export const header = (req, name) => (req.headers.find(([k]) => k.toLowerCase() === name) || [])[1];
+
+// Merges `state` into the responder's awsCertState (PUT http://log.cert.test/state).
+export async function setState(ctx, state) {
+  const body = Buffer.from(JSON.stringify(state)).toString('base64');
+  await ok(ctx, `python3 -S -c 'import base64, urllib.request; urllib.request.urlopen(urllib.request.Request("http://log.cert.test/state", data=base64.b64decode("${body}"), method="PUT"))'`);
+}
+
+// The cert's fixtures (cert/fixtures, see fetch.mjs there), read in Node.
+export const fixture = (name) => new URL(`../fixtures/${name}`, import.meta.url);
+
+// Runs a list of aws argvs in one python (lib/aws_many.py), from bin/aws's
+// own setup; [{ rc, stdout, stderr }] in the same order.
+export async function awsMany(ctx, argvs, { env = keyEnv } = {}) {
+  const { readFileSync } = await import('node:fs');
+  const tag = Math.random().toString(36).slice(2);
+  await ctx.write(`/tmp/aws-many-${tag}.py`, readFileSync(new URL('./aws_many.py', import.meta.url)));
+  await ctx.write(`/tmp/aws-many-${tag}.json`, JSON.stringify(argvs));
+  await ok(ctx, `${env} python3 -S /tmp/aws-many-${tag}.py ${PKG}/bin/aws /tmp/aws-many-${tag}.json /tmp/aws-many-${tag}.out.json </dev/null`);
+  return JSON.parse(await ctx.read(`/tmp/aws-many-${tag}.out.json`));
+}

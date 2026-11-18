@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/aws-cli",
-  "version": "2.40.4-1",
+  "version": "2.40.4-2",
   "description": "The AWS Command Line Interface v2: aws, to manage AWS services from slicc.",
   "license": "Apache-2.0",
   "repository": {
@@ -30,7 +30,9 @@
     "access": "public"
   },
   "dependencies": {
-    "@ai-ecoverse/wasix-python": "3.15.0-8"
+    "@ai-ecoverse/py-cffi": "2.1.1-2",
+    "@ai-ecoverse/py-cryptography": "50.0.2-1",
+    "@ai-ecoverse/wasix-python": "3.15.0-10"
   },
   "engines": {
     "slicc-kernel": ">=1.122.3"
