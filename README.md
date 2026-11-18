@@ -128,6 +128,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-procps`](https://www.npmjs.com/package/@ai-ecoverse/wasm-procps) | [recipe](packages/procps) | procps-ng: ps, free, pgrep, pkill, kill, uptime and pidof. |
 | [`@ai-ecoverse/py-cffi`](https://www.npmjs.com/package/@ai-ecoverse/py-cffi) | [recipe](packages/py-cffi) | cffi, the C Foreign Function Interface for Python, with its _cffi_backend, for slicc WASIX CPython. |
 | [`@ai-ecoverse/py-contourpy`](https://www.npmjs.com/package/@ai-ecoverse/py-contourpy) | [recipe](packages/py-contourpy) | contourpy, contour calculation for Python (used by matplotlib). |
+| [`@ai-ecoverse/py-cryptography`](https://www.npmjs.com/package/@ai-ecoverse/py-cryptography) | [recipe](packages/py-cryptography) | cryptography, cryptographic recipes and primitives for Python, with OpenSSL. |
 | [`@ai-ecoverse/py-cycler`](https://www.npmjs.com/package/@ai-ecoverse/py-cycler) | [recipe](packages/py-cycler) | cycler for slicc WASIX CPython |
 | [`@ai-ecoverse/py-fonttools`](https://www.npmjs.com/package/@ai-ecoverse/py-fonttools) | [recipe](packages/py-fonttools) | fontTools, a library for manipulating fonts in Python. |
 | [`@ai-ecoverse/py-kiwisolver`](https://www.npmjs.com/package/@ai-ecoverse/py-kiwisolver) | [recipe](packages/py-kiwisolver) | kiwisolver, a fast constraint solver for Python (used by matplotlib). |
