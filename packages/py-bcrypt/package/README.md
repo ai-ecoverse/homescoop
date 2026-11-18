@@ -9,5 +9,5 @@ python3 -c "import bcrypt; h = bcrypt.hashpw(b'secret', bcrypt.gensalt()); print
 `bcrypt/_bcrypt.cpython-315-wasm32-wasix.so` is a `dylink.0` side module that `python.wasm` loads by `dlopen`.
 
 - **Build:** in homescoop's CI from the PyPI sdist. The Rust extension is compiled with cargo for wasix-org/rust's `wasm32-wasmer-wasi-dl` target with `scripts/rust-pyext.sh`, homescoop's toolchain for Rust extensions (as `@ai-ecoverse/py-cryptography`). Random salts come from WASI's `random_get` (getrandom 0.3.3 with `scripts/rust-pyext/getrandom-dl.patch`).
-- **Python range:** `>=3.15.0-8 <3.15.1`.
+- **Python range:** `>=3.15.0-8 <3.15.1 || … || >=3.15.29-1 <3.15.30` (3.15.0-8 or any later 3.15 patch release, homescoop#1939).
 - **A Rust panic aborts python.** The target's Rust standard library is built with `panic=abort`, so where bcrypt would raise pyo3's `PanicException` (a bug, not a bad input), python exits with a trap instead. Bad inputs are Python exceptions as everywhere else: `ValueError` for an invalid salt or rounds out of range, `TypeError` for a `str` password.

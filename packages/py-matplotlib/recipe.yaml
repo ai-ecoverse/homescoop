@@ -45,6 +45,8 @@ inputs:
 notices:
   not_linked:
     meson: "build tool"
+repack:
+  from: "3.11.2-14"
 dependencies:
   build: [wasix-python]
   host: []

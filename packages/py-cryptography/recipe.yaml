@@ -34,6 +34,10 @@ sources:
     sha256: "438596cac081036d3c1d532ab7e7335eeb35567bc961749a0d5797176db0db68"
 inputs:
   - scripts/rust-pyext/**
+repack:
+  from: "50.0.2-1"
+  files:
+    - README.md
 dependencies:
   build: [wasix-python]
   host: []

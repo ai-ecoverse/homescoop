@@ -24,6 +24,10 @@ inputs:
   - scripts/cffi-emit.py
   - packages/py-cffi/recipe.yaml
   - packages/py-pycparser/recipe.yaml
+repack:
+  from: "1.6.2-1"
+  files:
+    - README.md
 dependencies:
   build: [wasix-python]
   host: []

@@ -1,5 +1,9 @@
 # py-bcrypt: negative proof
 
+## python-range.mjs: 5.0.0-1 nests a second python under a later 3.15 patch release (5.0.0-2; homescoop#1939; 2026-11-18)
+
+npm `@ai-ecoverse/py-bcrypt@5.0.0-1` takes wasix-python as the patch-line range. `npm install --package-lock-only` of its tarball beside a stand-in `@ai-ecoverse/wasix-python` 3.15.2-1 (a package.json-only tarball, `python-range.mjs`'s `fakePython`) resolves a second python from the registry: `node_modules/@ai-ecoverse/py-bcrypt/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10. `_slicc_site` refuses a py-\* whose python isn't the one running, so on wasix-python 3.15.2-1 its import would fail. 5.0.0-2's repack, with the series range, resolves one python, at the top level, with 3.15.1-1, 3.15.2-1 and 3.15.29-1 stand-ins and with the floor and newest from npm.
+
 ## 5.0.0-1: the first build (2026-11-17)
 
 There is no earlier py-bcrypt. The negatives are the two crate patches this

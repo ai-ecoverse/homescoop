@@ -1,5 +1,9 @@
 # py-matplotlib: negative proof
 
+## python-range.mjs: 3.11.2-14 nests a second python under a later 3.15 patch release (3.11.2-15; homescoop#1939; 2026-11-18)
+
+npm `@ai-ecoverse/py-matplotlib@3.11.2-14` takes wasix-python as the patch-line range. `npm install --package-lock-only` of its tarball beside a stand-in `@ai-ecoverse/wasix-python` 3.15.2-1 (a package.json-only tarball, `python-range.mjs`'s `fakePython`) resolves a second python from the registry: `node_modules/@ai-ecoverse/py-contourpy/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10, `node_modules/@ai-ecoverse/py-cycler/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10, `node_modules/@ai-ecoverse/py-fonttools/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10, `node_modules/@ai-ecoverse/py-kiwisolver/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10, `node_modules/@ai-ecoverse/py-matplotlib/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10, `node_modules/@ai-ecoverse/py-numpy/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10, `node_modules/@ai-ecoverse/py-packaging/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10, `node_modules/@ai-ecoverse/py-pillow/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10, `node_modules/@ai-ecoverse/py-pyparsing/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10. `_slicc_site` refuses a py-\* whose python isn't the one running, so on wasix-python 3.15.2-1 its import would fail. 3.11.2-15's repack, with the series range, resolves one python, at the top level, with 3.15.1-1, 3.15.2-1 and 3.15.29-1 stand-ins and with the floor and newest from npm.
+
 ## cert only on 3.11.2-14: render.mjs (#1263) and the sidemods needs check (#1261; 2026-10-22)
 
 No -N: the published 3.11.2-14 passes `cert/render.mjs` (slicc-kernel 1.144.1, `--users enforce`). #1261's missing py-pytz was fixed in #1259 before it merged (`needs` and `needsInstall` list `@ai-ecoverse/py-pytz`, now `@2026.4.0-5`, npm `latest`), so only the check is new.

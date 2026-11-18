@@ -12,7 +12,8 @@
     "cert/bcrypt.mjs: hashpw ($2b$ and $2a$) and kdf (bcrypt-pbkdf, 4 and 50 rounds) give the answers CPython's bcrypt 5.0.0 gives for the same inputs; 20 gensalt() salts are all different (getrandom through WASI random_get, scripts/rust-pyext/getrandom-dl.patch); checkpw true for the password, false for another; a bad salt, rounds 2, prefix 3x, a str password, a string that is no hash and an empty kdf password raise ValueError/TypeError, not a panic=abort trap; 4 Python threads hash and check at once",
     "cert/notices.mjs: THIRD-PARTY-NOTICES.md names the wasix-org Rust standard library with its licence text, and (scripts/rust-crate-notices.mjs, checked against cargo tree by check-rust-notices.mjs at build) every crate _bcrypt links, getrandom 0.3.3 among them",
     "build.sh (scripts/rust-pyext/check-side-module.mjs): _bcrypt has dylink.0, exports PyModExport__bcrypt and the TLS entry points, every env/GOT import is exported by wasix-python 3.15.0-8's python.wasm, no EH instructions; no build path in it",
-    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.15.0-8 <3.15.1"
+    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.15.0-8 <3.15.1",
+    "5.0.0-2 (homescoop#1939): packaging-only repack of 5.0.0-1 (repack.from, README.md) with @ai-ecoverse/wasix-python as the series range pythonSeries('3.15.0-8'), the 3.15.0-8 line and every 3.15.Z-1 line through 3.15.29, instead of >=3.15.0-8 <3.15.1. scripts/browser-cert/python-range.mjs: the tarball resolves one python with 3.15.0-8, with the newest in needsInstall and with stand-ins 3.15.1-1 and 3.15.29-1. 5.0.0-1 nests a second python under the 3.15.1-1 stand-in (NEGATIVE.md)"
   ],
   "ci": [
     "node scripts/browser-cert/python-range.mjs py-bcrypt"

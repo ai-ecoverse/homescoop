@@ -8,7 +8,7 @@ Pillow 13.0.0 for slicc WASIX CPython 3.15 (`cp315-wasix_wasm32`): JPEG, PNG (zl
   - `_imagingmath` and `_imagingmorph`.
   There's no `_imagingtk` (no Tk on WASIX), `_imagingcms`, `_webp` or `_avif`.
 - **Build:** in homescoop's CI from the PyPI sdist against wasix-python 3.15.0-1 (wasix-sysroot 2025.9.30-38).
-- **Python range:** `>=3.15.0-1 <3.15.1`.
+- **Python range:** `>=3.15.0-1 <3.15.1 || … || >=3.15.29-1 <3.15.30` (3.15.0-1 or any later 3.15 patch release, homescoop#1939).
 - **Pillow 13 removals** (see also "What changes for your code" below):
   - Python 3.10 support;
   - saving I-mode images as PNG with clipping;

@@ -20,6 +20,10 @@ sources:
   cpython:
     url: "https://www.python.org/ftp/python/3.15.0/Python-3.15.0.tgz"
     sha256: "438596cac081036d3c1d532ab7e7335eeb35567bc961749a0d5797176db0db68"
+repack:
+  from: "1.5.1-12"
+  files:
+    - README.md
 dependencies:
   build: [wasix-python]
   host: []

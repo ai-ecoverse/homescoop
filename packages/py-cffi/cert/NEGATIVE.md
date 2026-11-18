@@ -1,5 +1,9 @@
 # py-cffi: negative proof
 
+## python-range.mjs: 2.1.1-2 nests a second python under a later 3.15 patch release (2.1.1-3; homescoop#1939; 2026-11-18)
+
+npm `@ai-ecoverse/py-cffi@2.1.1-2` takes wasix-python as the patch-line range. `npm install --package-lock-only` of its tarball beside a stand-in `@ai-ecoverse/wasix-python` 3.15.2-1 (a package.json-only tarball, `python-range.mjs`'s `fakePython`) resolves a second python from the registry: `node_modules/@ai-ecoverse/py-cffi/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10. `_slicc_site` refuses a py-\* whose python isn't the one running, so on wasix-python 3.15.2-1 its import would fail. 2.1.1-3's repack, with the series range, resolves one python, at the top level, with 3.15.1-1, 3.15.2-1 and 3.15.29-1 stand-ins and with the floor and newest from npm.
+
 ## 2.1.1-1 without cffi-wasix-closures.patch (homescoop#2119; 2026-11-17)
 
 The same build, with `_cffi_backend.c` compiled from the unpatched sdist and the same flags, swapped into this tarball. Run on slicc-kernel 1.189.2 (users enforce) and wasix-python 3.15.0-8 with `scripts/browser-cert/run.mjs --package py-cffi`:

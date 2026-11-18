@@ -32,6 +32,8 @@ notices:
     meson: "build tool"
 inputs:
   - packages/py-kiwisolver/test/wasm-call-signatures.mjs
+repack:
+  from: "3.0.6-4"
 dependencies:
   build:
     - wasix-python

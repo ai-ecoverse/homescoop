@@ -1,5 +1,9 @@
 # py-packaging: negative proof
 
+## python-range.mjs: 26.3.0-10 nests a second python under a later 3.15 patch release (26.3.0-11; homescoop#1939; 2026-11-18)
+
+npm `@ai-ecoverse/py-packaging@26.3.0-10` takes wasix-python as the patch-line range. `npm install --package-lock-only` of its tarball beside a stand-in `@ai-ecoverse/wasix-python` 3.15.2-1 (a package.json-only tarball, `python-range.mjs`'s `fakePython`) resolves a second python from the registry: `node_modules/@ai-ecoverse/py-packaging/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10. `_slicc_site` refuses a py-\* whose python isn't the one running, so on wasix-python 3.15.2-1 its import would fail. 26.3.0-11's repack, with the series range, resolves one python, at the top level, with 3.15.1-1, 3.15.2-1 and 3.15.29-1 stand-ins and with the floor and newest from npm.
+
 ## The first cp315 release (homescoop#761; 2026-10-18)
 
 npm's cp314 py-packaging (`latest`) declares `@ai-ecoverse/wasix-python >=3.14.2-16 <3.14.3`, so with wasix-python 3.15.0-1 at the top, npm nests a second, 3.14 python under it (python-range.mjs --lock-only fails, as for the 3.14.2-16 exact pin below). Its .pyc files are `cpython-314`, which 3.15 doesn't use. The cp315 tarball resolves one python and passes every spec on 3.15.0-1 (slicc-kernel 1.125.0); cert/record.mjs checks its `cpython-315` .pyc.

@@ -1,5 +1,9 @@
 # py-scipy: negative proof
 
+## python-range.mjs: 1.18.1-3 nests a second python under a later 3.15 patch release (1.18.1-4; homescoop#1939; 2026-11-18)
+
+npm `@ai-ecoverse/py-scipy@1.18.1-3` takes wasix-python as the patch-line range. `npm install --package-lock-only` of its tarball beside a stand-in `@ai-ecoverse/wasix-python` 3.15.2-1 (a package.json-only tarball, `python-range.mjs`'s `fakePython`) resolves a second python from the registry: `node_modules/@ai-ecoverse/py-numpy/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10, `node_modules/@ai-ecoverse/py-scipy/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10. `_slicc_site` refuses a py-\* whose python isn't the one running, so on wasix-python 3.15.2-1 its import would fail. 1.18.1-4's repack, with the series range, resolves one python, at the top level, with 3.15.1-1, 3.15.2-1 and 3.15.29-1 stand-ins and with the floor and newest from npm.
+
 ## importlib.metadata (homescoop#731; 2026-10-19)
 
 npm's py-scipy 1.18.0-12, the repack of a local build that shipped no dist-info, on wasix-python 3.14.2-28 and slicc-kernel 1.125.0: `import scipy; importlib.metadata.version('scipy')` gives `1.18.0`, then `importlib.metadata.PackageNotFoundError: No package metadata was found for scipy` (rc 1). The CI-built 1.18.1 ships `scipy-1.18.1.dist-info`. `cert/import.mjs` now checks the metadata version (`pyImport`'s `dist`) and passes on both lines.
