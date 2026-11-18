@@ -36,13 +36,23 @@ push. A refreshed PR then carries the new version everywhere;
 ### The refresh
 
 For Renovate PRs no person or agent has to act on those lines:
-[`scripts/renovate-refresh.mjs`](../scripts/renovate-refresh.mjs) does it, run
-by `scripts/renovate-refresh-host.sh` (its own clone, main's scripts) from a bb
-script automation on Lars's host every 15 minutes. It pushes with that host's
-git credentials, so the PR's runs start normally; the Mend-hosted Renovate app
-runs no `postUpgradeTasks`, and a `GITHUB_TOKEN` push starts none. Before it,
-the refresh waited for the coordinator agent, and bumps stalled for days when
-it was down (#2083, #2085 and #2087 in November 2026).
+[`scripts/renovate-refresh.mjs`](../scripts/renovate-refresh.mjs) does it, in
+`ladder-build.yml`'s `renovate-refresh` job. In a PR run the job starts as soon
+as `recipe-sha` fails on a same-repo `renovate/` head and refreshes that PR; the
+hourly scheduled run picks up any PR that missed it (a push refused while the
+PR was queued, say). The job checks out main and runs main's scripts, never the
+head's, and isn't in `ci`'s needs.
+
+It pushes with a token of the **renovate-refresh GitHub App**
+(`actions/create-github-app-token`: `vars.RENOVATE_REFRESH_APP_ID` and
+`secrets.RENOVATE_REFRESH_APP_KEY`; contents, pull requests and workflows write,
+on this repository only; workflows because a rebase onto main can carry
+`.github/workflows` changes). A `GITHUB_TOKEN` push starts no runs, and the
+Mend-hosted Renovate app runs no `postUpgradeTasks`; an App's push gets its own
+`pull_request` run, which cancels the run that pushed it (its review included).
+Without the variable and the secret the job prints a notice and does nothing.
+Before it, the refresh waited for the coordinator agent, and bumps stalled for
+days when it was down (#2083, #2085 and #2087 in November 2026).
 
 It picks an open PR by Renovate (not a draft, not from a fork, on a
 `renovate/` branch) that changes only `packages/*/recipe.yaml`, whose commits
@@ -64,7 +74,7 @@ longer apply show up later, in host-build; here: a tag that moved, bytes that
 changed under an unchanged URL, a missing download), or a change outside those
 files. A failed refresh gets one PR comment per head
 (`<!-- homescoop:renovate-refresh -->`, the reason and the log's tail) and
-nothing is pushed. Run it by hand with
+nothing is pushed. Run it by hand (with git and `gh` that can push) with
 `node scripts/renovate-refresh.mjs [--pr <n>] [--dry-run]`;
 `scripts/test/renovate-refresh.test.mjs` covers the choice and a refresh
 against a local origin.

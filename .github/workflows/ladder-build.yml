@@ -18,6 +18,8 @@
 #                  close-listed-issues.
 #   dispatch       the same publish for named packages, on main only.
 #   issues/hourly  issue-labels.
+#   renovate-refresh  after recipe-sha fails on a Renovate PR, and hourly:
+#                  push the printed refresh (scripts/renovate-refresh.mjs).
 #
 # See docs/ladder-builds.md.
 name: ladder-build
@@ -1029,6 +1031,61 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/issue-labels.mjs --backlog --apply
+
+  # The refresh recipe-sha prints, pushed to a Renovate recipe PR by
+  # scripts/renovate-refresh.mjs (docs/renovate.md, "The refresh"): right
+  # after recipe-sha fails on a same-repo renovate/ head, and hourly for any
+  # PR that missed it. It pushes with the renovate-refresh GitHub App's token,
+  # not GITHUB_TOKEN (whose pushes start no runs), so the refreshed head gets
+  # its own pull_request run; that push cancels this run, review included.
+  # main's scripts run, never the head's. Not in ci's needs; never on a merge
+  # group or a push, and it can't publish.
+  renovate-refresh:
+    needs: [recipe-sha]
+    if: always() && ((github.event_name == 'pull_request' && needs.recipe-sha.result == 'failure' && startsWith(github.head_ref, 'renovate/') && github.event.pull_request.head.repo.full_name == github.repository) || github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      APP_ID: ${{ vars.RENOVATE_REFRESH_APP_ID }}
+      HAS_KEY: ${{ secrets.RENOVATE_REFRESH_APP_KEY != '' }}
+    steps:
+      - name: The renovate-refresh App is configured
+        id: app
+        run: |
+          if [[ -n "$APP_ID" && "$HAS_KEY" == true ]]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::renovate-refresh: SKIP no vars.RENOVATE_REFRESH_APP_ID / secrets.RENOVATE_REFRESH_APP_KEY (docs/renovate.md, \"The refresh\")"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+      - id: token
+        if: steps.app.outputs.ok == 'true'
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.RENOVATE_REFRESH_APP_ID }}
+          private-key: ${{ secrets.RENOVATE_REFRESH_APP_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+      - if: steps.app.outputs.ok == 'true'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          token: ${{ steps.token.outputs.token }}
+      - if: steps.app.outputs.ok == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+      - name: Refresh and push
+        if: steps.app.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: node scripts/renovate-refresh.mjs --repo "$GITHUB_REPOSITORY" ${PR:+--pr "$PR"}
 
   stress-lockfile:
     if: github.event_name == 'pull_request'
