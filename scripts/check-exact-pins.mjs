@@ -84,27 +84,10 @@ export function seriesRange(spec) {
   return { floor: first.floor, last: `${x}.${y}.${SERIES_LAST}`, below: `${x}.${y}.${SERIES_LAST + 1}`, lines: spec.split(' || ') };
 }
 
-export const PYTHON_SERIES_PENDING = new Set([
-  '@ai-ecoverse/py-bcrypt',
-  '@ai-ecoverse/py-cffi',
-  '@ai-ecoverse/py-contourpy',
-  '@ai-ecoverse/py-cryptography',
-  '@ai-ecoverse/py-cycler',
-  '@ai-ecoverse/py-fonttools',
-  '@ai-ecoverse/py-kiwisolver',
-  '@ai-ecoverse/py-matplotlib',
-  '@ai-ecoverse/py-numpy',
-  '@ai-ecoverse/py-packaging',
-  '@ai-ecoverse/py-pandas',
-  '@ai-ecoverse/py-pillow',
-  '@ai-ecoverse/py-pynacl',
-  '@ai-ecoverse/py-pyparsing',
-  '@ai-ecoverse/py-scipy',
-  '@ai-ecoverse/wasm-emscripten',
-]);
+export const PYTHON_SERIES_PENDING = new Set([]);
 
-export function seriesState(pkg) {
-  if (!PYTHON_SERIES_PENDING.has(pkg?.name)) return null;
+export function seriesState(pkg, pending = PYTHON_SERIES_PENDING) {
+  if (!pending.has(pkg?.name)) return null;
   return pythonRange(pkg.dependencies?.[PYTHON]) ? 'pending' : 'repinned';
 }
 
