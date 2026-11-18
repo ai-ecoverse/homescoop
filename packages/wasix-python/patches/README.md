@@ -1,5 +1,18 @@
 # wasix-python patches
 
+## CPython 3.15.2 (wasix-python 3.15.2-1)
+
+All 13 `cpython-*.patch` files were checked against pristine 3.15.2 in `build.sh`'s order with `git apply -v`, which reports every hunk's offset (`patch -s` doesn't). They apply at offset 0 with no fuzz, so a hunk can't drift to a similar block.
+
+| patch | 3.15.2 |
+| --- | --- |
+| `cpython-multiprocessing-noshare-wasix.patch` | rebased by hand: 3.15.2 picks the default context lazily in `_get_platform_default_context()`, gh-155717, so the `'forkserver' in _concrete_contexts` guard moves into it. It still comes first, so a build without fork never reaches `util._has_writeable_tempdir()` |
+| `cpython-fork-hint-wasix.patch` | rebased by hand: the `sys.platform not in ('darwin', 'wasi')` hunk moves to the same function; spawn stays the default in both builds |
+| `cpython-home-wasix.patch` | rebased by hand: 3.15.2 adds `base_executable_dir` right after the context of the first `getpath.py` hunk; the patch's code is unchanged |
+| `cpython-configure-wasix.patch`, `cpython-multiprocessing-wasix.patch` | line numbers only, and required: 3.15.2's `configure` grew and its Emscripten case now holds the same `py_cv_module_*=n/a` block as WASI. At the old numbers, the grp/pwd/resource hunk and the `_multiprocessing`/`_posixshmem` hunk apply cleanly to the Emscripten case, and those modules are lost on WASI |
+| `cpython-multiprocessing-util-wasix.patch`, `cpython-multiprocessing-unix-listener-wasix.patch`, `cpython-thread-native-id-wasix.patch` | line numbers only |
+| the others | unchanged, offset 0 |
+
 ## CPython 3.15.0 (wasix-python 3.15.0-1, homescoop#761)
 
 Every `cpython-*.patch` was regenerated against pristine 3.15.0: applied in `build.sh`'s order, each hunk checked where it landed, then re-diffed, so all of them apply at offset 0 with no fuzz. `build.sh` applies them with `-F0`, so a hunk that no longer matches fails the build instead of landing somewhere else. Two hunks of the 3.14.2 files did land in the wrong place, matched exactly but at the wrong offset: 3.15's `configure` gives Emscripten the same `py_cv_module_*=n/a` block as WASI, so `cpython-configure-wasix.patch`'s grp/pwd/resource hunk and `cpython-multiprocessing-wasix.patch`'s `_multiprocessing`/`_posixshmem` hunk were applied to the Emscripten case. None was dropped: 3.15.0 still has every problem they fix.

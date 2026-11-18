@@ -8,7 +8,7 @@ ptys (homescoop#783). Spawn stays the default start method in both builds.
 
 --- a/Lib/multiprocessing/context.py
 +++ b/Lib/multiprocessing/context.py
-@@ -199,6 +199,12 @@ class BaseContext(object):
+@@ -200,6 +200,12 @@ class BaseContext(object):
          try:
              ctx = _concrete_contexts[method]
          except KeyError:
@@ -21,15 +21,15 @@ ptys (homescoop#783). Spawn stays the default start method in both builds.
              raise ValueError('cannot find context for %r' % method) from None
          ctx._check_available()
          return ctx
-@@ -334,7 +340,7 @@ if sys.platform != 'win32':
-     # on macOS since macOS 10.14 (Mojave). Use spawn by default instead.
-     # gh-84559: We changed everyones default to a thread safeish one in 3.14.
-     if ('forkserver' in _concrete_contexts and reduction.HAVE_SEND_HANDLE
--            and sys.platform != 'darwin'):
-+            and sys.platform not in ('darwin', 'wasi')):
-         _default_context = DefaultContext(_concrete_contexts['forkserver'])
-     else:
-         _default_context = DefaultContext(_concrete_contexts['spawn'])
+@@ -346,7 +352,7 @@ if sys.platform != 'win32':
+         # on macOS since macOS 10.14 (Mojave). Use spawn by default instead.
+         # gh-84559: We changed everyones default to a thread safeish one in 3.14.
+         if ('forkserver' in _concrete_contexts and reduction.HAVE_SEND_HANDLE
+-                and sys.platform != 'darwin'):
++                and sys.platform not in ('darwin', 'wasi')):
+             # gh-155717: forkserver requires to write temporary files.
+             #
+             # Imported here rather than at the top level as util is costly
 --- a/Lib/os.py
 +++ b/Lib/os.py
 @@ -1215,3 +1215,15 @@ if _exists('sched_getaffinity') and sys._get_cpu_count_config() < 0:

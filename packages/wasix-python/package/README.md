@@ -2,6 +2,15 @@
 
 CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 
+## Since 3.15.2-1
+
+- **CPython 3.15.2**, with bundled `pip` 26.2.2. The ABI stays `cp315`.
+- **`multiprocessing` still starts with `spawn`.** 3.15.2 chooses the default start method on first use; on WASIX it stays `spawn` in both builds, and the build without fork still offers only `spawn`.
+- **`venv` finds its home the same way.** 3.15.2's getpath also searches from the resolved base executable; `cert/venv.mjs` and `cert/isolated.mjs` cover it.
+- **The py-\* take every 3.15 patch release** (homescoop#1939). Since their series re-pin, each py-\* takes wasix-python as the series range `>=3.15.0-1 <3.15.1 || >=3.15.1-1 <3.15.2 || … || >=3.15.29-1 <3.15.30`, so npm and pnpm install one python for all of them, this one, and a later 3.15.N needs no new py-\*. A published py-\* from before the re-pin (`>=3.15.0-1 <3.15.1`) still nests its own 3.15.0 python under this one, and discovery refuses it, so update it. CPython keeps the ABI within 3.15 (3.15.2 changes no struct layout and removes no exported symbol), and every wasix-python release is certified with the published py-\* installed by their ranges. A range up to the next minor wouldn't do: our versions are semver prereleases, and npm matches 3.15.2-1 only against a range that names a 3.15.2 prerelease.
+- **Discovery still wants the same python.** `_slicc_site` puts a py-\* on `sys.path` only if the wasix-python it resolves to is this exact version, as before. A py-\* whose python can't be resolved at all is accepted when its declared range holds this python, which now includes the series range. Under pnpm's `pnpm add -g`, where every package is its own project with its own copy of python, a py-\* project installed before a python update keeps the older copy and is refused until `pnpm update -g` moves it.
+- **mimalloc 2.5.2**, from 2.1.2, comes with 3.15.2. It is built in, but python allocates with the libc's malloc (`WITH_PYMALLOC=0`, no `PYTHONMALLOC=mimalloc`); `cert/heap-size.mjs` and `cert/heap-threads.mjs` cover the heap as before.
+
 ## Since 3.15.0-10
 
 - **pip knows the native-crypto packages.** `pip install` of cffi, cryptography, PyNaCl or bcrypt stops at once when they aren't installed, with the package to add: `pnpm add -g @ai-ecoverse/py-cryptography` (or `py-cffi`, `py-pynacl`, `py-bcrypt`). It doesn't try to build them from an sdist, which needs a C compiler or Rust and fails slowly. Once they're installed, pip treats them as already satisfied, so `pip install` of a package that requires them (msal, paramiko, azure-identity) installs the rest of what it needs.
@@ -79,7 +88,7 @@ CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 
 ## Since 3.15.0-1
 
-**CPython 3.15.0, a new ABI (homescoop#761).** SOABI `cpython-315-wasm32-wasix`, the stdlib and `site-packages` under `lib/python3.15`, bytecode tag `cpython-315`, `package.json` `slicc.python` `abi` `cp315`.
+**A new ABI since CPython 3.15.0 (homescoop#761).** SOABI `cpython-315-wasm32-wasix`, the stdlib and `site-packages` under `lib/python3.15`, bytecode tag `cpython-315`, `package.json` `slicc.python` `abi` `cp315`.
 - **The py-\* built before 3.15 don't load.** Their extension modules are `cpython-314-wasm32-wasix.so` and their `slicc.python.requires.abi` is `cp314`, so `_slicc_site.discover()` leaves them off `sys.path` (`python -v` names each one) and `import numpy` raises `ModuleNotFoundError`. That covers py-numpy, py-pandas, py-scipy, py-matplotlib, py-contourpy, py-kiwisolver and py-pillow until they're rebuilt for 3.15. The pure-Python py-\* load, except those that, until their next release, depend on wasix-python `<3.14.3`: npm or pnpm gives them their own older python, nested beside this one, and discovery refuses them as built for another python.
 - **UTF-8 mode is the default** (PEP 686): `open()` without an encoding and the filesystem encoding are UTF-8 whatever the locale; `-X utf8=0` or `PYTHONUTF8=0` turns it off.
 - Every CPython patch in `patches/` is regenerated against 3.15.0; none is dropped, since 3.15 has none of the fixes. Bundled `pip` 26.2.1.
@@ -100,7 +109,7 @@ CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 - Record locks (`fcntl` F_SETLK*, `lockf`) go through slicc-kernel (since -21, below). Since 3.14.2-26 `fcntl.flock` is real: per open file description, on any descriptor (`slicc.flock`, slicc-kernel ≥ 1.117.0). On older kernels it's a whole-file record lock, and up to -25 it was a no-op.
 - stdout is line-buffered unless it is a regular file, so output streams and survives crashes
 - `signal.alarm`/`setitimer` and `time.sleep` resuming after a signal (the sysroot's libc patches, `patches/`)
-- Bundled `pip` (26.2.1 since 3.15.0-1); `.pyc` are unchecked-hash
+- Bundled `pip` (26.2.2 since 3.15.2-1, 26.2.1 in 3.15.0-N); `.pyc` are unchecked-hash
 - Not built: `_uuid`, `curses`, `dbm`, `_zstd`, `tkinter`
 - `TZ` works: POSIX rules (`EST5EDT,M3.2.0,M11.1.0`; wasix-sysroot -18, homescoop#193), and zone names (`TZ=Europe/Berlin`, which slicc-kernel ≥ 1.174.2 sets) once `/usr/share/zoneinfo` has the zone files: seven links it to [`@ai-ecoverse/tzdata`](https://www.npmjs.com/package/@ai-ecoverse/tzdata). `time.localtime()`, `datetime.now().astimezone()` and `strftime('%Z')` follow it, and `zoneinfo` reads the same tree (`/usr/share/zoneinfo` is on `zoneinfo.TZPATH`), or the `py-tzdata` package where it's installed
 
