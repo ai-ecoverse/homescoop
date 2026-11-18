@@ -1,3 +1,7 @@
+## serial/serial.mjs: 3.15.0-8 can't set DTR (3.15.0-9; device access 3e; 2026-11-14)
+
+npm `@ai-ecoverse/wasix-python@3.15.0-8` (wasix-sysroot -40) on slicc-kernel 1.186.0's Node entry, with `/dev/ttyUSB0` and `/dev/ttyUSB1` added by `kernel.devices.add` and answered by `cert/serial/fake-port.js`: FAIL. pip installs pyserial 3.5 in a venv, and `cert/serial/loopback.py` opens the port, writes and reads back `b'hello'`, then fails at `s.dtr = False`: `fcntl.ioctl(self.fd, TIOCMBIC, TIOCM_DTR_str)` raises `OSError: [Errno 28] Invalid argument`. `cert/serial/esp_rom.py` fails the same way at the first line of its classic reset. The fake ports saw only `configure` at 115200, a `flush` of the input and `close`: no `setSignals`. pyserial's open ignores the same EINVAL from its own DTR/RTS setup, so the port opens. 3.15.0-9 is expected to pass on the same kernel in CI; this repo runs browser specs only there.
+
 ## pip-guard.mjs: 3.15.0-7 has no pydata fail-fast (3.15.0-8)
 
 On npm `@ai-ecoverse/wasix-python@3.15.0-7` (no `_slicc_pip.py`), `pip install numpy` with `PIP_NO_INDEX=1` and an empty find-links fails with pip's stock `No matching distribution found for numpy` (or `Could not find a version that satisfies the requirement numpy`). The stderr does not mention `Python data tools`, `pydata`, or `pnpm add -g @ai-ecoverse/py-numpy`. With a network index, the same release starts an sdist build (cmake/ninja) for `wasm32-wasix` and looks hung. 3.15.0-8's `cert/pip-guard.mjs` expects the catalog hint instead.
