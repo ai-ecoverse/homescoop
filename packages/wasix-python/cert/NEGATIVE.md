@@ -1,3 +1,7 @@
+## The no-repin guard: the patch-range py-* nest 3.15.0-10 under 3.15.2-1 (3.15.2-1; homescoop#1939; 2026-11-18)
+
+`npm install --package-lock-only` of a stand-in `@ai-ecoverse/wasix-python` 3.15.2-1 with the 21 py-* of main's `cert/meta.json` needsInstall (py-numpy 2.5.4-4, py-cffi 2.1.1-2, …, the patch-range releases) resolves a second python, `node_modules/@ai-ecoverse/<pkg>/node_modules/@ai-ecoverse/wasix-python` 3.15.0-10, under each of the 15 that take wasix-python. With `noRepin: true`, `cert/fixtures/repin.mjs` throws `no-repin cert: … is wasix-python 3.15.0-10, not 3.15.2-1` on that layout, as codex's review of #1932 found (#1939). With this release's needsInstall (the #2151 series repacks) the same install resolves one python, at the top level.
+
 ## series-range.mjs: 3.15.0-10 can't read the series range (3.15.2-1; homescoop#1939; 2026-11-18)
 
 `lib/python3.15/_slicc_site.py` from npm `@ai-ecoverse/wasix-python@3.15.0-10`, imported by a host python 3: `_in_range('3.15.0-10', pythonSeries('3.15.0-1'))` is `False`, and so is `_in_range('3.15.2-1', …)`. `_in_range('3.15.0-10', '>=3.15.0-1 <3.15.1')` is `True`. -10's `_in_range` splits the spec at its first ` <` and reads the rest as one version, so ` || ` makes it fail. On 3.15.0-10, a re-pinned py-\* whose python can't be resolved would be refused. `cert/series-range.mjs` expects `True` for this python's own series and agreement with npm semver (`scripts/cert-kernel-floor.mjs` `satisfies`) on every pair.
