@@ -15,7 +15,7 @@ that stale PWD and looked for fnox.toml from the parent's directory.
 HOME_DIR comes from HOME on WASI.
 
 diff --git a/crates/fnox-core/src/env.rs b/crates/fnox-core/src/env.rs
-index 9f01e4c..afa4919 100644
+index 5d2479a..26c0c70 100644
 --- a/crates/fnox-core/src/env.rs
 +++ b/crates/fnox-core/src/env.rs
 @@ -40,12 +40,18 @@ pub fn remove_var<K: AsRef<OsStr>>(key: K) {
@@ -58,7 +58,7 @@ index 9f01e4c..afa4919 100644
                  #[cfg(windows)]
                  return HOME_DIR.join("AppData").join("Local");
 diff --git a/src/main.rs b/src/main.rs
-index fbc65cb..16690ab 100644
+index 99106e3..e704961 100644
 --- a/src/main.rs
 +++ b/src/main.rs
 @@ -2,7 +2,68 @@ use fnox::commands::Cli;
@@ -128,10 +128,10 @@ index fbc65cb..16690ab 100644
 +        let _ = std::env::set_current_dir(dir);
 +    }
      let argv: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
-     if fnox::hook_env::can_exit_before_startup(&argv) {
-         return Ok(());
-@@ -10,7 +71,8 @@ fn main() -> miette::Result<()> {
-     run(argv)
+     #[cfg(target_os = "macos")]
+     {
+@@ -138,7 +199,8 @@ mod touch_id_helper_tests {
+     }
  }
  
 -#[tokio::main]

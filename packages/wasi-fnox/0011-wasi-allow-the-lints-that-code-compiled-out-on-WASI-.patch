@@ -4,7 +4,7 @@ Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 11/19] wasi: allow the lints that code compiled out on WASI triggers
 
 diff --git a/crates/fnox-core/src/lib.rs b/crates/fnox-core/src/lib.rs
-index 1d1bfe5..179bb07 100644
+index 3e3cc89..69890e1 100644
 --- a/crates/fnox-core/src/lib.rs
 +++ b/crates/fnox-core/src/lib.rs
 @@ -8,6 +8,17 @@
@@ -24,7 +24,7 @@ index 1d1bfe5..179bb07 100644
 +
  pub mod audit;
  pub mod auth_prompt;
- pub mod config;
+ #[cfg(not(target_os = "wasi"))]
 diff --git a/src/lib.rs b/src/lib.rs
 index 1d5b269..7c438d0 100644
 --- a/src/lib.rs

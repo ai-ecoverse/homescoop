@@ -4,19 +4,19 @@ Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 1/19] build: gate non-WASI dependencies by target
 
 diff --git a/Cargo.toml b/Cargo.toml
-index cd2d1ec..3e07ab2 100644
+index 0948569..ba4cfd9 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
-@@ -16,7 +16,7 @@ rust-version = "1.91.1"
- 
+@@ -17,7 +17,7 @@ rust-version = "1.91.1"
  [workspace.dependencies]
+ cc = "1"
  aes-gcm = "0.11.0-rc.3"
 -age = { version = "0.12", features = ["armor", "ssh", "plugin", "cli-common"] }
 +age = { version = "0.12" }
  aho-corasick = "1"
  anyhow = "1"
  arboard = "3"
-@@ -36,7 +36,7 @@ azure_security_keyvault_secrets = { version = "1" }
+@@ -37,7 +37,7 @@ azure_security_keyvault_secrets = { version = "1" }
  base64 = "0.23"
  blake3 = "1"
  bytes = "1"
@@ -25,7 +25,7 @@ index cd2d1ec..3e07ab2 100644
  ci_info = "0.14"
  usage-rs = { version = "7", features = ["diagnostics", "completions", "config"] }
  console = "0.16"
-@@ -107,7 +107,7 @@ tempfile = "3"
+@@ -108,7 +108,7 @@ tempfile = "3"
  tera = { version = "2", default-features = false }
  terminal_size = "0.4"
  thiserror = "2"
@@ -34,7 +34,7 @@ index cd2d1ec..3e07ab2 100644
  tokio-rustls = "0.26"
  toml_edit = { version = "0.25", features = ["serde"] }
  tracing = "0.1"
-@@ -142,7 +142,6 @@ fnox-core = { path = "crates/fnox-core", version = "1" }
+@@ -143,7 +143,6 @@ fnox-core = { path = "crates/fnox-core", version = "1" }
  # transitively via fnox-core and are not listed here.
  aho-corasick = { workspace = true }
  anyhow = { workspace = true }
@@ -42,7 +42,7 @@ index cd2d1ec..3e07ab2 100644
  atty = { workspace = true }
  base64 = { workspace = true }
  blake3 = { workspace = true }
-@@ -150,9 +149,7 @@ chrono = { workspace = true }
+@@ -151,9 +150,7 @@ chrono = { workspace = true }
  ci_info = { workspace = true }
  usage-rs = { workspace = true }
  console = { workspace = true }
@@ -52,7 +52,7 @@ index cd2d1ec..3e07ab2 100644
  futures = { workspace = true }
  globset = { workspace = true }
  hex = { workspace = true }
-@@ -162,32 +159,40 @@ ipnet = { workspace = true }
+@@ -163,32 +160,40 @@ ipnet = { workspace = true }
  libc = { workspace = true }
  miette = { workspace = true }
  miniz_oxide = { workspace = true }
@@ -104,7 +104,7 @@ index cd2d1ec..3e07ab2 100644
  [dev-dependencies]
  async-trait = { workspace = true }
 diff --git a/crates/fnox-core/Cargo.toml b/crates/fnox-core/Cargo.toml
-index 66d011e..37b89a0 100644
+index ea225f0..7e708e9 100644
 --- a/crates/fnox-core/Cargo.toml
 +++ b/crates/fnox-core/Cargo.toml
 @@ -11,51 +11,26 @@ readme = "../../README.md"
@@ -159,13 +159,14 @@ index 66d011e..37b89a0 100644
  schemars = { workspace = true }
  serde = { workspace = true }
  serde_json = { workspace = true }
-@@ -69,16 +44,47 @@ strum = { workspace = true }
+@@ -69,17 +44,48 @@ strum = { workspace = true }
  tempfile = { workspace = true }
  tera = { workspace = true }
  thiserror = { workspace = true }
 -tokio = { workspace = true }
  toml_edit = { workspace = true }
  tracing = { workspace = true }
+ url = { workspace = true }
  urlencoding = { workspace = true }
 -which = { workspace = true }
 +

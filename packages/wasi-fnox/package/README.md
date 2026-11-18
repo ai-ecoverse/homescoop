@@ -1,6 +1,6 @@
 # @ai-ecoverse/wasi-fnox
 
-[fnox](https://fnox.jdx.dev) 1.47 for [slicc](https://github.com/ai-ecoverse/slicc)'s kernel: a WASI preview1 command, `fnox`, built from upstream jdx/fnox v1.47.0 with [homescoop's patch series](https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-fnox) (`NNNN-*.patch`, listed in `recipe.yaml`). The patches are carried by homescoop, not upstreamed.
+[fnox](https://fnox.jdx.dev) 1.48 for [slicc](https://github.com/ai-ecoverse/slicc)'s kernel: a WASI preview1 command, `fnox`, built from upstream jdx/fnox v1.48.0 with [homescoop's patch series](https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-fnox) (`NNNN-*.patch`, listed in `recipe.yaml`). The patches are carried by homescoop, not upstreamed.
 
 ## In seven
 
@@ -22,7 +22,7 @@ Seven's vault holds the secret values, and fnox keeps only placeholders. The vau
 - **`fnox proxy rules --json`:** prints a project's rules as proposals.
 - **`fnox check`:** asks the vault about each sealed record.
 - **`fnox deactivate`:** removes the shell hooks and the `fnox` function even if the binary is gone (since 1.42.1), as upstream.
-- **Refused:** `as_file` secrets, `sync`, `reencrypt`, `fnox edit`, `fnox files`, `fnox set|get --file` (use `fnox set` / `fnox get`), and since 1.46.0 proxy rules that name a `lease` (native short-lived credentials).
+- **Refused:** `as_file` secrets, `sync`, `reencrypt`, `fnox edit`, `fnox files`, `fnox set|get --file` (use `fnox set` / `fnox get`), since 1.46.0 proxy rules that name a `lease` (native short-lived credentials), and since 1.48.0 `fnox set --open` (seven has no browser to open).
 - **age:** decrypting an age secret isn't supported yet (slicc-vault#2). Encrypting to age recipients works.
 - **Other providers:** only `sealed`, `age` and `plain` are built. Values from `plain` are passed on with a warning.
 - **Templates:** a secret's `default` and a provider's string fields can use `{{ fnox.profile }}` and `{{ fnox.profiles }}` (Tera, since 1.41), as upstream. A sealed secret's `value`, its placeholder, is never rendered.
@@ -36,7 +36,7 @@ Without `/dev/sealed`, every sealed operation fails with `not running in seven: 
 
 fnox is MIT (see `LICENSE`). `THIRD-PARTY-NOTICES.md` lists the crates, Rust's standard library and wasi-libc that `bin/fnox.wasm` links.
 
-## WASI support for fnox 1.47
+## WASI support for fnox 1.48
 
 `fnox exec --only` and `--except` retain upstream filtering: excluded providers are not resolved, dependencies are resolved without being exported, and excluded configured values are not injected. Inherited environment variables retain their original values unless the child plan replaces or removes them; these flags do not clear the environment. The WASI child starts from the environment captured before resolution, so a resolved interpolation dependency cannot enter it through process-environment mutation. Sealed selections still use the kernel ticket path.
 
@@ -49,3 +49,5 @@ Since 1.45.0, upstream secret files (`[files]`, `fnox files`, `set|get|edit --fi
 Since 1.46.0, upstream `fnox push` (CI and hosting secret stores), proxy lease credentials, and the `[files]` sync cache need native HTTP, CLIs and helper threads. This build compiles `push` and `push_targets` out, refuses proxy rules that name a `lease`, and keeps `sync` refused; port-specific `allow_private` entries still validate in the WASI proxy stub.
 
 Since 1.47.0, upstream adds named and passphrase-protected age identities, named age recipients, and an `azure-container-apps` push target. Passphrase prompts and age plugins stay native-only; this build still refuses age decryption in seven. A project `fnox.toml` with a `[targets]` table (for host `fnox push`) loads in seven: the table is parsed and ignored. Until 1.46.0-1, gating `Config.targets` off made that table an unknown field and every command failed (homescoop#2009).
+
+Since 1.48.0, a secret can record the page where a new value is issued (`url = "https://…"`, `fnox set NAME --url URL`), and `fnox list` shows it. Upstream's `fnox set --open` opens that page in a browser through the platform's opener, which seven doesn't have: this build compiles the opener out and refuses `--open` before reading a value, so open the url yourself and run `fnox set`. The macOS Keychain Touch ID protection, streaming `fnox proxy run` responses, the SIGPIPE handling for servers, vault lease `ttl` and the daemon's `FNOX_AGE_KEY` refresh are native-only and stay compiled out with the keychain provider, the native proxy, leases and the daemon. `fnox get` retrying through provider tokens kept as secrets (upstream #1125) sets those values only in fnox's own environment; the providers built here (`sealed`, `age`, `plain`) take no such tokens.
