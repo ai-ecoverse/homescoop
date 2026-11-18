@@ -1,3 +1,12 @@
+## pip-crypto.mjs: 3.15.0-9 has no fail-fast for the native-crypto packages (3.15.0-10; homescoop#2119; 2026-11-18)
+
+npm `@ai-ecoverse/wasix-python@3.15.0-9` on slicc-kernel 1.189.2 (browser cert, users enforce, `run.mjs --spec pip-crypto.mjs`), with py-cffi 2.1.1-2, py-cryptography 50.0.2-1, py-pynacl 1.6.2-1 and py-bcrypt 5.0.0-1 installed: FAIL.
+
+- **The installed half passes.** pip reads the py-* dist-info, so `pip install cryptography` is `Requirement already satisfied`, and the local wheel that requires all four installs.
+- **The plain venv fails.** Its `pip install cryptography` ends in pip's stock `ERROR: Could not find a version that satisfies the requirement cryptography (from versions: none)` / `No matching distribution found for cryptography`, with no `pip cannot install … on WASIX` and no `pnpm add -g @ai-ecoverse/py-cryptography`. With an index, pip would download the sdist and try a Rust build.
+
+The same 3.15.0-9 tarball passes `pip-crypto.mjs`, `pip-guard.mjs` and `sidemods.mjs` once only `lib/python3.15/_slicc_pip.py` is replaced with this release's (its `.pyc` removed). That is the only runtime file this release changes.
+
 ## serial/serial.mjs: 3.15.0-8 can't set DTR (3.15.0-9; device access 3e; 2026-11-14)
 
 npm `@ai-ecoverse/wasix-python@3.15.0-8` (wasix-sysroot -40) on slicc-kernel 1.186.0's Node entry, with `/dev/ttyUSB0` and `/dev/ttyUSB1` added by `kernel.devices.add` and answered by `cert/serial/fake-port.js`: FAIL. pip installs pyserial 3.5 in a venv, and `cert/serial/loopback.py` opens the port, writes and reads back `b'hello'`, then fails at `s.dtr = False`: `fcntl.ioctl(self.fd, TIOCMBIC, TIOCM_DTR_str)` raises `OSError: [Errno 28] Invalid argument`. `cert/serial/esp_rom.py` fails the same way at the first line of its classic reset. The fake ports saw only `configure` at 115200, a `flush` of the input and `close`: no `setSignals`. pyserial's open ignores the same EINVAL from its own DTR/RTS setup, so the port opens. 3.15.0-9 is expected to pass on the same kernel in CI; this repo runs browser specs only there.
