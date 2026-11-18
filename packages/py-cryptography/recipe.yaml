@@ -1,0 +1,63 @@
+# pyca/cryptography for slicc WASIX CPython 3.15: the first Rust (pyo3)
+# extension in homescoop, built with scripts/rust-pyext.sh.
+name: py-cryptography
+builder: host
+reproducible: true
+# renovate: datasource=pypi depName=cryptography
+version: "50.0.2"
+npm: "@ai-ecoverse/py-cryptography"
+summary: "cryptography 50.0.2 for slicc WASIX CPython 3.15 (Rust _rust side module, OpenSSL 3.5.9 linked in)"
+source:
+  url: "https://files.pythonhosted.org/packages/source/c/cryptography/cryptography-{{version}}.tar.gz"
+  sha256: "7b46165bb56eb4704e2eaaf86f3c940d19154535d9b0ca7d6d590b04060e00d5"
+sources:
+  # The release Cargo.lock of 50.0.2 names target-lexicon 0.13.5 (pyo3-build-config's).
+  target_lexicon:
+    url: "https://static.crates.io/crates/target-lexicon/target-lexicon-0.13.5.crate"
+    sha256: "adb6935a6f5c20170eeceb1a3835a49e12e19d792f6dd344ccc76a985ca5a6ca"
+  # Host cffi generates _openssl.c (build.rs runs _cffi_src/build_openssl.py);
+  # the same cffi as @ai-ecoverse/py-cffi, whose _cffi_backend runs it.
+  cffi:
+    url: "https://files.pythonhosted.org/packages/source/c/cffi/cffi-2.1.1.tar.gz"
+    sha256: "dd31f52ea1086513bb9df30f8fcee9b8918323ae067a3d5b78bc826a000712be"
+  pycparser:
+    url: "https://files.pythonhosted.org/packages/source/p/pycparser/pycparser-3.12.tar.gz"
+    sha256: "f03387877eab82ce01bbdfd0ba7252ee55a90b1c708d5129e2ce915475cf1db6"
+  wasix_python:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.15.0-8.tgz"
+    sha256: "351288012d82e8bfb41317322600deb69defe915f751febd1bc8f14f0c976444"
+  wasix_openssl:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-openssl/-/wasix-openssl-3.5.9-4.tgz"
+    sha256: "47629bd4e1f53ee1aa32e3ef150cd744c4eb242632f8bad2818c631aa6c645b7"
+  cpython:
+    url: "https://www.python.org/ftp/python/3.15.0/Python-3.15.0.tgz"
+    sha256: "438596cac081036d3c1d532ab7e7335eeb35567bc961749a0d5797176db0db68"
+inputs:
+  - scripts/rust-pyext/**
+dependencies:
+  build: [wasix-python]
+  host: []
+  run: [wasix-python]
+about:
+  homepage: https://cryptography.io
+  license: Apache-2.0 OR BSD-3-Clause
+  notes: |
+    Cross-built from the PyPI sdist: the Rust crate src/rust (pyo3 0.29,
+    abi3) with cargo for wasix-org/rust's wasm32-wasmer-wasi-dl target, as a
+    dylink.0 side module (cryptography/hazmat/bindings/_rust.cpython-315-wasm32-wasix.so)
+    that python.wasm loads by dlopen; scripts/rust-pyext.sh has the
+    toolchain and why. OpenSSL is @ai-ecoverse/wasix-openssl 3.5.9-4's PIC
+    libcrypto.a and libssl.a, linked in statically (OPENSSL_STATIC); the
+    cffi-generated _openssl module (src/_cffi_src, cffi 2.1.1 on the host)
+    is compiled into _rust with wasixcc (legacy wasm EH, PIC) and imports
+    _cffi_backend from @ai-ecoverse/py-cffi at run time. No patches to
+    cryptography; target-lexicon (pyo3's build script only) gets
+    scripts/rust-pyext/target-lexicon-dl.patch.
+    The target's std is panic=abort: a Rust panic aborts python instead of
+    raising pyo3's PanicException. cryptography's error paths
+    (InvalidSignature, InvalidTag, ValueError for bad keys) are Python
+    exceptions and don't panic.
+notices:
+  not_linked:
+    target_lexicon: "pyo3's build script parses the target triple with it on the build host; nothing of it is in the wasm"
+    pycparser: "cffi's C parser, run on the build host to generate _openssl.c; nothing of it is in the wasm"

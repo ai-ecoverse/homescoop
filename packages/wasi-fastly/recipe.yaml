@@ -1,0 +1,48 @@
+# The Fastly CLI (fastly/cli) for slicc WASI preview1: fastly.wasm built by
+# homescoop from fastly's source with GOOS=wasip1 and patches/, plus a
+# host-import module for slicc-kernel.
+name: wasi-fastly
+builder: host
+reproducible: true
+# renovate: datasource=github-releases depName=fastly/cli extractVersion=^v(?<version>.*)$
+version: "17.1.0"
+npm: "@ai-ecoverse/wasi-fastly"
+summary: "Fastly CLI 17.1.0 for slicc WASI preview1 (command fastly)"
+source:
+  url: "https://github.com/fastly/cli/archive/3e9473d248429bad874e848281f0e91ad6f41ea8.tar.gz"
+  sha256: "a3a0fbcd7b85fd4b1594c2e548b61f539259068e5888383d3d9c94673c042120"
+  tag: "v{{version}}"
+  commit: "3e9473d248429bad874e848281f0e91ad6f41ea8"
+  tree: "3ec1c88d5dbac25b4beacbd6d3b64e69b309e2e3"
+toolchain:
+  # fastly v17.1.0's go.mod requires go 1.26.10.
+  go: "1.27.3"
+  go_sha256_linux_x64: "65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40"
+  go_sha256_macos_arm64: "dd3908cf20959d798c1e06ebe5b72213f0505ce01373b40ce3110975a6cd99c2"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://www.fastly.com/documentation/reference/cli/
+  license: Apache-2.0
+  notes: |
+    fastly v17.1.0 (tag v17.1.0, commit 3e9473d). build.sh fetches the
+    pinned source and Go 1.27.3, vendors the modules (go.sum checked),
+    applies patches/*.patch and builds ./cmd/fastly with GOOS=wasip1
+    GOARCH=wasm CGO_ENABLED=0 -trimpath -buildvcs=false and upstream's
+    release ldflags (-s -w, revision.AppVersion v<version>,
+    revision.GitCommit the short commit, revision.Environment release).
+    patches/0001-wasip1-build.patch: wasip1 files for go-ps and
+    otiai10/copy, the only modules that do not build for wasip1.
+    patches/0002-wasip1-slicc-host.patch: HTTP (http.DefaultTransport, and
+    go-fastly's client on wasip1) through package/host/fastly-host.mjs
+    (fastly_host imports), modes for the config directory, config.toml and
+    errors.log, and a piped token for fastly auth login.
+    patches/0003-wasip1-unavailable-commands.patch: SSO, compute
+    build/publish/serve/init/install-tools, update and install refuse with
+    a clear error; no update check, no build-data notice.
+    patches/0004-lazy-oidc-metadata.patch: the OpenID Connect metadata is
+    fetched only when an SSO token may need it.
+    build.sh runs wasm-opt -Oz and fails above 62 MiB, so fastly.wasm fits
+    a Cloudflare Dynamic Worker (64 MiB of code).

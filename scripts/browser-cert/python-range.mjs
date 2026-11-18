@@ -6,6 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PYTHON, inPythonRange, pythonRange } from '../check-exact-pins.mjs';
 import { readCertMeta } from './cert-meta.mjs';
+import { peerTarball } from '../peer-tarball.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const TOP = `node_modules/${PYTHON}`;
@@ -32,10 +33,17 @@ function sh(cmd, args, opts = {}) {
   return r.stdout;
 }
 
-function lockFor(tgz, python, work) {
+// cert/meta.json "peers" built in this run (scripts/peer-tarball.mjs) stand in
+// for their registry versions, so a py-* whose py-* dependency is new in the
+// same pull request (py-cffi and py-pycparser) resolves before either is on npm.
+export function peerTarballs(meta, find = peerTarball) {
+  return (meta.peers || []).map((p) => find(p)).filter((t) => t.endsWith('.tgz'));
+}
+
+function lockFor(tgz, python, work, peers = []) {
   const dir = mkdtempSync(join(work, 'lock-'));
   writeFileSync(join(dir, 'package.json'), '{"name":"python-range-probe","private":true}\n');
-  sh('npm', ['install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund', '--silent', tgz, `${PYTHON}@${python}`], { cwd: dir });
+  sh('npm', ['install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund', '--silent', tgz, ...peers, `${PYTHON}@${python}`], { cwd: dir });
   const lock = JSON.parse(readFileSync(join(dir, 'package-lock.json'), 'utf8'));
   rmSync(dir, { recursive: true, force: true });
   return lock;
@@ -80,9 +88,11 @@ function main(argv) {
   mkdirSync(base, { recursive: true });
   const work = mkdtempSync(join(base, `python-range-${pkg}-`));
   let failed = 0;
+  const peers = peerTarballs(meta);
+  for (const p of peers) console.log(`python-range: peer ${p} (this run's artifact, cert/meta.json peers)`);
   try {
     for (const python of [...new Set([range.floor, newest])]) {
-      const errors = lockErrors(lockFor(tgz, python, work), python);
+      const errors = lockErrors(lockFor(tgz, python, work, peers), python);
       if (errors.length) {
         failed++;
         console.error(`python-range: FAIL ${tgz} with ${PYTHON}@${python}:\n  - ${errors.join('\n  - ')}`);

@@ -1,0 +1,91 @@
+Build the Fastly CLI for GOOS=wasip1.
+
+Reason: fastly v17.1.0 builds for wasip1 except for two modules.
+github.com/mitchellh/go-ps (ps.Processes, which compute serve uses to find
+a running Viceroy) has no wasip1 file, so processes and findProcess are
+undefined. github.com/otiai10/copy (cp.Copy, which compute init uses for a
+local --from directory) builds its named-pipe, lutimes and stat-times files
+for every Unix but js, and wasip1 has no Mkfifo, Lutimes or Atim/Ctim. go-ps
+gets a wasip1 file that answers "no process table"; otiai10/copy takes its
+js/plan9 fallbacks on wasip1 (named pipes and symlink times are not copied,
+times come from ModTime). compute serve and compute init are refused on
+wasip1 before they reach either (0003).
+
+Upstream: not filed (homescoop does not file upstream reports).
+removeWhen: go-ps and otiai10/copy build for GOOS=wasip1 without it.
+
+diff --git a/vendor/github.com/mitchellh/go-ps/process_wasip1.go b/vendor/github.com/mitchellh/go-ps/process_wasip1.go
+--- /dev/null
++++ b/vendor/github.com/mitchellh/go-ps/process_wasip1.go
+@@ -0,0 +1,17 @@
++//go:build wasip1
++
++package ps
++
++import "errors"
++
++// errNoProcessTable is what wasip1 answers: slicc-kernel gives a WASI
++// program no process table to read.
++var errNoProcessTable = errors.New("go-ps: wasip1 has no process table")
++
++func findProcess(int) (Process, error) {
++	return nil, errNoProcessTable
++}
++
++func processes() ([]Process, error) {
++	return nil, errNoProcessTable
++}
+diff --git a/vendor/github.com/otiai10/copy/copy_namedpipes.go b/vendor/github.com/otiai10/copy/copy_namedpipes.go
+--- a/vendor/github.com/otiai10/copy/copy_namedpipes.go
++++ b/vendor/github.com/otiai10/copy/copy_namedpipes.go
+@@ -1,4 +1,4 @@
+-//go:build !windows && !plan9 && !netbsd && !aix && !illumos && !solaris && !js
++//go:build !windows && !plan9 && !netbsd && !aix && !illumos && !solaris && !js && !wasip1
+ 
+ package copy
+ 
+diff --git a/vendor/github.com/otiai10/copy/copy_namedpipes_x.go b/vendor/github.com/otiai10/copy/copy_namedpipes_x.go
+--- a/vendor/github.com/otiai10/copy/copy_namedpipes_x.go
++++ b/vendor/github.com/otiai10/copy/copy_namedpipes_x.go
+@@ -1,4 +1,4 @@
+-//go:build windows || plan9 || netbsd || aix || illumos || solaris || js
++//go:build windows || plan9 || netbsd || aix || illumos || solaris || js || wasip1
+ 
+ package copy
+ 
+diff --git a/vendor/github.com/otiai10/copy/preserve_ltimes.go b/vendor/github.com/otiai10/copy/preserve_ltimes.go
+--- a/vendor/github.com/otiai10/copy/preserve_ltimes.go
++++ b/vendor/github.com/otiai10/copy/preserve_ltimes.go
+@@ -1,4 +1,4 @@
+-//go:build !windows && !plan9 && !js
++//go:build !windows && !plan9 && !js && !wasip1
+ 
+ package copy
+ 
+diff --git a/vendor/github.com/otiai10/copy/preserve_ltimes_x.go b/vendor/github.com/otiai10/copy/preserve_ltimes_x.go
+--- a/vendor/github.com/otiai10/copy/preserve_ltimes_x.go
++++ b/vendor/github.com/otiai10/copy/preserve_ltimes_x.go
+@@ -1,4 +1,4 @@
+-//go:build windows || js || plan9
++//go:build windows || js || plan9 || wasip1
+ 
+ package copy
+ 
+diff --git a/vendor/github.com/otiai10/copy/stat_times.go b/vendor/github.com/otiai10/copy/stat_times.go
+--- a/vendor/github.com/otiai10/copy/stat_times.go
++++ b/vendor/github.com/otiai10/copy/stat_times.go
+@@ -1,4 +1,4 @@
+-//go:build !windows && !darwin && !freebsd && !plan9 && !netbsd && !js
++//go:build !windows && !darwin && !freebsd && !plan9 && !netbsd && !js && !wasip1
+ 
+ // TODO: add more runtimes
+ 
+diff --git a/vendor/github.com/otiai10/copy/stat_times_x.go b/vendor/github.com/otiai10/copy/stat_times_x.go
+--- a/vendor/github.com/otiai10/copy/stat_times_x.go
++++ b/vendor/github.com/otiai10/copy/stat_times_x.go
+@@ -1,4 +1,4 @@
+-//go:build plan9 || netbsd
++//go:build plan9 || netbsd || wasip1
+ 
+ package copy
+ 

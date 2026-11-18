@@ -1,0 +1,57 @@
+name: py-cffi
+builder: host
+# ladder-pr builds it twice and compares the package.tgz sha256.
+reproducible: true
+# renovate: datasource=pypi depName=cffi
+version: "2.1.1"
+npm: "@ai-ecoverse/py-cffi"
+summary: "cffi 2.1.1 for slicc WASIX CPython 3.15"
+source:
+  url: "https://files.pythonhosted.org/packages/source/c/cffi/cffi-{{version}}.tar.gz"
+  sha256: "dd31f52ea1086513bb9df30f8fcee9b8918323ae067a3d5b78bc826a000712be"
+sources:
+  # The libffi python.wasm links (packages/wasix-python/recipe.yaml
+  # sources.libffi, test/libffi-pin.test.mjs keeps them equal). Only its
+  # headers are used: _cffi_backend imports the ffi_* functions from
+  # python.wasm, the copy _ctypes uses, and links no libffi of its own.
+  libffi:
+    url: "https://github.com/wasix-org/libffi/archive/09cbf7d66d232a01dbb0c88fd5ae65fa9c15f7c7.tar.gz"
+    sha256: "7097de0f66f458c2bd44e0e021e449a2572692067f7136791bdd4788330de978"
+    commit: "09cbf7d66d232a01dbb0c88fd5ae65fa9c15f7c7"
+    tree: "a83f4b7e97c78d8cdb9720cee275b1572a59bd93"
+  wasix_python:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.15.0-1.tgz"
+    sha256: "f96dde95f183dbc4b48a46bf70f6f616b823f5b9bafa75fa5e1334d1f96f4481"
+  cpython:
+    url: "https://www.python.org/ftp/python/3.15.0/Python-3.15.0.tgz"
+    sha256: "438596cac081036d3c1d532ab7e7335eeb35567bc961749a0d5797176db0db68"
+inputs:
+  - scripts/cffi-wasix.sh
+  - scripts/cffi-emit.py
+  - packages/py-pycparser/recipe.yaml
+  - packages/py-kiwisolver/test/wasm-call-signatures.mjs
+# 2.1.1-2 changes only the README (the downstream example links lib-pic/,
+# the PIC archive a side module needs): the bytes of 2.1.1-1 plus it.
+# Drop this block at the next rebuild.
+repack:
+  from: "2.1.1-1"
+  files:
+    - README.md
+dependencies:
+  build: [wasix-python]
+  host: []
+  run: [wasix-python, py-pycparser]
+about:
+  license: MIT-0
+  notes: |
+    Cross-built from the PyPI sdist with wasixcc (PIC, legacy wasm EH, the
+    variant python.wasm is) as a dylink.0 side module against wasix-python
+    3.15.0-1's headers (wasix-sysroot -38): _cffi_backend.cpython-315-wasm32-wasix.so
+    at the top of site-packages, as cffi's wheels have it. It compiles against
+    the headers of wasix-python's libffi (wasix-org 09cbf7d) and imports
+    ffi_call, ffi_prep_cif(_var), ffi_closure_alloc and the ffi_type_*
+    globals from python.wasm, which exports them (one libffi: _ctypes' copy).
+    cffi-wasix-closures.patch makes cffi use libffi's closure allocator on
+    WASIX, as on Emscripten. share/py-cffi/selftest has the cert fixtures: an
+    ABI-mode C side module and an API-mode extension built on the host with
+    scripts/cffi-wasix.sh, the helper for downstream cffi recipes.

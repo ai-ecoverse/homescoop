@@ -1,0 +1,38 @@
+{
+  "name": "@ai-ecoverse/py-pycparser",
+  "version": "3.12.0-1",
+  "description": "pycparser, a C parser in pure Python (the parser cffi's cdef uses), for slicc WASIX CPython.",
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/py-pycparser/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/py-pycparser",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "python"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {},
+  "homescoop": {
+    "recipe": "py-pycparser",
+    "upstream": "3.12"
+  },
+  "slicc": {
+    "python": {
+      "sitePackages": "lib/python3/site-packages"
+    }
+  }
+}

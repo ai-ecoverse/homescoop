@@ -1,0 +1,858 @@
+diff --git a/awscli/botocore/auth.py b/awscli/botocore/auth.py
+index 1db7104..a291e67 100644
+--- a/awscli/botocore/auth.py
++++ b/awscli/botocore/auth.py
+@@ -22,6 +22,7 @@ from email.utils import formatdate
+ from hashlib import sha256
+ 
+ from botocore.compat import (
++    HAS_CRT,
+     MD5_AVAILABLE,  # noqa
+     HTTPHeaders,
+     encodebytes,
+@@ -893,7 +894,12 @@ class BearerAuth(TokenSigner):
+ # the botocore.crt.auth module imports functions/classes defined above from
+ # this module. In the future, we should isolate those functions/classes into
+ # a separate utility module to avoid any potential circular import.
+-import botocore.crt.auth  # noqa
++# homescoop (slicc): only with awscrt, which the SigV4a signers need.
++if HAS_CRT:
++    import botocore.crt.auth  # noqa
++
++# The signature versions that only awscrt can sign (SigV4a).
++CRT_ONLY_AUTH_TYPES = ('v4a', 's3v4a', 's3v4a-query')
+ 
+ 
+ def resolve_auth_type(auth_trait):
+@@ -946,20 +952,25 @@ def resolve_auth_scheme_preference(preference_list, auth_options):
+ AUTH_TYPE_MAPS = {
+     'v2': SigV2Auth,
+     'v4': SigV4Auth,
+-    'v4a': botocore.crt.auth.CrtSigV4AsymAuth,
+     'v4-query': SigV4QueryAuth,
+     'v3': SigV3Auth,
+     'v3https': SigV3Auth,
+     's3v4': S3SigV4Auth,
+     's3v4-query': S3SigV4QueryAuth,
+     's3v4-presign-post': S3SigV4PostAuth,
+-    's3v4a': botocore.crt.auth.CrtS3SigV4AsymAuth,
+-    's3v4a-query': botocore.crt.auth.CrtS3SigV4AsymQueryAuth,
+     'v4-s3express': S3ExpressAuth,
+     'v4-s3express-query': S3ExpressQueryAuth,
+     'v4-s3express-presign-post': S3ExpressPostAuth,
+     'bearer': BearerAuth,
+ }
++if HAS_CRT:
++    AUTH_TYPE_MAPS.update(
++        {
++            'v4a': botocore.crt.auth.CrtSigV4AsymAuth,
++            's3v4a': botocore.crt.auth.CrtS3SigV4AsymAuth,
++            's3v4a-query': botocore.crt.auth.CrtS3SigV4AsymQueryAuth,
++        }
++    )
+ 
+ AUTH_TYPE_TO_SIGNATURE_VERSION = {
+     'aws.auth#sigv4': 'v4',
+diff --git a/awscli/botocore/compat.py b/awscli/botocore/compat.py
+index 246563e..deb4c0e 100644
+--- a/awscli/botocore/compat.py
++++ b/awscli/botocore/compat.py
+@@ -87,6 +87,33 @@ def ensure_bytes(s, encoding='utf-8', errors='strict'):
+     raise ValueError(f"Expected str or bytes, received {type(s)}.")
+ 
+ 
++# homescoop (slicc): awscrt is optional here, as in standalone botocore. The
++# AWS CLI v2 requires it, but it is a native extension with no WASIX build,
++# so this package ships without it. HAS_CRT says whether it is importable;
++# the CRT-only features (SigV4a, the CRT S3 transfer client, xxhash
++# checksums, `aws login`, EC2 Instance Connect's tunnel and the commands
++# that use awscrt.crypto) say so when they are used, and CRC32C and
++# CRC64NVME fall back to botocore.crc (pure Python).
++try:
++    import awscrt  # noqa: F401
++
++    HAS_CRT = os.environ.get('BOTO_DISABLE_CRT', 'false').lower() != 'true'
++except ImportError:
++    HAS_CRT = False
++
++
++def crt_unavailable(feature):
++    """The error for a feature that needs awscrt when it is missing."""
++    from botocore.exceptions import MissingDependencyException
++
++    return MissingDependencyException(
++        msg=(
++            f'{feature} requires awscrt, the AWS Common Runtime, which this '
++            'AWS CLI build does not include.'
++        )
++    )
++
++
+ try:
+     import xml.etree.cElementTree as ETree
+ except ImportError:
+diff --git a/awscli/botocore/crc.py b/awscli/botocore/crc.py
+new file mode 100644
+index 0000000..166c5a9
+--- /dev/null
++++ b/awscli/botocore/crc.py
+@@ -0,0 +1,111 @@
++# homescoop (slicc): pure-Python CRC32C and CRC64NVME, and CRC combining,
++# for when awscrt is not available (botocore.compat.HAS_CRT is False).
++#
++# The functions take and return the same values as awscrt.checksums:
++# crc32c(data, previous_crc32c=0) and crc64nvme(data, previous_crc64nvme=0)
++# continue a running checksum the way zlib.crc32 does, and
++# combine_*(crc1, crc2, len2) give the checksum of A + B from the checksums
++# of A and B and the length of B.
++#
++#   CRC-32C    (Castagnoli) reflected poly 0x82F63B78, init/xorout 0xFFFFFFFF
++#   CRC-64/NVME             reflected poly 0x9A6C9329AC4BC9B5,
++#                           init/xorout 0xFFFFFFFFFFFFFFFF
++#   CRC-32     (zlib)       reflected poly 0xEDB88320, init/xorout 0xFFFFFFFF
++#
++# Check values ("123456789"): CRC-32C 0xE3069283, CRC-64/NVME
++# 0xAE8B14860A799888, CRC-32 0xCBF43926.
++from binascii import crc32 as _zlib_crc32
++
++_CRC32_POLY = 0xEDB88320
++_CRC32C_POLY = 0x82F63B78
++_CRC64NVME_POLY = 0x9A6C9329AC4BC9B5
++_MASK32 = 0xFFFFFFFF
++_MASK64 = 0xFFFFFFFFFFFFFFFF
++
++
++def _table(poly):
++    table = []
++    for n in range(256):
++        c = n
++        for _ in range(8):
++            c = (c >> 1) ^ poly if c & 1 else c >> 1
++        table.append(c)
++    return tuple(table)
++
++
++_CRC32C_TABLE = _table(_CRC32C_POLY)
++_CRC64NVME_TABLE = _table(_CRC64NVME_POLY)
++
++
++def _update(table, mask, data, crc):
++    crc = (crc & mask) ^ mask
++    for b in memoryview(data).cast('B'):
++        crc = table[(crc ^ b) & 0xFF] ^ (crc >> 8)
++    return crc ^ mask
++
++
++def crc32c(data, previous_crc32c=0):
++    return _update(_CRC32C_TABLE, _MASK32, data, previous_crc32c)
++
++
++def crc64nvme(data, previous_crc64nvme=0):
++    return _update(_CRC64NVME_TABLE, _MASK64, data, previous_crc64nvme)
++
++
++def crc32(data, previous_crc32=0):
++    return _zlib_crc32(data, previous_crc32) & _MASK32
++
++
++# Combining, as zlib's crc32_combine: the register of A advanced over len2
++# zero bytes (a linear map over GF(2), applied as a matrix and squared for
++# each bit of the length), then xor the checksum of B. The init and xorout
++# terms cancel, so the same holds for the conditioned values.
++def _gf2_times(mat, vec):
++    s = 0
++    i = 0
++    while vec:
++        if vec & 1:
++            s ^= mat[i]
++        vec >>= 1
++        i += 1
++    return s
++
++
++def _gf2_square(mat):
++    return [_gf2_times(mat, m) for m in mat]
++
++
++def _combine(poly, width, crc1, crc2, len2):
++    if len2 <= 0:
++        return crc1
++    # The operator for one zero bit, then two, then four.
++    odd = [poly] + [1 << n for n in range(width - 1)]
++    even = _gf2_square(odd)
++    odd = _gf2_square(even)
++    while True:
++        # Each pass applies a square of the operator: 1, 2, 4, ... zero bytes.
++        even = _gf2_square(odd)
++        if len2 & 1:
++            crc1 = _gf2_times(even, crc1)
++        len2 >>= 1
++        if not len2:
++            break
++        odd = _gf2_square(even)
++        if len2 & 1:
++            crc1 = _gf2_times(odd, crc1)
++        len2 >>= 1
++        if not len2:
++            break
++    return crc1 ^ crc2
++
++
++def combine_crc32(crc1, crc2, len2):
++    return _combine(_CRC32_POLY, 32, crc1, crc2, len2)
++
++
++def combine_crc32c(crc1, crc2, len2):
++    return _combine(_CRC32C_POLY, 32, crc1, crc2, len2)
++
++
++def combine_crc64nvme(crc1, crc2, len2):
++    return _combine(_CRC64NVME_POLY, 64, crc1, crc2, len2)
+diff --git a/awscli/botocore/credentials.py b/awscli/botocore/credentials.py
+index a119716..18f4dbb 100644
+--- a/awscli/botocore/credentials.py
++++ b/awscli/botocore/credentials.py
+@@ -27,9 +27,13 @@ from hashlib import sha1
+ import botocore.compat
+ import botocore.configloader
+ import dateutil.parser
+-from awscrt.crypto import EC
+ from botocore import UNSIGNED
+-from botocore.compat import compat_shell_split, total_seconds
++from botocore.compat import (
++    HAS_CRT,
++    compat_shell_split,
++    crt_unavailable,
++    total_seconds,
++)
+ from botocore.config import Config
+ from botocore.exceptions import (
+     ClientError,
+@@ -2652,6 +2656,11 @@ class LoginCredentialFetcher:
+         # strip should handle the optional newline at the end as well
+         contents = ''.join(content_lines).strip()
+ 
++        # homescoop (slicc): the DPoP key of `aws login` needs awscrt.crypto.
++        if not HAS_CRT:
++            raise crt_unavailable('Credentials from `aws login`')
++        from awscrt.crypto import EC
++
+         try:
+             return EC.new_key_from_der_data(base64.b64decode(contents))
+         except ValueError as e:
+diff --git a/awscli/botocore/exceptions.py b/awscli/botocore/exceptions.py
+index 83d4098..cbb9e99 100644
+--- a/awscli/botocore/exceptions.py
++++ b/awscli/botocore/exceptions.py
+@@ -500,6 +500,10 @@ class UnknownClientMethodError(BotoCoreError):
+     fmt = 'Client does not have method: {method_name}'
+ 
+ 
++class MissingDependencyException(BotoCoreError):
++    fmt = "Missing Dependency: {msg}"
++
++
+ class UnsupportedSignatureVersionError(BotoCoreError):
+     """Error when trying to use an unsupported Signature Version."""
+ 
+diff --git a/awscli/botocore/httpchecksum.py b/awscli/botocore/httpchecksum.py
+index ff077c0..9ece4cb 100644
+--- a/awscli/botocore/httpchecksum.py
++++ b/awscli/botocore/httpchecksum.py
+@@ -25,8 +25,7 @@ import logging
+ from binascii import crc32
+ from hashlib import sha1, sha256, sha512
+ 
+-from awscrt import checksums as crt_checksums
+-from botocore.compat import urlparse
++from botocore.compat import HAS_CRT, crt_unavailable, urlparse
+ from botocore.exceptions import AwsChunkedWrapperError, FlexibleChecksumError
+ from botocore.model import StructureShape
+ from botocore.response import StreamingBody
+@@ -37,9 +36,18 @@ from botocore.utils import (
+     has_checksum_header,
+ )
+ 
++if HAS_CRT:
++    from awscrt import checksums as crt_checksums
++else:
++    # homescoop (slicc): without awscrt, CRC32C and CRC64NVME are computed
++    # in pure Python (botocore.crc) and the xxhash checksums are unavailable.
++    from botocore import crc as crt_checksums
++
+ logger = logging.getLogger(__name__)
+ 
+-DEFAULT_CHECKSUM_ALGORITHM = "CRC64NVME"
++# Without awscrt the default is CRC32, which zlib computes, as in standalone
++# botocore; CRC64NVME in pure Python is far slower.
++DEFAULT_CHECKSUM_ALGORITHM = "CRC64NVME" if HAS_CRT else "CRC32"
+ 
+ 
+ class BaseChecksum:
+@@ -329,6 +337,10 @@ def resolve_request_checksum_algorithm(
+ 
+         algorithm_name = params[algorithm_member].lower()
+         if algorithm_name not in supported_algorithms:
++            if not HAS_CRT and algorithm_name in _CRT_ONLY_CHECKSUM_ALGORITHMS:
++                raise crt_unavailable(
++                    f'The {algorithm_name.upper()} checksum algorithm'
++                )
+             raise FlexibleChecksumError(
+                 error_msg=f"Unsupported checksum algorithm: {algorithm_name}"
+             )
+@@ -596,6 +608,10 @@ _CHECKSUM_CLS = {
+     'xxhash3': CrtXxhash3Checksum,
+     'xxhash128': CrtXxhash128Checksum,
+ }
++_CRT_ONLY_CHECKSUM_ALGORITHMS = ['xxhash64', 'xxhash3', 'xxhash128']
++if not HAS_CRT:
++    for _name in _CRT_ONLY_CHECKSUM_ALGORITHMS:
++        del _CHECKSUM_CLS[_name]
+ 
+ 
+ _SUPPORTED_CHECKSUM_ALGORITHMS = list(_CHECKSUM_CLS.keys())
+diff --git a/awscli/botocore/regions.py b/awscli/botocore/regions.py
+index 4fdf677..462f972 100644
+--- a/awscli/botocore/regions.py
++++ b/awscli/botocore/regions.py
+@@ -24,7 +24,12 @@ from enum import Enum
+ 
+ import jmespath
+ from botocore import UNSIGNED, xform_name
+-from botocore.auth import AUTH_TYPE_MAPS, resolve_auth_scheme_preference
++from botocore.auth import (
++    AUTH_TYPE_MAPS,
++    CRT_ONLY_AUTH_TYPES,
++    resolve_auth_scheme_preference,
++)
++from botocore.compat import HAS_CRT, crt_unavailable
+ from botocore.endpoint_provider import S3_UNREFERENCED_PARAMS, EndpointProvider
+ from botocore.exceptions import (
+     EndpointProviderError,
+@@ -749,6 +754,11 @@ class EndpointRulesetResolver:
+                 # authSchemes list is present in the Endpoint object but none
+                 # of the entries are supported, raise an exception.
+                 auth_type_options = [s['name'] for s in auth_schemes]
++                # homescoop (slicc): say so when only awscrt could sign it.
++                if not HAS_CRT and any(
++                    name in CRT_ONLY_AUTH_TYPES for name in auth_type_options
++                ):
++                    raise crt_unavailable('SigV4a signing for this endpoint')
+                 raise UnknownSignatureVersionError(
+                     signature_version=', '.join(auth_type_options)
+                 )
+diff --git a/awscli/botocore/signers.py b/awscli/botocore/signers.py
+index 82ab36b..dddc850 100644
+--- a/awscli/botocore/signers.py
++++ b/awscli/botocore/signers.py
+@@ -18,7 +18,7 @@ import weakref
+ import botocore
+ import botocore.auth
+ from botocore.awsrequest import create_request_object, prepare_request_dict
+-from botocore.compat import OrderedDict
++from botocore.compat import HAS_CRT, OrderedDict, crt_unavailable
+ from botocore.exceptions import (
+     ParamValidationError,
+     UnknownClientMethodError,
+@@ -271,6 +271,16 @@ class RequestSigner:
+             signature_version = self._signature_version
+ 
+         cls = botocore.auth.AUTH_TYPE_MAPS.get(signature_version)
++        if (
++            cls is None
++            and not HAS_CRT
++            and signature_version in botocore.auth.CRT_ONLY_AUTH_TYPES
++        ):
++            # homescoop (slicc): SigV4a needs awscrt.
++            raise crt_unavailable(
++                'SigV4a signing (multi-region access points and other '
++                'global endpoints)'
++            )
+         if cls is None:
+             raise UnknownSignatureVersionError(
+                 signature_version=signature_version
+diff --git a/awscli/botocore/useragent.py b/awscli/botocore/useragent.py
+index 6e265ff..19acf76 100644
+--- a/awscli/botocore/useragent.py
++++ b/awscli/botocore/useragent.py
+@@ -31,6 +31,7 @@ from string import ascii_letters, digits
+ from typing import NamedTuple, Optional
+ 
+ from botocore import __version__ as botocore_version
++from botocore.compat import HAS_CRT
+ from botocore.context import get_context
+ 
+ logger = logging.getLogger(__name__)
+@@ -383,7 +384,9 @@ class UserAgentString:
+ 
+     @classmethod
+     def from_environment(cls):
+-        crt_version = _get_crt_version() or 'Unknown'
++        # homescoop (slicc): no md/awscrt component without awscrt, as in
++        # standalone botocore.
++        crt_version = _get_crt_version() or ('Unknown' if HAS_CRT else None)
+         return cls(
+             platform_name=platform.system(),
+             platform_version=platform.release(),
+@@ -698,5 +701,6 @@ def _get_crt_version():
+         import awscrt
+ 
+         return awscrt.__version__
+-    except AttributeError:
++    except (AttributeError, ImportError):
++        # homescoop (slicc): awscrt is optional (botocore.compat.HAS_CRT).
+         return None
+diff --git a/awscli/botocore/utils.py b/awscli/botocore/utils.py
+index 50a7289..2c93b09 100644
+--- a/awscli/botocore/utils.py
++++ b/awscli/botocore/utils.py
+@@ -40,9 +40,10 @@ import botocore
+ import botocore.awsrequest
+ import botocore.httpsession
+ import dateutil.parser
+-from awscrt.crypto import EC
+ from botocore.compat import (
++    HAS_CRT,
+     MD5_AVAILABLE,
++    crt_unavailable,
+     get_md5,
+     get_tzinfo_options,
+     json,
+@@ -4243,6 +4244,10 @@ def build_dpop_header(private_key, uri, uid=None, ts=None):
+         json.dumps(payload, separators=(',', ':')).encode()
+     )
+     signing_input = f"{header_b64}.{payload_b64}".encode()
++    # homescoop (slicc): imported here, as awscrt is optional. A private_key
++    # is an awscrt.crypto.EC, so awscrt is there.
++    from awscrt.crypto import EC
++
+     signature = private_key.sign(hashlib.sha256(signing_input).digest())
+     signature_bytes = EC.decode_der_signature_to_padded_pair(
+         signature, pad_to=32
+diff --git a/awscli/customizations/cloudfront/sign.py b/awscli/customizations/cloudfront/sign.py
+index 64a46e0..60a0537 100644
+--- a/awscli/customizations/cloudfront/sign.py
++++ b/awscli/customizations/cloudfront/sign.py
+@@ -16,8 +16,12 @@ import ipaddress
+ import re
+ import sys
+ 
+-from awscrt.crypto import EC, RSA, RSASignatureAlgorithm
+-from awscrt.exceptions import AwsCrtError
++from botocore.compat import HAS_CRT, crt_unavailable
++
++# homescoop (slicc): awscrt is optional (botocore.compat.HAS_CRT).
++if HAS_CRT:
++    from awscrt.crypto import EC, RSA, RSASignatureAlgorithm
++    from awscrt.exceptions import AwsCrtError
+ from botocore.compat import parse_qsl, urlsplit
+ from botocore.signers import CloudFrontSigner
+ from botocore.utils import datetime2timestamp, parse_to_aware_datetime
+@@ -100,6 +104,8 @@ class BaseSignCommand(BasicCommand):
+     ]
+ 
+     def _run_main(self, args, parsed_globals):
++        if not HAS_CRT:
++            raise crt_unavailable('Signing CloudFront URLs and cookies')
+         resource = self._get_policy_resource(args)
+         date_less_than, date_greater_than = self._get_dates(args)
+         self._validate_signing_args(args)
+@@ -457,10 +463,14 @@ class _KeySigner:
+ 
+ 
+ class RSASigner(_KeySigner):
+-    _SIGNATURE_ALGORITHMS = {
+-        'SHA1': (RSASignatureAlgorithm.PKCS1_5_SHA1, hashlib.sha1),
+-        'SHA256': (RSASignatureAlgorithm.PKCS1_5_SHA256, hashlib.sha256),
+-    }
++    _SIGNATURE_ALGORITHMS = (
++        {
++            'SHA1': (RSASignatureAlgorithm.PKCS1_5_SHA1, hashlib.sha1),
++            'SHA256': (RSASignatureAlgorithm.PKCS1_5_SHA256, hashlib.sha256),
++        }
++        if HAS_CRT
++        else {}
++    )
+ 
+     def __init__(self, priv_key, hash_algorithm=None):
+         if hash_algorithm is None:
+diff --git a/awscli/customizations/cloudtrail/validation.py b/awscli/customizations/cloudtrail/validation.py
+index 150dca4..ce676a4 100644
+--- a/awscli/customizations/cloudtrail/validation.py
++++ b/awscli/customizations/cloudtrail/validation.py
+@@ -21,7 +21,7 @@ import zlib
+ from datetime import datetime, timedelta
+ from zlib import error as ZLibError
+ 
+-from awscrt.crypto import RSA, RSASignatureAlgorithm
++from botocore.compat import HAS_CRT, crt_unavailable
+ from botocore.exceptions import ClientError
+ from dateutil import parser, tz
+ 
+@@ -32,6 +32,10 @@ from awscli.customizations.cloudtrail.utils import (
+ from awscli.customizations.commands import BasicCommand
+ from awscli.schema import ParameterRequiredError
+ 
++# homescoop (slicc): awscrt is optional (botocore.compat.HAS_CRT).
++if HAS_CRT:
++    from awscrt.crypto import RSA, RSASignatureAlgorithm
++
+ LOG = logging.getLogger(__name__)
+ DATE_FORMAT = '%Y%m%dT%H%M%SZ'
+ DISPLAY_DATE_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
+@@ -1006,6 +1010,8 @@ class CloudTrailValidateLogs(BasicCommand):
+         self._found_end_time = None
+ 
+     def _run_main(self, args, parsed_globals):
++        if not HAS_CRT:
++            raise crt_unavailable('Validating CloudTrail digest signatures')
+         self.handle_args(args)
+         self.setup_services(parsed_globals)
+         self._call()
+diff --git a/awscli/customizations/cloudtrail/verifyqueryresults.py b/awscli/customizations/cloudtrail/verifyqueryresults.py
+index 6b1a45b..59f2d9c 100644
+--- a/awscli/customizations/cloudtrail/verifyqueryresults.py
++++ b/awscli/customizations/cloudtrail/verifyqueryresults.py
+@@ -6,7 +6,7 @@ import sys
+ from abc import ABC, abstractmethod
+ from os import path
+ 
+-from awscrt.crypto import RSA, RSASignatureAlgorithm
++from botocore.compat import HAS_CRT, crt_unavailable
+ 
+ from awscli.customizations.cloudtrail.utils import (
+     PublicKeyProvider,
+@@ -15,6 +15,10 @@ from awscli.customizations.cloudtrail.utils import (
+ from awscli.customizations.commands import BasicCommand
+ from awscli.customizations.exceptions import ParamValidationError
+ 
++# homescoop (slicc): awscrt is optional (botocore.compat.HAS_CRT).
++if HAS_CRT:
++    from awscrt.crypto import RSA, RSASignatureAlgorithm
++
+ SIGN_FILE_NAME = "result_sign.json"
+ 
+ 
+@@ -305,6 +309,8 @@ class CloudTrailVerifyQueryResult(BasicCommand):
+         self._source_region = None
+ 
+     def _run_main(self, args, parsed_globals):
++        if not HAS_CRT:
++            raise crt_unavailable('Verifying CloudTrail query result signatures')
+         self._call(args, parsed_globals)
+         return self._return_code
+ 
+diff --git a/awscli/customizations/ec2/decryptpassword.py b/awscli/customizations/ec2/decryptpassword.py
+index 902cd4c..8b9b738 100644
+--- a/awscli/customizations/ec2/decryptpassword.py
++++ b/awscli/customizations/ec2/decryptpassword.py
+@@ -14,11 +14,15 @@ import base64
+ import logging
+ import os
+ 
+-from awscrt.crypto import RSA, RSASignatureAlgorithm
+ from botocore import model
++from botocore.compat import HAS_CRT, crt_unavailable
+ 
+ from awscli.arguments import BaseCLIArgument
+ 
++# homescoop (slicc): awscrt is optional (botocore.compat.HAS_CRT).
++if HAS_CRT:
++    from awscrt.crypto import RSA, RSASignatureAlgorithm
++
+ logger = logging.getLogger(__name__)
+ 
+ 
+@@ -118,6 +122,8 @@ class LaunchKeyArgument(BaseCLIArgument):
+             value = parsed.get('PasswordData')
+             if not value:
+                 return
++            if not HAS_CRT:
++                raise crt_unavailable('Decrypting password data')
+             try:
+                 with open(self._key_path, 'rb') as pk_file:
+                     pk_bytes = pk_file.read()
+diff --git a/awscli/customizations/ec2instanceconnect/ssh.py b/awscli/customizations/ec2instanceconnect/ssh.py
+index 46c1953..c4b3c1c 100644
+--- a/awscli/customizations/ec2instanceconnect/ssh.py
++++ b/awscli/customizations/ec2instanceconnect/ssh.py
+@@ -18,7 +18,11 @@ import subprocess
+ import sys
+ import tempfile
+ 
+-from awscrt.crypto import ED25519, ED25519ExportFormat
++from botocore.compat import HAS_CRT, crt_unavailable
++
++# homescoop (slicc): awscrt is optional (botocore.compat.HAS_CRT).
++if HAS_CRT:
++    from awscrt.crypto import ED25519, ED25519ExportFormat
+ 
+ from awscli.compat import compat_shell_quote
+ from awscli.customizations.commands import BasicCommand
+@@ -443,6 +447,8 @@ class SshCommand(BasicCommand):
+ 
+ class KeyManager:
+     def generate_key(self):
++        if not HAS_CRT:
++            raise crt_unavailable('Generating an Ed25519 key')
+         logger.debug('Generate Ed25519 Key')
+         return ED25519.new_generate()
+ 
+diff --git a/awscli/customizations/ec2instanceconnect/websocket.py b/awscli/customizations/ec2instanceconnect/websocket.py
+index 68b1828..f970ff9 100644
+--- a/awscli/customizations/ec2instanceconnect/websocket.py
++++ b/awscli/customizations/ec2instanceconnect/websocket.py
+@@ -23,17 +23,21 @@ from queue import Queue
+ from threading import Event
+ from urllib.parse import urlparse
+ 
+-from awscrt import websocket
+-from awscrt.http import HttpProxyAuthenticationType, HttpProxyOptions
+-from awscrt.io import ClientTlsContext, TlsContextOptions
+-from awscrt.websocket import (
+-    OnConnectionSetupData,
+-    OnConnectionShutdownData,
+-    OnIncomingFrameCompleteData,
+-    OnIncomingFramePayloadData,
+-    OnSendFrameCompleteData,
+-    Opcode,
+-)
++from botocore.compat import HAS_CRT, crt_unavailable
++
++# homescoop (slicc): awscrt is optional (botocore.compat.HAS_CRT).
++if HAS_CRT:
++    from awscrt import websocket
++    from awscrt.http import HttpProxyAuthenticationType, HttpProxyOptions
++    from awscrt.io import ClientTlsContext, TlsContextOptions
++    from awscrt.websocket import (
++        OnConnectionSetupData,
++        OnConnectionShutdownData,
++        OnIncomingFrameCompleteData,
++        OnIncomingFramePayloadData,
++        OnSendFrameCompleteData,
++        Opcode,
++    )
+ 
+ from awscli.compat import is_windows
+ 
+@@ -339,6 +343,8 @@ class WebsocketManager:
+         eice_request_signer,
+         user_agent=None,
+     ):
++        if not HAS_CRT:
++            raise crt_unavailable("EC2 Instance Connect's websocket tunnel")
+         self._port = port
+         self._executor = ThreadPoolExecutor(
+             max_workers=max_websocket_connections
+diff --git a/awscli/customizations/login/login.py b/awscli/customizations/login/login.py
+index 0ec4164..19ff3cf 100644
+--- a/awscli/customizations/login/login.py
++++ b/awscli/customizations/login/login.py
+@@ -4,7 +4,7 @@ import os
+ import webbrowser
+ 
+ import botocore
+-from awscrt.crypto import EC, ECType
++from botocore.compat import HAS_CRT, crt_unavailable
+ from botocore.configprovider import ConfiguredEndpointProvider
+ from botocore.exceptions import ProfileNotFound
+ from botocore.utils import (
+@@ -36,6 +36,10 @@ from awscli.customizations.sso.utils import (
+ )
+ from awscli.customizations.utils import load_all_regions, uni_print
+ 
++# homescoop (slicc): awscrt is optional (botocore.compat.HAS_CRT).
++if HAS_CRT:
++    from awscrt.crypto import EC, ECType
++
+ DEFAULT_REGION_FOR_PROMPT = 'us-east-1'
+ 
+ 
+@@ -91,6 +95,9 @@ class LoginCommand(BasicCommand):
+         self._config_file_writer = config_file_writer
+ 
+     def _run_main(self, parsed_args, parsed_globals):
++        if not HAS_CRT:
++            # homescoop (slicc): the login key pair is an awscrt.crypto.EC.
++            raise crt_unavailable('`aws login`')
+         validate_redirect_port(parsed_args.redirect_port)
+         region = self._resolve_region(parsed_globals)
+         profile_name = self.resolve_profile_name()
+diff --git a/awscli/customizations/login/utils.py b/awscli/customizations/login/utils.py
+index ca74d4f..a7bd349 100644
+--- a/awscli/customizations/login/utils.py
++++ b/awscli/customizations/login/utils.py
+@@ -13,8 +13,7 @@ import textwrap
+ import uuid
+ from enum import Enum
+ 
+-from awscrt.crypto import EC, ECExportFormat, ECType
+-from botocore.compat import parse_qsl
++from botocore.compat import HAS_CRT, parse_qsl
+ from botocore.useragent import register_feature_id
+ from dateutil.tz.tz import tzutc
+ 
+@@ -30,6 +29,10 @@ from awscli.botocore.utils import (
+ )
+ from awscli.compat import compat_input
+ 
++# homescoop (slicc): awscrt is optional (botocore.compat.HAS_CRT).
++if HAS_CRT:
++    from awscrt.crypto import EC, ECExportFormat, ECType
++
+ LOG = logging.getLogger(__name__)
+ 
+ 
+diff --git a/awscli/customizations/s3/factory.py b/awscli/customizations/s3/factory.py
+index 8cd140c..ca02b83 100644
+--- a/awscli/customizations/s3/factory.py
++++ b/awscli/customizations/s3/factory.py
+@@ -13,23 +13,27 @@
+ import logging
+ import sys
+ 
+-import awscrt.s3
+ from botocore.client import Config
++from botocore.compat import HAS_CRT
+ from botocore.httpsession import DEFAULT_CA_BUNDLE
+ from botocore.retries.standard import DEFAULT_MAX_ATTEMPTS
+ from botocore.useragent import register_feature_id
+-from s3transfer.crt import (
+-    BotocoreCRTCredentialsWrapper,
+-    BotocoreCRTRequestSerializer,
+-    CRTTransferConfig,
+-    CRTTransferManager,
+-    acquire_crt_s3_process_lock,
+-    create_crt_client_bootstrap,
+-    create_s3_crt_client,
+-    release_crt_s3_process_lock,
+-)
+ from s3transfer.manager import TransferManager
+ 
++# homescoop (slicc): without awscrt there is only the classic transfer client.
++if HAS_CRT:
++    import awscrt.s3
++    from s3transfer.crt import (
++        BotocoreCRTCredentialsWrapper,
++        BotocoreCRTRequestSerializer,
++        CRTTransferConfig,
++        CRTTransferManager,
++        acquire_crt_s3_process_lock,
++        create_crt_client_bootstrap,
++        create_s3_crt_client,
++        release_crt_s3_process_lock,
++    )
++
+ from awscli.compat import urlparse
+ from awscli.customizations.s3 import constants
+ from awscli.customizations.s3.transferconfig import (
+@@ -206,6 +210,17 @@ class TransferManagerFactory:
+         preferred_transfer_client = runtime_config.get(
+             'preferred_transfer_client', constants.AUTO_RESOLVE_TRANSFER_CLIENT
+         )
++        if not HAS_CRT:
++            # homescoop (slicc): the crt client needs awscrt.
++            if preferred_transfer_client == constants.CRT_TRANSFER_CLIENT:
++                uni_print(
++                    f"warning: preferred_transfer_client = "
++                    f"{constants.CRT_TRANSFER_CLIENT} needs awscrt, which this "
++                    f"AWS CLI build does not include; using the "
++                    f"{constants.CLASSIC_TRANSFER_CLIENT} transfer client.\n",
++                    sys.stderr,
++                )
++            return constants.CLASSIC_TRANSFER_CLIENT
+         if preferred_transfer_client == constants.AUTO_RESOLVE_TRANSFER_CLIENT:
+             return self._resolve_transfer_client_type_for_system(
+                 params, runtime_config
+@@ -492,7 +507,7 @@ class TransferManagerFactory:
+         )
+ 
+     def _is_newly_eligible_for_crt_client(self, runtime_config):
+-        if self._is_preferring_crt_client(runtime_config):
++        if not HAS_CRT or self._is_preferring_crt_client(runtime_config):
+             return False
+         return not awscrt.s3.is_optimized_for_system()
+ 
+diff --git a/awscli/logger.py b/awscli/logger.py
+index b88eb59..6ae2ec0 100644
+--- a/awscli/logger.py
++++ b/awscli/logger.py
+@@ -13,25 +13,30 @@
+ import copy
+ import logging
+ 
+-import awscrt.io
++from botocore.compat import HAS_CRT
+ 
+ from awscli.redaction import redact
+ 
+ LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+ 
+ 
+-try:
+-    # Initializing CRT logging isn't thread-safe, but setting/updating it is.
+-    # So we always initialize logging when this module is imported so
+-    # subsequent enable/disable CRT logging calls can safely assume it's
+-    # already initialized.
+-    awscrt.io.init_logging(awscrt.io.LogLevel.NoLogs, 'stderr')
+-except RuntimeError:
+-    # Calling `init_logging` more than once raises a Runtime exception.
+-    # Even though normal usage shouldn't call it more than once in the
+-    # case of multiple imports, we should still guard against it if
+-    # something causes the module cache to be cleared between imports.
+-    pass
++# homescoop (slicc): awscrt is optional (botocore.compat.HAS_CRT); without
++# it there is no CRT log to turn on or off.
++if HAS_CRT:
++    import awscrt.io
++
++    try:
++        # Initializing CRT logging isn't thread-safe, but setting/updating
++        # it is. So we always initialize logging when this module is
++        # imported so subsequent enable/disable CRT logging calls can safely
++        # assume it's already initialized.
++        awscrt.io.init_logging(awscrt.io.LogLevel.NoLogs, 'stderr')
++    except RuntimeError:
++        # Calling `init_logging` more than once raises a Runtime exception.
++        # Even though normal usage shouldn't call it more than once in the
++        # case of multiple imports, we should still guard against it if
++        # something causes the module cache to be cleared between imports.
++        pass
+ 
+ 
+ class RedactingFormatter(logging.Formatter):
+@@ -105,8 +110,10 @@ def remove_stream_logger(logger_name):
+ 
+ 
+ def enable_crt_logging():
+-    awscrt.io.set_log_level(awscrt.io.LogLevel.Debug)
++    if HAS_CRT:
++        awscrt.io.set_log_level(awscrt.io.LogLevel.Debug)
+ 
+ 
+ def disable_crt_logging():
+-    awscrt.io.set_log_level(awscrt.io.LogLevel.NoLogs)
++    if HAS_CRT:
++        awscrt.io.set_log_level(awscrt.io.LogLevel.NoLogs)
+diff --git a/awscli/s3transfer/checksums.py b/awscli/s3transfer/checksums.py
+index 49aba71..680522d 100644
+--- a/awscli/s3transfer/checksums.py
++++ b/awscli/s3transfer/checksums.py
+@@ -4,10 +4,16 @@ import base64
+ import logging
+ from collections import namedtuple
+ 
+-from awscrt import checksums as crt_checksums
++from botocore.compat import HAS_CRT
+ from botocore.httpchecksum import _CHECKSUM_CLS
+ from s3transfer.exceptions import S3DownloadChecksumError
+ 
++if HAS_CRT:
++    from awscrt import checksums as crt_checksums
++else:
++    # homescoop (slicc): the pure-Python combine functions (botocore.crc).
++    from botocore import crc as crt_checksums
++
+ logger = logging.getLogger(__name__)
+ 
+ 
