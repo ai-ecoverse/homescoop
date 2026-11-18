@@ -36,7 +36,7 @@ index 7db9075..8b1726c 100644
          return Ok(false);
      }
 diff --git a/crates/fnox-core/src/config.rs b/crates/fnox-core/src/config.rs
-index 5b6b242..f32039b 100644
+index a18c517..6f7c429 100644
 --- a/crates/fnox-core/src/config.rs
 +++ b/crates/fnox-core/src/config.rs
 @@ -199,8 +199,12 @@ pub struct Config {
@@ -52,7 +52,7 @@ index 5b6b242..f32039b 100644
  
      /// Lua provider plugins to install, as `name = "<git url>[#ref]"`.
      /// `owner/repo` is shorthand for a GitHub repository.
-@@ -396,8 +400,12 @@ pub struct ProfileConfig {
+@@ -405,8 +409,12 @@ pub struct ProfileConfig {
      pub providers: IndexMap<String, ProviderConfig>,
  
      /// Push targets for this profile
@@ -65,7 +65,7 @@ index 5b6b242..f32039b 100644
  
      /// Default provider name for this profile
      #[serde(default, skip_serializing_if = "Option::is_none")]
-@@ -2236,6 +2244,7 @@ impl Config {
+@@ -2245,6 +2253,7 @@ impl Config {
  
      /// Get effective push targets for the active profile stack, with the same
      /// precedence as [`Self::get_leases`].
@@ -348,7 +348,7 @@ index 14833e4..44d194b 100644
  impl LeaseBackend for GitHubAppBackend {
      async fn create_lease(&self, _duration: Duration, _label: &str) -> Result<Lease> {
 diff --git a/crates/fnox-core/src/lease_backends/github_oauth.rs b/crates/fnox-core/src/lease_backends/github_oauth.rs
-index 45fd416..c6bd4cc 100644
+index 8d15447..93fbd20 100644
 --- a/crates/fnox-core/src/lease_backends/github_oauth.rs
 +++ b/crates/fnox-core/src/lease_backends/github_oauth.rs
 @@ -2,6 +2,7 @@ use crate::error::{FnoxError, Result};
@@ -451,21 +451,6 @@ index 45fd416..c6bd4cc 100644
  fn interactive_auth_required() -> FnoxError {
      FnoxError::ProviderAuthFailed {
          provider: PROVIDER.to_string(),
-@@ -416,12 +429,14 @@ fn interactive_auth_required() -> FnoxError {
- 
- /// Detach the launcher's stdio so a browser cannot write to, or hold open, the
- /// caller's pipes (`fnox env --json` promises a pure stdout).
-+#[cfg(not(target_os = "wasi"))]
- fn silence(cmd: &mut std::process::Command) -> &mut std::process::Command {
-     cmd.stdin(std::process::Stdio::null())
-         .stdout(std::process::Stdio::null())
-         .stderr(std::process::Stdio::null())
- }
- 
-+#[cfg(not(target_os = "wasi"))]
- fn open_browser(url: &str) -> std::io::Result<()> {
-     #[cfg(target_os = "macos")]
-     {
 diff --git a/crates/fnox-core/src/lease_backends/gitlab.rs b/crates/fnox-core/src/lease_backends/gitlab.rs
 index ba2df18..1f39e61 100644
 --- a/crates/fnox-core/src/lease_backends/gitlab.rs
@@ -538,7 +523,7 @@ index 1b40791..2906f55 100644
  impl LeaseBackend for KubernetesBackend {
      async fn create_lease(&self, duration: Duration, _label: &str) -> Result<Lease> {
 diff --git a/crates/fnox-core/src/lease_backends/mod.rs b/crates/fnox-core/src/lease_backends/mod.rs
-index d902c1f..8f2a725 100644
+index 629ecfa..c62bbb1 100644
 --- a/crates/fnox-core/src/lease_backends/mod.rs
 +++ b/crates/fnox-core/src/lease_backends/mod.rs
 @@ -70,6 +70,7 @@ pub(crate) fn env_credential(name: &str) -> Option<String> {
@@ -549,7 +534,7 @@ index d902c1f..8f2a725 100644
  pub(crate) fn require_secure_url(backend: &str, field: &str, value: &str) -> Result<()> {
      let url = reqwest::Url::parse(value).map_err(|e| {
          crate::error::FnoxError::Config(format!(
-@@ -519,6 +520,15 @@ impl LeaseBackendConfig {
+@@ -519,12 +520,32 @@ impl LeaseBackendConfig {
      }
  
      /// Create a lease backend instance from this configuration
@@ -563,8 +548,25 @@ index d902c1f..8f2a725 100644
 +    /// Create a lease backend instance from this configuration
 +    #[cfg(not(target_os = "wasi"))]
      pub fn create_backend(&self) -> Result<Box<dyn LeaseBackend>> {
-         match self {
-             LeaseBackendConfig::AwsSts {
+         self.create_backend_with_duration(None)
+     }
+ 
+     /// Like [`create_backend`](Self::create_backend), but `duration_override` (for example
+     /// from `fnox lease create --duration`) counts as an explicitly requested duration.
++    #[cfg(target_os = "wasi")]
++    pub fn create_backend_with_duration(
++        &self,
++        _duration_override: Option<&str>,
++    ) -> Result<Box<dyn LeaseBackend>> {
++        self.create_backend()
++    }
++
++    /// Like [`create_backend`](Self::create_backend), but `duration_override` (for example
++    /// from `fnox lease create --duration`) counts as an explicitly requested duration.
++    #[cfg(not(target_os = "wasi"))]
+     pub fn create_backend_with_duration(
+         &self,
+         duration_override: Option<&str>,
 diff --git a/crates/fnox-core/src/lease_backends/oauth2_client_credentials.rs b/crates/fnox-core/src/lease_backends/oauth2_client_credentials.rs
 index efcb9ec..e0cdd27 100644
 --- a/crates/fnox-core/src/lease_backends/oauth2_client_credentials.rs
@@ -640,7 +642,7 @@ index 968c638..27e04c7 100644
  impl LeaseBackend for TailscaleBackend {
      async fn create_lease(&self, duration: Duration, label: &str) -> Result<Lease> {
 diff --git a/crates/fnox-core/src/lease_backends/vault.rs b/crates/fnox-core/src/lease_backends/vault.rs
-index 7bcf100..88f642d 100644
+index 4303925..c9ef69b 100644
 --- a/crates/fnox-core/src/lease_backends/vault.rs
 +++ b/crates/fnox-core/src/lease_backends/vault.rs
 @@ -64,6 +64,7 @@ pub fn required_env_vars(
@@ -651,15 +653,15 @@ index 7bcf100..88f642d 100644
  pub struct VaultBackend {
      address: String,
      token: Option<String>,
-@@ -74,6 +75,7 @@ pub struct VaultBackend {
-     method: String,
+@@ -77,6 +78,7 @@ pub struct VaultBackend {
+     send_ttl: bool,
  }
  
 +#[cfg(not(target_os = "wasi"))]
  impl VaultBackend {
+     #[allow(clippy::too_many_arguments)]
      pub fn new(
-         address: Option<String>,
-@@ -195,6 +197,7 @@ impl VaultBackend {
+@@ -206,6 +208,7 @@ impl VaultBackend {
      }
  }
  
@@ -668,11 +670,15 @@ index 7bcf100..88f642d 100644
  impl LeaseBackend for VaultBackend {
      async fn create_lease(&self, duration: Duration, _label: &str) -> Result<Lease> {
 diff --git a/crates/fnox-core/src/lib.rs b/crates/fnox-core/src/lib.rs
-index 54ca411..a237250 100644
+index 7b83038..fa56021 100644
 --- a/crates/fnox-core/src/lib.rs
 +++ b/crates/fnox-core/src/lib.rs
-@@ -12,17 +12,21 @@ pub mod audit;
+@@ -10,20 +10,25 @@
+ 
+ pub mod audit;
  pub mod auth_prompt;
++#[cfg(not(target_os = "wasi"))]
+ pub mod browser;
  pub mod config;
  pub mod config_path;
 +#[cfg(not(target_os = "wasi"))]
@@ -720,7 +726,7 @@ index e711ff9..7d1390a 100644
      let arg0 = std::path::PathBuf::from(std::env::args_os().next()?);
      let invoked = if arg0.components().count() > 1 {
 diff --git a/src/commands/init.rs b/src/commands/init.rs
-index dfa88fa..f804819 100644
+index 1dd3da1..9219d0a 100644
 --- a/src/commands/init.rs
 +++ b/src/commands/init.rs
 @@ -1,8 +1,11 @@
@@ -777,7 +783,7 @@ index dfa88fa..f804819 100644
      fn collect_fields(&self, info: &WizardInfo) -> Result<HashMap<String, String>> {
          let mut fields = HashMap::new();
  
-@@ -255,6 +265,7 @@ impl InitCommand {
+@@ -264,6 +274,7 @@ impl InitCommand {
      }
  
      /// Get the provider name from the user
@@ -785,7 +791,7 @@ index dfa88fa..f804819 100644
      fn get_provider_name(&self, default: &str) -> Result<String> {
          Input::new("Provider name:")
              .placeholder(default)
-@@ -270,6 +281,7 @@ impl InitCommand {
+@@ -279,6 +290,7 @@ impl InitCommand {
      }
  
      /// Test the provider connection and print the result
@@ -794,7 +800,7 @@ index dfa88fa..f804819 100644
          &self,
          provider_name: &str,
 diff --git a/src/commands/lease.rs b/src/commands/lease.rs
-index 89b1400..219e71c 100644
+index 5da54b3..140910e 100644
 --- a/src/commands/lease.rs
 +++ b/src/commands/lease.rs
 @@ -355,6 +355,12 @@ impl LeaseCreateCommand {
@@ -811,7 +817,7 @@ index 89b1400..219e71c 100644
                              .placeholder("paste value here")
                              .run()
 diff --git a/src/commands/mod.rs b/src/commands/mod.rs
-index a0339f1..b171eb6 100644
+index 18220d3..50bd9fe 100644
 --- a/src/commands/mod.rs
 +++ b/src/commands/mod.rs
 @@ -10,6 +10,7 @@ pub mod check;
@@ -883,7 +889,15 @@ index a0339f1..b171eb6 100644
      Tui(tui::TuiCommand),
  
      /// Generate usage specification
-@@ -329,9 +341,11 @@ impl Commands {
+@@ -326,6 +338,7 @@ impl Commands {
+     ///
+     /// Such a command must survive a peer that hangs up mid-write, so it
+     /// ignores SIGPIPE; other commands die on it like a normal Unix tool.
++    #[cfg(not(target_os = "wasi"))]
+     pub fn serves_connections(&self) -> bool {
+         match self {
+             Commands::Daemon(cmd) => cmd.serves_connections(),
+@@ -342,9 +355,11 @@ impl Commands {
              Commands::Init(cmd) => cmd.run(cli).await,
              Commands::Completion(cmd) => cmd.run(cli).await,
              Commands::ConfigFiles(cmd) => cmd.run(cli).await,
@@ -895,7 +909,7 @@ index a0339f1..b171eb6 100644
              Commands::Plugin(cmd) => cmd.run(cli).await,
              Commands::Usage(cmd) => cmd.run(cli).await,
              Commands::Activate(cmd) => cmd
-@@ -370,6 +384,7 @@ impl Commands {
+@@ -383,6 +398,7 @@ impl Commands {
              Commands::List(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              // Inside `fnox proxy run`, the proxy serves the tools; the relay
              // needs no config, which a sandbox may hide
@@ -903,7 +917,7 @@ index a0339f1..b171eb6 100644
              Commands::Mcp(_) if crate::mcp::relay::requested() => {
                  crate::mcp::relay::check_flags(
                      &cli.config,
-@@ -379,6 +394,7 @@ impl Commands {
+@@ -392,6 +408,7 @@ impl Commands {
                  )?;
                  crate::mcp::relay::run().await
              }
@@ -911,7 +925,7 @@ index a0339f1..b171eb6 100644
              Commands::Mcp(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Profiles(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Provider(cmd)
-@@ -387,7 +403,9 @@ impl Commands {
+@@ -400,7 +417,9 @@ impl Commands {
                  cmd.run(cli, Config::new()).await
              }
              Commands::Provider(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -921,7 +935,7 @@ index a0339f1..b171eb6 100644
              Commands::Push(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Reencrypt(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Env(cmd) => cmd.run(cli).await,
-@@ -396,6 +414,7 @@ impl Commands {
+@@ -409,6 +428,7 @@ impl Commands {
              Commands::Set(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Sync(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Scan(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -930,11 +944,26 @@ index a0339f1..b171eb6 100644
          }
      }
 diff --git a/src/commands/set.rs b/src/commands/set.rs
-index 19df5fe..3a45571 100644
+index 03350f6..f7a91f1 100644
 --- a/src/commands/set.rs
 +++ b/src/commands/set.rs
-@@ -365,12 +365,18 @@ impl SetCommand {
-             // Only metadata is being set, no secret value needed
+@@ -354,6 +354,14 @@ impl SetCommand {
+             config::validate_secret_url(url).map_err(FnoxError::Config)?;
+         }
+ 
++        #[cfg(target_os = "wasi")]
++        if self.open {
++            return Err(FnoxError::Config(
++                "fnox set --open is not available in seven: open the url yourself, then run fnox set"
++                    .into(),
++            ));
++        }
++
+         if self.open && (!atty::is(atty::Stream::Stdin) || fnox_core::env::is_non_interactive()) {
+             return Err(FnoxError::Config(
+                 "--open needs an interactive terminal to prompt for the new value".into(),
+@@ -398,15 +406,22 @@ impl SetCommand {
+             // asks for a value, even alongside `--url` or `--description`)
              None
          } else {
 +            #[cfg(target_os = "wasi")]
@@ -942,6 +971,10 @@ index 19df5fe..3a45571 100644
 +                "no value given: pass it as an argument or pipe it on stdin".to_string(),
 +            ));
              // Interactive terminal - prompt for value
++            #[cfg(not(target_os = "wasi"))]
+             if self.open {
+                 self.open_secret_url(&config, &write_profile_stack, profile)?;
+             }
 +            #[cfg(not(target_os = "wasi"))]
              let value = demand::Input::new("Enter secret value")
                  .prompt("Secret value: ")
@@ -952,8 +985,16 @@ index 19df5fe..3a45571 100644
              Some(value)
          };
  
+@@ -648,6 +663,7 @@ impl SetCommand {
+     /// Without a URL this only warns, so the value prompt still follows. A
+     /// launcher that fails (no browser over SSH) is not an error either: the
+     /// printed URL is the fallback.
++    #[cfg(not(target_os = "wasi"))]
+     fn open_secret_url(
+         &self,
+         config: &Config,
 diff --git a/src/daemon.rs b/src/daemon.rs
-index 2e20fc2..c1d5829 100644
+index 762daff..cf59a25 100644
 --- a/src/daemon.rs
 +++ b/src/daemon.rs
 @@ -596,6 +596,15 @@ pub async fn start_background(cli: &Cli, config: Option<&Config>) -> Result<bool
@@ -1015,10 +1056,10 @@ index debf455..44bc527 100644
  
  // Re-export commonly used items
 diff --git a/src/main.rs b/src/main.rs
-index 555a249..fbc65cb 100644
+index d24ae4d..99106e3 100644
 --- a/src/main.rs
 +++ b/src/main.rs
-@@ -39,6 +39,7 @@ async fn run(argv: Vec<std::ffi::OsString>) -> miette::Result<()> {
+@@ -158,6 +158,7 @@ async fn run(argv: Vec<std::ffi::OsString>) -> miette::Result<()> {
      }
  
      // Initialize rustls crypto provider for GCP SDKs

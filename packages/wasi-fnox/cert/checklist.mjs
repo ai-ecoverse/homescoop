@@ -423,6 +423,36 @@ export default async function (ctx) {
   assert.equal(targetsExec.stdout.trim(), 'from-targets-toml', `1.47.0 [targets] exec value: ${targetsExec.stdout}`);
   assert.doesNotMatch(targetsExec.stderr, /unknown field `targets`|invalid_toml|panicked|wasm trap/);
   await write(
+    'home/v148url/fnox.toml',
+    [
+      '[providers.plain]',
+      'type = "plain"',
+      '',
+      '[secrets]',
+      'LVL = { provider = "plain", value = "from-url-toml", url = "https://a.io/t" }',
+      '',
+    ].join('\n'),
+  );
+  const urlGet = await run(['fnox', 'get', 'LVL'], { cwd: '/home/v148url', env });
+  assert.equal(urlGet.status, 0, `1.48.0 secret url get: ${urlGet.stderr}`);
+  assert.equal(urlGet.stdout.trim(), 'from-url-toml', `1.48.0 secret url get value: ${urlGet.stdout}`);
+  assert.doesNotMatch(urlGet.stderr, /unknown field `url`|invalid_toml|panicked|wasm trap/);
+  const urlList = await run(['fnox', 'list'], { cwd: '/home/v148url', env });
+  assert.equal(urlList.status, 0, `1.48.0 list with a secret url: ${urlList.stderr}`);
+  assert.ok(urlList.stdout.includes('https://a.io/t'), `1.48.0 list shows the secret's url: ${urlList.stdout}`);
+  const urlOpen = await run(['fnox', 'set', 'LVL', '--open'], { cwd: '/home/v148url', env, stdin: '' });
+  assert.notEqual(urlOpen.status, 0, `1.48.0 set --open must fail in seven: ${urlOpen.stdout}`);
+  assert.notEqual(urlOpen.status, 134, `1.48.0 set --open trapped: ${urlOpen.stderr}`);
+  assert.ok(flat(urlOpen.stderr).includes('fnox set --open is not available in seven: open the url yourself, then run fnox set'), `1.48.0 set --open refusal: ${urlOpen.stderr}`);
+  assert.doesNotMatch(urlOpen.stderr, /panicked|wasm trap/);
+  assert.ok((await read('home/v148url/fnox.toml')).includes('value = "from-url-toml"'), '1.48.0 set --open left the secret in place');
+  const urlSet = await run(['fnox', 'set', 'LVL', '--url', 'https://a.io/n'], { cwd: '/home/v148url', env, stdin: '' });
+  assert.equal(urlSet.status, 0, `1.48.0 set --url records the url: ${urlSet.stderr}`);
+  assert.doesNotMatch(urlSet.stderr, /panicked|wasm trap/);
+  const urlToml = await read('home/v148url/fnox.toml');
+  assert.ok(urlToml.includes('https://a.io/n'), `1.48.0 set --url writes the new url: ${urlToml}`);
+  assert.ok(urlToml.includes('from-url-toml'), `1.48.0 set --url keeps the value: ${urlToml}`);
+  await write(
     'home/v146lease/fnox.toml',
     [
       '[providers.plain]',

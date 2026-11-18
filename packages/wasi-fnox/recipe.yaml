@@ -1,5 +1,5 @@
 # fnox (jdx/fnox) for seven's kernel: the secrets tool as a WASI command.
-# Upstream is jdx/fnox v1.47.0; the patches live here (NNNN-*.patch, applied
+# Upstream is jdx/fnox v1.48.0; the patches live here (NNNN-*.patch, applied
 # in filename order by apply.sh) and are only those the WASI build or seven's
 # in-kernel integration needs. Needs slicc-kernel 1.175.0 and later
 # (/dev/sealed, exec tickets and the ask op).
@@ -12,7 +12,7 @@ summary: "fnox 1.48 for slicc WASI preview1 (command fnox; seven's sealed store)
 source:
   url: "https://github.com/jdx/fnox/archive/refs/tags/v{{version}}.tar.gz"
   sha256: "f870de49eb15bba6531f6e7014c1013f703d3cca7ff77d56ebeacc488f6b6c8e"
-  epoch: "1793726739"
+  epoch: "1794255284"
 # ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#536).
 reproducible: true
 toolchain:
@@ -26,7 +26,7 @@ about:
   homepage: https://fnox.jdx.dev
   license: MIT
   notes: |
-    Upstream is jdx/fnox v1.47.0; the patches live here, are not
+    Upstream is jdx/fnox v1.48.0; the patches live here, are not
     upstreamed (per Lars), and are kept only when (a) the WASI build
     needs them or (b) seven's in-kernel integration does. Host installs
     use upstream fnox as it is. apply.sh checks and applies the series
@@ -47,7 +47,9 @@ about:
            built without its Azure SDK credential code); from 1.41.0
            also the gopass provider (the gopass CLI through
            tokio::process), whose GNUPGHOME, GOPASS_HOMEDIR and
-           GOPASS_CONFIG_NOWRAP proxy run scrubs the same way
+           GOPASS_CONFIG_NOWRAP proxy run scrubs the same way; from
+           1.48.0 also a module directory whose list sits in a submodule
+           (keychain/provider.rs, re-exported by keychain/mod.rs)
       0003 compile out mcp (including request_secret and the proxy MCP
            relay), local_http, secret_session, tui, daemon, leases,
            prompts on WASI, and from 1.40.0 the plugin command and
@@ -59,6 +61,11 @@ about:
            also push and push_targets (CI/hosting writes); from
            1.47.0-1 Config.targets stays as an opaque map on WASI so a
            shared fnox.toml with [targets] still loads (homescoop#2009);
+           from 1.48.0 also fnox_core::browser (its opener has no WASI
+           arm), so `fnox set --open` is refused on WASI before any value
+           is read, Commands::serves_connections (only native main calls
+           it) and the native create_backend_with_duration (a WASI one
+           returns create_backend's refusal for `fnox lease create`);
            proxy stays as a WASI stub for rules validation (0009)
       0004 the working directory (PWD when it is .'s device and inode,
            else the walk up ..; 1.46.0-2: not a stale PWD), HOME from
@@ -108,7 +115,7 @@ about:
            ciphertext or plaintext
     cargo build --locked --release --bin fnox --target wasm32-wasip1
     with RUSTFLAGS --cfg tokio_unstable and SOURCE_DATE_EPOCH set to the
-    v1.47.0 commit time (source.epoch, 2026-11-03T17:25:39Z), so the
+    v1.48.0 commit time (source.epoch, 2026-11-09T20:14:44Z), so the
     build is byte-reproducible (homescoop#364), then wasm-opt -Oz
     (binaryen 133). No C toolchain. THIRD-PARTY-NOTICES.md from cargo metadata
     plus Rust's std and wasi-libc licences. 1.39.0-1 is certified and
@@ -184,3 +191,21 @@ about:
     0006, 0007, 0008, 0010, 0012, 0013, 0016, 0018 and 0019 keep the
     same added and removed lines. build.sh's usage-test notice moves
     to 7.1.5 (the same LICENSE, f68207e9...).
+    1.48.0-1 rebases the series onto v1.48.0: 0002 finds a disabled
+    provider's env_dependencies() in keychain/provider.rs (keychain is a
+    module directory from 1.48.0, and its Touch ID helper is
+    macOS-only) and keeps keychain's touch_id interactive-auth and
+    daemon-cache arms; providers::discovery (item metadata only) stays
+    common; 0003 compiles out fnox_core::browser, refuses `fnox set
+    --open` on WASI (no browser; `--url` and the url field work), and
+    gates serves_connections and create_backend_with_duration; 0004
+    keeps the macOS __touch-id-* entry points beside the WASI
+    working-directory setup. Upstream's streaming proxy responses, the
+    SIGPIPE change, vault lease ttl and the daemon FNOX_AGE_KEY refresh
+    are in native code this build compiles out; `fnox get`'s retry
+    through provider-token secrets (upstream #1125) only sets those
+    values in fnox's own environment, and age, plain and sealed have no
+    such tokens. Security patches 0006, 0007, 0008, 0010, 0012, 0013,
+    0016, 0018 and 0019 keep the same added and removed lines.
+    source.epoch is the v1.48.0 tag's commit time; build.sh's
+    usage-test notice moves to 7.3.0 (the same LICENSE, f68207e9...).

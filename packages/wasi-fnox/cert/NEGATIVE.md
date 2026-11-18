@@ -200,3 +200,9 @@ The published 1.46.0-1 fails `cert/cwd.mjs` at `PWD=/tmp` (`No configuration fil
 Since 1.46.0-1, 0003 gated `Config.targets` and `ProfileConfig.targets` off on WASI with `push_targets`. Config deserialisation rejects unknown fields, so a project `fnox.toml` with an upstream `[targets.<name>]` table failed to load (`unknown field \`targets\``) and every command failed. 1.47.0-1 keeps an opaque `IndexMap<String, serde_json::Value>` for `targets` on WASI so the table parses and is ignored, and only the code that writes to targets stays compiled out.
 
 The published 1.46.0-2 against the new checklist row fails at `fnox get LVL` in `/home/v147targets` with `unknown field \`targets\`` (status non-zero). The head build's `get` and `exec` succeed with the plain value.
+
+## 1.48.0-1: secret urls load, set --open is refused on WASI
+
+fnox 1.48.0 adds a `url` field on secrets and `fnox set --url` / `--open` (upstream #1145). `--open` launches the platform's browser opener through `fnox_core::browser`, which has no WASI arm, so 0003 compiles that module out and refuses `fnox set --open` on WASI before any value is read, with `fnox set --open is not available in seven: open the url yourself, then run fnox set`. The `url` field and `--url` work as upstream.
+
+The published 1.47.0-1 against the new checklist rows fails at `fnox get LVL` in `/home/v148url`: its `SecretConfig` has `deny_unknown_fields` and no `url`, so the project's `fnox.toml` fails to load with `unknown field \`url\``. It also has no `--open` or `--url` flag on `fnox set`, so the refusal message and the recorded url are missing, and `--version` prints 1.47.0 where the recipe says 1.48.0. The head build loads the file, lists the url, refuses `--open` without a trap and records `--url`.

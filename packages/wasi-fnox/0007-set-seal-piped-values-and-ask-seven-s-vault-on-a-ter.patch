@@ -4,19 +4,19 @@ Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 7/19] set: seal piped values and ask seven's vault on a terminal
 
 diff --git a/src/commands/set.rs b/src/commands/set.rs
-index 3a45571..fab8cbf 100644
+index f7a91f1..ba0c4d1 100644
 --- a/src/commands/set.rs
 +++ b/src/commands/set.rs
-@@ -328,6 +328,8 @@ impl SetCommand {
-         let has_metadata =
-             self.description.is_some() || self.if_missing.is_some() || self.default.is_some();
+@@ -368,6 +368,8 @@ impl SetCommand {
+             ));
+         }
  
 +        #[cfg_attr(not(target_os = "wasi"), allow(unused_mut))]
 +        let mut ask_vault = false;
          // Get the secret value if provided
          let mut generated: Option<String> = None;
          let secret_value = if self.generate {
-@@ -366,9 +368,10 @@ impl SetCommand {
+@@ -407,9 +409,10 @@ impl SetCommand {
              None
          } else {
              #[cfg(target_os = "wasi")]
@@ -29,8 +29,8 @@ index 3a45571..fab8cbf 100644
 +            }
              // Interactive terminal - prompt for value
              #[cfg(not(target_os = "wasi"))]
-             let value = demand::Input::new("Enter secret value")
-@@ -412,6 +415,35 @@ impl SetCommand {
+             if self.open {
+@@ -457,6 +460,35 @@ impl SetCommand {
              )));
          }
  
@@ -66,7 +66,7 @@ index 3a45571..fab8cbf 100644
          // Check if secret should be base64 encoded
          let secret_value = if self.base64_encode {
              secret_value
-@@ -479,12 +511,16 @@ impl SetCommand {
+@@ -524,12 +556,16 @@ impl SetCommand {
                              provider_name
                          );
  
@@ -89,7 +89,7 @@ index 3a45571..fab8cbf 100644
  
                          if self.dry_run {
                              // In dry-run mode, skip actual remote storage
-@@ -558,6 +594,11 @@ impl SetCommand {
+@@ -607,6 +643,11 @@ impl SetCommand {
              secret_config.sync = None;
          }
  

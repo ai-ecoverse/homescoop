@@ -4,11 +4,11 @@ Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 2/19] providers: build only age and plain for WASI
 
 diff --git a/crates/fnox-core/build/generate_providers.rs b/crates/fnox-core/build/generate_providers.rs
-index 3603d20..3494cc7 100644
+index eacaaab..b9c9341 100644
 --- a/crates/fnox-core/build/generate_providers.rs
 +++ b/crates/fnox-core/build/generate_providers.rs
-@@ -446,9 +446,19 @@ fn generate_provider_methods(
-             quote! { Self::#variant { .. } => false }
+@@ -468,9 +468,19 @@ fn generate_provider_methods(
+             quote! { Self::#variant { daemon_cache, .. } => daemon_cache.unwrap_or(true) }
          };
          daemon_cache_arms.push(daemon_cache_arm);
 -        env_deps_arms.push(quote! {
@@ -27,10 +27,10 @@ index 3603d20..3494cc7 100644
 +                Self::#variant { .. } => &[#(#deps),*]
 +            });
 +        }
-         let interactive = provider.requires_interactive_auth;
-         interactive_auth_arms.push(quote! {
-             Self::#variant { .. } => #interactive
-@@ -460,6 +470,7 @@ fn generate_provider_methods(
+         if let Some(field) = &provider.requires_interactive_auth_field {
+             let field = Ident::new(field, Span::call_site());
+             interactive_auth_arms.push(quote! {
+@@ -489,6 +499,7 @@ fn generate_provider_methods(
      // Build use statements for provider modules
      let module_uses: Vec<TokenStream> = providers
          .iter()
@@ -38,7 +38,7 @@ index 3603d20..3494cc7 100644
          .map(|(_name, provider)| {
              let module = Ident::new(&provider.module, Span::call_site());
              quote! { use super::super::#module; }
-@@ -777,6 +788,85 @@ fn generate_from_wizard_fields_body(provider: &ProviderToml) -> TokenStream {
+@@ -820,6 +831,95 @@ fn generate_from_wizard_fields_body(provider: &ProviderToml) -> TokenStream {
      }
  }
  
@@ -48,15 +48,25 @@ index 3603d20..3494cc7 100644
 +/// literal list of string literals, so an upstream change can't silently
 +/// empty it.
 +fn disabled_env_dependencies(module: &str) -> Vec<String> {
-+    let file = format!("src/providers/{module}.rs");
-+    let path = if std::path::Path::new(&file).exists() {
-+        file
-+    } else {
-+        format!("src/providers/{module}/mod.rs")
-+    };
++    let sig = "pub fn env_dependencies() -> &'static [&'static str] {";
++    // A module is a file or a directory; in a directory (keychain, from
++    // 1.48.0) the list may sit in a submodule that mod.rs re-exports.
++    let candidates = [
++        format!("src/providers/{module}.rs"),
++        format!("src/providers/{module}/mod.rs"),
++        format!("src/providers/{module}/provider.rs"),
++    ];
++    let path = candidates
++        .iter()
++        .find(|file| {
++            fs::read_to_string(file)
++                .map(|src| src.contains(sig))
++                .unwrap_or(false)
++        })
++        .cloned()
++        .unwrap_or_else(|| candidates[0].clone());
 +    println!("cargo:rerun-if-changed={path}");
 +    let src = fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
-+    let sig = "pub fn env_dependencies() -> &'static [&'static str] {";
 +    let (_, rest) = src
 +        .split_once(sig)
 +        .unwrap_or_else(|| panic!("{path}: no `{sig}`"));
@@ -124,7 +134,7 @@ index 3603d20..3494cc7 100644
  fn generate_provider_instantiate(
      providers: &[(String, ProviderToml)],
  ) -> Result<String, Box<dyn std::error::Error>> {
-@@ -794,6 +884,18 @@ fn generate_provider_instantiate(
+@@ -837,6 +937,18 @@ fn generate_provider_instantiate(
              vec![]
          };
  
@@ -144,10 +154,10 @@ index 3603d20..3494cc7 100644
              arms.push(quote! {
                  ResolvedProviderConfig::#variant => {
 diff --git a/crates/fnox-core/src/providers/age.rs b/crates/fnox-core/src/providers/age.rs
-index 7cfb45d..5f44186 100644
+index b5197d3..1709d76 100644
 --- a/crates/fnox-core/src/providers/age.rs
 +++ b/crates/fnox-core/src/providers/age.rs
-@@ -285,6 +285,7 @@ impl crate::providers::Provider for AgeEncryptionProvider {
+@@ -353,6 +353,7 @@ impl crate::providers::Provider for AgeEncryptionProvider {
  
          // Parse recipients - try SSH, native age, then plugin formats
          let mut parsed_recipients: Vec<Box<dyn age::Recipient + Send + Sync>> = Vec::new();
@@ -155,7 +165,7 @@ index 7cfb45d..5f44186 100644
          let mut plugin_recipients: Vec<age::plugin::Recipient> = Vec::new();
  
          for recipient in &self.recipients {
-@@ -300,7 +301,15 @@ impl crate::providers::Provider for AgeEncryptionProvider {
+@@ -368,7 +369,15 @@ impl crate::providers::Provider for AgeEncryptionProvider {
                  continue;
              }
  
@@ -171,7 +181,7 @@ index 7cfb45d..5f44186 100644
              match recipient.parse::<age::plugin::Recipient>() {
                  Ok(plugin_recipient) => plugin_recipients.push(plugin_recipient),
                  Err(e) => {
-@@ -314,10 +323,12 @@ impl crate::providers::Provider for AgeEncryptionProvider {
+@@ -382,10 +391,12 @@ impl crate::providers::Provider for AgeEncryptionProvider {
          // Build one plugin driver per distinct plugin name. RecipientPluginV1
          // filters the recipient list by plugin name internally, so we pass the
          // full list and spawn the matching `age-plugin-*` binary from $PATH.
@@ -184,7 +194,7 @@ index 7cfb45d..5f44186 100644
          for plugin_name in plugin_names {
              let plugin = age::plugin::RecipientPluginV1::new(
                  &plugin_name,
-@@ -569,6 +580,12 @@ impl AgeEncryptionProvider {
+@@ -663,6 +674,12 @@ impl AgeEncryptionProvider {
                      source: e,
                  })?;
  
@@ -197,7 +207,7 @@ index 7cfb45d..5f44186 100644
              let content = if is_age_encrypted(&bytes) {
                  decrypt_identity_file(&key_file_path, &bytes)?
              } else {
-@@ -602,12 +619,14 @@ impl AgeEncryptionProvider {
+@@ -696,12 +713,14 @@ impl AgeEncryptionProvider {
                      // identities (e.g. AGE-PLUGIN-YUBIKEY-1...) by driving the
                      // matching `age-plugin-*` binary for PIN/touch prompts.
                      cursor.set_position(0);
@@ -217,7 +227,7 @@ index 7cfb45d..5f44186 100644
                          .map_err(|e| FnoxError::AgeIdentityParseFailed {
                              details: e.to_string(),
                          })?
-@@ -640,6 +659,9 @@ impl AgeEncryptionProvider {
+@@ -734,6 +753,9 @@ impl AgeEncryptionProvider {
      }
  }
  
@@ -227,7 +237,7 @@ index 7cfb45d..5f44186 100644
  /// Identity files decrypted with a prompted passphrase, so one run asks once per file.
  /// Keyed by canonical path; the encrypted bytes are kept so an edited file is not served stale.
  type DecryptedIdentities = HashMap<PathBuf, (Vec<u8>, String)>;
-@@ -712,6 +734,10 @@ fn decrypt_with_passphrase(
+@@ -806,6 +828,10 @@ fn decrypt_with_passphrase(
      String::from_utf8(out).map_err(|e| e.to_string())
  }
  
@@ -265,10 +275,10 @@ index 97368bd..7eff514 100644
          let auth_failed = |e: azure_core::Error| FnoxError::ProviderAuthFailed {
              provider: provider.to_string(),
 diff --git a/crates/fnox-core/src/providers/mod.rs b/crates/fnox-core/src/providers/mod.rs
-index c3f23ed..6aac4ad 100644
+index 8e5f243..03b560e 100644
 --- a/crates/fnox-core/src/providers/mod.rs
 +++ b/crates/fnox-core/src/providers/mod.rs
-@@ -5,45 +5,88 @@ use std::path::PathBuf;
+@@ -5,46 +5,89 @@ use std::path::PathBuf;
  
  // Provider implementation modules
  pub mod age;
@@ -291,6 +301,7 @@ index c3f23ed..6aac4ad 100644
  pub mod bitwarden;
 +#[cfg(not(target_os = "wasi"))]
  pub mod bitwarden_sm;
+ pub mod discovery;
 +#[cfg(not(target_os = "wasi"))]
  pub mod doppler;
 +#[cfg(not(target_os = "wasi"))]
@@ -358,7 +369,7 @@ index c3f23ed..6aac4ad 100644
  pub use resolver::resolve_provider_config;
  pub use secret_ref::{
      OptionProviderSecretRef, OptionStringOrSecretRef, ResolvedStringOrProviderRef,
-@@ -157,14 +200,17 @@ mod generated {
+@@ -160,14 +203,17 @@ mod generated {
      }
      pub(super) mod providers_instantiate {
          // Need to import provider modules for instantiation
@@ -377,7 +388,7 @@ index c3f23ed..6aac4ad 100644
          include!(concat!(
              env!("OUT_DIR"),
              "/generated/providers_instantiate.rs"
-@@ -517,6 +563,7 @@ pub(crate) fn get_provider_from_resolved_with_context_and_identity_cycle_guard(
+@@ -540,6 +586,7 @@ pub(crate) fn get_provider_from_resolved_with_context_and_identity_cycle_guard(
          };
          return get_provider_from_resolved(provider_name, &resolved);
      }
@@ -409,7 +420,7 @@ index af0663e..cdf5ac7 100644
  }
  
 diff --git a/src/commands/provider/add.rs b/src/commands/provider/add.rs
-index 448f85f..97ec5e0 100644
+index 56257e1..96b8527 100644
 --- a/src/commands/provider/add.rs
 +++ b/src/commands/provider/add.rs
 @@ -240,7 +240,14 @@ impl AddCommand {
