@@ -24,7 +24,10 @@ import { readFileSync } from 'node:fs';
 const NM = '/node_modules/@ai-ecoverse';
 const AWAY = '.wasix-python.repin';
 const META = JSON.parse(readFileSync(new URL('../meta.json', import.meta.url), 'utf8'));
-const accepts = (spec, version) => {
+export const accepts = (spec, version) => typeof spec === 'string' && spec.includes(' || ')
+  ? spec.split(' || ').some((line) => acceptsLine(line, version))
+  : acceptsLine(spec, version);
+const acceptsLine = (spec, version) => {
   const r = /^>=(\d+)\.(\d+)\.(\d+)-(\d+) <(\d+)\.(\d+)\.(\d+)$/.exec(spec);
   if (!r) return spec === version;
   const [x, y, z, n, a, b, c] = r.slice(1).map(Number);
