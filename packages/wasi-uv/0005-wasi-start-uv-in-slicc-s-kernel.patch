@@ -14,22 +14,10 @@ Subject: [PATCH] wasi: start uv in slicc's kernel
   on WASI, so a task woken by a blocking thread (every tokio::fs call)
   would otherwise wait for the next IO event.
 ---
- Cargo.lock           |   1 +
  crates/uv/Cargo.toml |   5 +++++
  crates/uv/src/lib.rs |  97 ++++++++++++++++++++++++++++++++++++++++++++++++++-----
- 3 files changed, 98 insertions(+), 5 deletions(-)
+ 2 files changed, 97 insertions(+), 5 deletions(-)
 
-diff --git a/Cargo.lock b/Cargo.lock
---- a/Cargo.lock
-+++ b/Cargo.lock
-@@ -5664,6 +5664,7 @@
-  "indoc",
-  "insta",
-  "itertools 0.14.0",
-+ "libc",
-  "owo-colors",
-  "predicates",
-  "regex",
 diff --git a/crates/uv/Cargo.toml b/crates/uv/Cargo.toml
 --- a/crates/uv/Cargo.toml
 +++ b/crates/uv/Cargo.toml

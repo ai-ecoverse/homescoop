@@ -139,7 +139,6 @@ const certMeta = JSON.parse(source('meta.json'));
 function checkCrateRefresh (crates, patch, meta) {
   for (const [name, version] of crates) {
     assert.ok(patch.includes(`+${name} = { path = "homescoop-crates/${name}-${version}" }`), `0001's [patch.crates-io] names ${name} ${version}`);
-    assert.ok(patch.includes(` name = "${name}"\n version = "${version}"\n-source`), `0001's Cargo.lock hunk names ${name} ${version}`);
     assert.ok(`crates/${name}-${version}.patch` in meta.patches, `cert/meta.json lists ${name} ${version}`);
   }
 }
@@ -153,24 +152,7 @@ test('NEGATIVE: a half-done crate refresh fails', () => {
   const crate = [['cargo-util', '0.2.32']];
   const stale = (text) => text.replaceAll('0.2.32', '0.2.31');
   assert.throws(() => checkCrateRefresh(crate, stale(firstPatch), certMeta), /0001's \[patch\.crates-io\] names cargo-util 0\.2\.32/);
-  const pathOnly = firstPatch.replace(' name = "cargo-util"\n version = "0.2.32"', ' name = "cargo-util"\n version = "0.2.31"');
-  assert.throws(() => checkCrateRefresh(crate, pathOnly, certMeta), /0001's Cargo\.lock hunk names cargo-util 0\.2\.32/);
   assert.throws(() => checkCrateRefresh(crate, firstPatch, JSON.parse(stale(JSON.stringify(certMeta)))), /cert\/meta\.json lists cargo-util 0\.2\.32/);
-});
-
-const UV_LOCK_WASIX = /"uv-workspace-commands",\n "walkdir",\n\+ "wasix-command",\n "which",\n "wiremock",/;
-
-function checkUvLockOmitsWasix (patch) {
-  assert.doesNotMatch(patch, UV_LOCK_WASIX, "0001 must not add wasix-command to the uv package's Cargo.lock deps (crates/uv has no wasix-command; cargo --locked then fails)");
-}
-
-test("0001's Cargo.lock does not add wasix-command to the uv package", () => {
-  checkUvLockOmitsWasix(firstPatch);
-});
-
-test('NEGATIVE: a 0001 that adds wasix-command to the uv package lock entry fails', () => {
-  const bad = `${firstPatch}\n@@\n "uv-workspace-commands",\n "walkdir",\n+ "wasix-command",\n "which",\n "wiremock",\n`;
-  assert.throws(() => checkUvLockOmitsWasix(bad), /must not add wasix-command to the uv package/);
 });
 
 test("timeout.mjs logs the timeout it causes on purpose as expected, not as a 'wasi-uv: FAIL' line", async () => {

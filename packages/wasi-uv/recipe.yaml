@@ -71,6 +71,15 @@ about:
     0.13.7-2: THIRD-PARTY-NOTICES.md includes the eight [patch.crates-io]
     path crates under homescoop-crates/ (homescoop#2035); the notices
     generator and check-rust-notices no longer skip them.
+    0.13.8-1: Cargo.lock is apply.sh's (lock.mjs with lock.json, after
+    the series): the eight crates/ entries lose their registry source,
+    lock.json's crates gain wasix-command / wasix-net / web-time / libc,
+    and wasix-command and wasix-net are inserted by name, so a uv bump
+    that moves the lock needs no patch refresh (0001's lock hunk did not
+    apply to 0.13.8); cargo --locked checks the result. 0003 rebased for
+    0.13.8's write_atomic_with_permissions and the now public
+    LockedFile::lock_file (the credentials store locks through it; on
+    WASI that is the same slicc.fcntl_lock path).
     crates/: hyper-util (dial via wasix-net), rustls-native-certs,
     cargo-util (compile on WASI), reqsign-core/-google/-http-send-reqwest
     and astral-reqwest-middleware/-retry (mechanical: wasm32 means

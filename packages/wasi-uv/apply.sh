@@ -76,4 +76,6 @@ for p in "${series[@]}"; do
   echo "== wasi-uv: applied $name"
 done
 
+node "$PKG/lock.mjs" "$SRC/Cargo.lock" || die "lock.mjs could not edit $SRC/Cargo.lock (see packages/wasi-uv/lock.json)"
+
 printf '%s\n' "${series[@]##*/}" "${crate_patches[@]##*/}" >"$SRC/.slicc-patched"
