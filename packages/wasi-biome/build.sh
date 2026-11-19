@@ -15,6 +15,9 @@ if [[ -n "${FORCE:-}" || ! -f "$SRC_DIR/Cargo.toml" ]]; then
   # The archive's top-level directory is biome--biomejs-biome-<version>.
   tar -xzf "$TARBALL" -C "$SRC_DIR" --strip-components=1
 fi
+RUST="$(node "$HOMESCOOP_ROOT/scripts/read-recipe.mjs" wasi-biome --field toolchain.rust)"
+grep -qx "channel = \"$RUST\"" "$SRC_DIR/rust-toolchain.toml" \
+  || { echo "wasi-biome: recipe.yaml's toolchain.rust $RUST is not biome $VERSION's rust-toolchain.toml channel" >&2; exit 1; }
 homescoop_apply_patches "$SRC_DIR"
 
 # The crawler, scanner and module graph run on std threads (and rayon), so
@@ -75,7 +78,9 @@ if strings "$DEST/biome.wasm" | grep -E '/Users/[^/]+/|/home/runner/|/var/folder
   exit 1
 fi
 shasum -a 256 "$DEST/biome.wasm"
-RUST="$(cd "$SRC_DIR" && rustc --version | sed -n 's/^rustc \([0-9.]*\) .*/\1/p')"
+RUSTC="$(cd "$SRC_DIR" && rustc --version | sed -n 's/^rustc \([0-9.]*\) .*/\1/p')"
+[[ "$RUSTC" == "$RUST" ]] \
+  || { echo "wasi-biome: rustc $RUSTC built biome.wasm, but recipe.yaml's toolchain.rust is $RUST" >&2; exit 1; }
 homescoop_notices_begin "biome.wasm (Biome $VERSION, MIT OR Apache-2.0, see LICENSE) statically links these crates, Rust's standard library and wasi-libc."
 (cd "$SRC_DIR" && CARGO_TARGET_DIR="$OUT/target" homescoop_notice_rust "$SRC_DIR" "$TARGET" "$RUST" --root biome_cli)
 echo "OK wasi-biome $VERSION (biome)"

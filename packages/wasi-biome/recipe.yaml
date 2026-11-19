@@ -5,12 +5,14 @@ name: wasi-biome
 builder: host
 runner: pool
 # renovate: datasource=github-tags depName=biomejs/biome extractVersion=^@biomejs/biome@(?<version>.*)$
-version: "2.6.6"
+version: "2.6.7"
 npm: "@ai-ecoverse/wasi-biome"
 summary: "Biome 2.6 for slicc WASI preview1 (command biome)"
 source:
   url: "https://github.com/biomejs/biome/archive/refs/tags/@biomejs/biome@{{version}}.tar.gz"
-  sha256: "c0588dd352e9bebcf8de334baf0b5a120fa50933b57787b277e720e7057cb476"
+  sha256: "4a17edfe38a4437040d1f12ebd41a78bebec056522351c446c451b856b7e9cf4"
+toolchain:
+  rust: "1.99.1"
 inputs:
   - scripts/rust-wasm-refresh-alloc.rs
 # homescoop#1287: the initial heap from the measured peak, with headroom.
@@ -43,3 +45,6 @@ about:
     2.6.4-2: 0001 no longer takes a stale PWD (Node's spawn with `cwd`
     leaves the parent's); cert/cwd.mjs, on slicc-kernel 1.176.2 with
     slicc-jsh's node.
+    2.6.7-1: biome 2.6.7 pins Rust 1.99.1. toolchain.rust names it;
+    build.sh fails when it is not rust-toolchain.toml's channel or the
+    rustc that builds, and cert/notices.mjs reads it for the notice.
