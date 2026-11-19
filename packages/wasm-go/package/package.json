@@ -3,6 +3,9 @@
   "version": "1.27.4-2",
   "description": "The Go 1.27 compiler, linker and assembler, with a go command (build, run, mod download) that drives them in slicc-kernel.",
   "license": "BSD-3-Clause",
+  "engines": {
+    "slicc-kernel": ">=1.88.0"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ai-ecoverse/homescoop.git",

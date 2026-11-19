@@ -29,6 +29,10 @@ file that starts with `#include "textflag.h"` stops at
 
 ## The `go` command
 
+The command needs slicc-kernel 1.88.0 or later (`engines.slicc-kernel`):
+it runs the tools with `ctx.sync.run`, downloads with `ctx.fetch`, and marks
+what it links executable with `ctx.fs.chmod`, which older kernels lack.
+
 cmd/go can't drive the toolchain in WASI (wasip1 has no processes), so
 `bin/go.mjs` plans the build and runs `compile`, `link` and `asm` by path,
 as cmd/go would. It is the only command the package registers; `compile`,
