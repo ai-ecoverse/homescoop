@@ -181,6 +181,25 @@ export default async function go(ctx) {
   assert.equal(r.stdout, 'hello, slicc\n', out(r));
   assert.match(await ls(`${home}/go/pkg/mod/example.test/`), /^!greet@v1\.0\.0$/m, 'the module cache escapes upper case');
 
+  const cached = `${home}/go/pkg/mod/example.test/!greet@v1.0.0`;
+  for (const [what, tamper] of [
+    ['a modified file', () => write(`${cached}/greet.go`, GREET.replace('hello, ', 'evil, '))],
+    ['an extra file', () => write(`${cached}/evil.go`, 'package greet\n\nfunc init() { panic("evil") }\n')],
+    ['a removed file', () => run(['rm', `${cached}/go.mod`])],
+  ]) {
+    r = await run(['go', 'mod', 'download'], use);
+    assert.equal(r.status, 0, out(r));
+    await tamper();
+    r = await run(['go', 'run', '-a', '.'], use, { GOPROXY: 'off' });
+    assert.equal(r.status, 1, `${what} under a valid .slicc-ok is refused: ${out(r)}`);
+    assert.match(r.stderr, /checksum mismatch\n\tcached: [\s\S]*SECURITY ERROR[\s\S]*Remove \/home\/gopher\/go\/pkg\/mod\/example\.test\/!greet@v1\.0\.0 to download it again/, out(r));
+    assert.doesNotMatch(r.stdout, /evil/, out(r));
+    r = await run(['rm', '-rf', cached]);
+    assert.equal(r.status, 0, out(r));
+  }
+  r = await run(['go', 'mod', 'download'], use);
+  assert.equal(r.status, 0, out(r));
+
   const other = `${home}/other`;
   await write(`${other}/go.mod`, `module example.com/other\n\ngo 1.27\n\nrequire ${MOD} ${VER}\n`);
   await write(`${other}/main.go`, `package main\n\nimport greet "${MOD}"\n\nfunc main() { println(greet.Hello("other")) }\n`);
@@ -267,5 +286,5 @@ export default async function go(ctx) {
   assert.equal(r.status, 2, out(r));
   r = await run(['go', 'frob']);
   assert.equal(r.status, 2, out(r));
-  console.log('go: version, env, build/run with embed (an edited asset recompiles), tags, file-name constraints and asm; archive cache; proxy download checked against go.sum (mismatch, missing entry, a cached module against another go.sum, a ../ zip entry: all refused; !-escaped cache path); a dependency\'s replace outside it ignored, a missing replace directory refused; GOPRIVATE not fetched; go.work refused; vendor; local replace; compile/import errors rc 1; test/get/install/list/vet/work, -race and an unknown command rc 2');
+  console.log('go: version, env, build/run with embed (an edited asset recompiles), tags, file-name constraints and asm; archive cache; proxy download checked against go.sum (mismatch, missing entry, a cached module against another go.sum, a modified, extra or removed file under a valid .slicc-ok, a ../ zip entry: all refused; !-escaped cache path); a dependency\'s replace outside it ignored, a missing replace directory refused; GOPRIVATE not fetched; go.work refused; vendor; local replace; compile/import errors rc 1; test/get/install/list/vet/work, -race and an unknown command rc 2');
 }

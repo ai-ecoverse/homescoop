@@ -375,13 +375,37 @@ class Driver {
   async verified(path, version, dir) {
     const want = this.sumFor(path, version);
     if (!(await this.exists(dir))) return this.download(path, version, dir, want);
-    let have;
-    try {
-      have = (await this.readText(`${dir}/.slicc-ok`)).trim();
-    } catch {
-      throw new GoError(`go: ${path}@${version}: ${dir} is in the module cache, but this go driver did not verify it (no .slicc-ok); remove it to download it again`);
+    if (!(await this.exists(`${dir}/.slicc-ok`))) {
+      throw new GoError(`go: ${path}@${version}: ${dir} is in the module cache, but this go driver did not extract it (no .slicc-ok); remove it to download it again`);
     }
-    if (have !== want) throw mismatch(path, version, have, want, 'the module cache');
+    const got = await this.treeHash(path, version, dir);
+    if (got !== want) throw mismatch(path, version, got, want, 'the module cache', dir);
+  }
+
+  async treeHash(path, version, dir) {
+    const files = [];
+    const stat = (p) => (typeof this.fs.lstat === 'function' ? this.fs.lstat(p) : this.fs.stat(p));
+    const walk = async (d, rel) => {
+      const names = (await this.fs.readdir(d)).filter((name) => rel || name !== '.slicc-ok');
+      const subdirs = [];
+      await pool(names, async (name) => {
+        const p = `${d}/${name}`;
+        const r = rel ? `${rel}/${name}` : name;
+        const st = await stat(p);
+        if (st.isSymbolicLink || (!st.isDirectory && !st.isFile)) {
+          throw new GoError(`go: ${path}@${version}: ${p} in the module cache is not a regular file or directory; remove ${dir} to download it again`);
+        }
+        if (st.isDirectory) subdirs.push([p, r]);
+        else files.push({ name: `${path}@${version}/${r}`, file: p });
+      });
+      for (const [p, r] of subdirs) await walk(p, r);
+    };
+    await walk(dir, '');
+    await pool(files, async (f) => {
+      f.line = `${hex(await sha256(await this.fs.readFile(f.file)))}  ${f.name}\n`;
+    });
+    files.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    return `h1:${base64(await sha256(files.map((f) => f.line).join('')))}`;
   }
 
   async download(path, version, dir, want) {
@@ -445,6 +469,7 @@ class Driver {
       if (!f.name.startsWith(prefix)) throw new GoError(`go: ${path}@${version}: zip entry ${f.name} outside ${prefix}`);
       const rel = f.name.slice(prefix.length);
       if (/[\\\x00-\x1f\x7f]/.test(rel) || rel.split('/').some((s) => s === '..' || s === '.' || s === '')) throw new GoError(`go: ${path}@${version}: bad zip entry ${f.name}`);
+      if (rel === '.slicc-ok') throw new GoError(`go: ${path}@${version}: zip entry ${f.name} is reserved for the module cache`);
       const folded = rel.toLowerCase();
       if (seen.has(folded)) throw new GoError(`go: ${path}@${version}: zip has more than one entry for ${f.name} (or a case-insensitive collision)`);
       seen.add(folded);
@@ -1252,8 +1277,17 @@ function evalPlusBuild(line, has) {
   return line.split(/\s+/).some((term) => term.split(',').every((t) => (t.startsWith('!') ? !has(t.slice(1)) : has(t))));
 }
 
-function mismatch(path, version, got, want, what) {
-  return new GoError(`go: ${path}@${version}: verifying module: checksum mismatch\n\t${what === 'the download' ? 'downloaded' : 'cached'}: ${got}\n\tgo.sum:     ${want}\n\nSECURITY ERROR\nThe module in ${what} does NOT match the hash recorded in go.sum.`);
+async function pool(items, fn, width = 32) {
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) await fn(items[next++]);
+  };
+  await Promise.all(Array.from({ length: Math.min(width, items.length) }, worker));
+}
+
+function mismatch(path, version, got, want, what, dir) {
+  const fix = dir ? `\nRemove ${dir} to download it again.` : '';
+  return new GoError(`go: ${path}@${version}: verifying module: checksum mismatch\n\t${what === 'the download' ? 'downloaded' : 'cached'}: ${got}\n\tgo.sum:     ${want}\n\nSECURITY ERROR\nThe module in ${what} does NOT match the hash recorded in go.sum.${fix}`);
 }
 
 async function inflate(data, size, name) {

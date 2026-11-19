@@ -339,7 +339,37 @@ test('wasm-go driver: a module cache entry is checked against go.sum on every bu
   foreign.put(`${cacheDir(GREET)}/greet.go`, 'package greet\n\nfunc Hello() string { return "unverified" }\n');
   r = await go(foreign, ['build'], { cwd: fdir, fetch: proxyFor(GREET) });
   assert.equal(r.status, 1, 'a module directory this go never verified is not trusted');
-  assert.match(r.stderr, /did not verify it/);
+  assert.match(r.stderr, /did not extract it/);
+  assert.deepEqual(r.tools('compile'), []);
+});
+
+test('wasm-go driver: a cached module is hashed again on use, so a planted .slicc-ok cannot vouch for other files', async () => {
+  const cases = [
+    ['a modified file', (fs) => fs.put(`${cacheDir(GREET)}/greet.go`, 'package greet\n\nfunc Hello() string { return "evil" }\n')],
+    ['an extra file', (fs) => fs.put(`${cacheDir(GREET)}/evil.go`, 'package greet\n\nfunc init() { panic("evil") }\n')],
+    ['a file in a new directory', (fs) => fs.put(`${cacheDir(GREET)}/sub/x.go`, 'package sub\n')],
+    ['a removed file', (fs) => fs.rm(`${cacheDir(GREET)}/go.mod`)],
+  ];
+  for (const [what, tamper] of cases) {
+    const fs = world();
+    const dir = useApp(fs);
+    let r = await go(fs, ['build'], { cwd: dir, fetch: proxyFor(GREET) });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(fs.text(`${cacheDir(GREET)}/.slicc-ok`), `${GREET.sum}\n`);
+    await tamper(fs);
+    r = await go(fs, ['build', '-a'], { cwd: dir, env: { GOPROXY: 'off' } });
+    assert.equal(r.status, 1, what);
+    assert.match(r.stderr, /checksum mismatch\n\tcached: h1:[\s\S]*go\.sum: {5}h1:[\s\S]*SECURITY ERROR[\s\S]*Remove \/home\/u\/go\/pkg\/mod\/example\.test\/!greet@v1\.0\.0 to download it again/, what);
+    assert.deepEqual(r.tools('compile'), [], `${what}: nothing compiled`);
+  }
+  const fs = world();
+  const dir = useApp(fs);
+  fs.put(`${cacheDir(GREET)}/go.mod`, 'module example.test/Greet\n\ngo 1.21\n');
+  fs.put(`${cacheDir(GREET)}/greet.go`, 'package greet\n\nfunc Hello() string { return "evil" }\n');
+  fs.put(`${cacheDir(GREET)}/.slicc-ok`, `${GREET.sum}\n`);
+  const r = await go(fs, ['build'], { cwd: dir, env: { GOPROXY: 'off' } });
+  assert.equal(r.status, 1, 'a planted .slicc-ok with the right h1 over other sources');
+  assert.match(r.stderr, /SECURITY ERROR/);
   assert.deepEqual(r.tools('compile'), []);
 });
 
@@ -380,6 +410,7 @@ test('wasm-go driver: zip entries with .., duplicates or a bad size are refused 
   for (const [what, entries, want] of [
     ['a ../ entry', [['example.test/Greet@v1.0.0/go.mod', 'module example.test/Greet\n'], ['example.test/Greet@v1.0.0/../../../escape.go', 'package x\n']], /bad zip entry/],
     ['an entry outside the module prefix', [['example.test/Greet@v1.0.0/go.mod', 'module example.test/Greet\n'], ['other@v1.0.0/x.go', 'package x\n']], /outside example\.test\/Greet@v1\.0\.0\//],
+    ['a .slicc-ok entry', [['example.test/Greet@v1.0.0/go.mod', 'module example.test/Greet\n'], ['example.test/Greet@v1.0.0/.slicc-ok', 'h1:x\n']], /reserved for the module cache/],
     ['a duplicate entry', [['example.test/Greet@v1.0.0/go.mod', 'module example.test/Greet\n'], ['example.test/Greet@v1.0.0/go.mod', 'module evil\n']], /more than one entry/],
   ]) {
     const fs = world();
