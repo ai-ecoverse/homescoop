@@ -23,7 +23,44 @@
     "with wasm-go-std-wasip1 of the same version (this run's peer artifact, else the registry's): compile and link a fmt/os program in the kernel; the wasip1 binary runs there and prints 'hello from go 42 3'",
     "goroot/pkg/include ships Go's assembler headers (textflag.h, funcdata.h, asm_*.h): as gopher, asm -I goroot/pkg/include assembles a textflag.h NOSPLIT function (gensymabis and object), compile -symabis declares it, the object joins main's archive, and the linked program prints 'asm says 42'; asm without -I can't open textflag.h, as upstream Go's asm (homescoop#747). 1.26.5-2: no goroot/pkg/include (NEGATIVE.md)",
     "cert/licence.mjs (1.27.2-2, homescoop#897): the package ships Go's LICENSE (Copyright 2009 The Go Authors, BSD-3-Clause) and PATENTS (Additional IP Rights Grant (Patents)), both from the pinned go source tarball and both in package.json files[]. 1.27.2-1 shipped LICENSE only (NEGATIVE.md)",
-    "cert/go.mjs (1.27.4-2): the go command (bin/go.mjs, \"abi\": \"js\"), as gopher under users enforce with wasm-go-std-wasip1 beside it: go version and go env; go build and go run of a module with //go:embed (dot files left out), a //go:build tag (-tags special), a _linux file left out and a wasm .s function (asm -gensymabis, compile -symabis -asmhdr, the object appended to the archive) print what they should; an unchanged rebuild with -x runs link but no compile (archive cache); a required module (example.test/Greet, mixed case) from a GOPROXY ctx.serve() answers: a go.sum mismatch → rc 1, checksum mismatch, SECURITY ERROR, nothing in GOMODCACHE; an empty go.sum → rc 1, missing go.sum entry; the right h1 → it builds and runs, cached as example.test/!greet@v1.0.0; vendor/ and a local replace build with GOPROXY=off; a compile error → rc 1 with '# command-line-arguments' and ./ce.go:3:15; an unknown import → rc 1, no required module provides package; go test, go build -race and an unknown command → rc 2"
+    "cert/go.mjs (1.27.4-2): the go command (bin/go.mjs, \"abi\": \"js\"), as gopher under users enforce with wasm-go-std-wasip1 beside it: go version and go env; go build and go run of a module with //go:embed (dot files left out; an edited embedded file compiles again and the program prints the new bytes), a //go:build tag (-tags special), a _linux file left out and a wasm .s function (asm -gensymabis, compile -symabis -asmhdr, the object appended to the archive) print what they should; an unchanged rebuild with -x runs link but no compile (archive cache); required modules from a GOPROXY ctx.serve() answers: a go.sum mismatch → rc 1, checksum mismatch, SECURITY ERROR, nothing in GOMODCACHE; an empty go.sum → rc 1, missing go.sum entry; the right h1 → it builds and runs, cached as example.test/!greet@v1.0.0; that cached module under another project whose go.sum has another h1 → rc 1, cached checksum mismatch, and with no go.sum line → rc 1; a zip whose go.sum matches but with a ../ entry → rc 1, bad zip entry, nothing extracted or written above the cache; a dependency whose go.mod replaces a module with a directory outside it ($HOME/evil) builds with the go.sum-checked module (the replace is ignored, as go ignores it); a replace to a missing directory → rc 1; GOPRIVATE=example.test → rc 1, not fetched through GOPROXY; a go.work → rc 2 unless GOWORK=off; vendor/ and a local replace build with GOPROXY=off; a compile error → rc 1 with '# command-line-arguments' and ./ce.go:3:15; an unknown import → rc 1, no required module provides package; go test/get/install/list/vet/work → rc 2, not supported by this go driver yet; go build -race and an unknown command → rc 2"
   ],
-  "users": "enforce"
+  "users": "enforce",
+  "extra_kernels": [
+    {
+      "kernel": "@ai-ecoverse/slicc-kernel@1.65.0",
+      "why": "floor probe 1.65.0",
+      "specs": [
+        "go.mjs"
+      ]
+    },
+    {
+      "kernel": "@ai-ecoverse/slicc-kernel@1.76.0",
+      "why": "floor probe 1.76.0",
+      "specs": [
+        "go.mjs"
+      ]
+    },
+    {
+      "kernel": "@ai-ecoverse/slicc-kernel@1.102.6",
+      "why": "floor probe 1.102.6",
+      "specs": [
+        "go.mjs"
+      ]
+    },
+    {
+      "kernel": "@ai-ecoverse/slicc-kernel@1.130.2",
+      "why": "floor probe 1.130.2",
+      "specs": [
+        "go.mjs"
+      ]
+    },
+    {
+      "kernel": "@ai-ecoverse/slicc-kernel@1.160.0",
+      "why": "floor probe 1.160.0",
+      "specs": [
+        "go.mjs"
+      ]
+    }
+  ]
 }

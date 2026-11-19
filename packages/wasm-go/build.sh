@@ -71,7 +71,6 @@ rm -rf "$DEST"
 mkdir -p "$(dirname "$DEST")"
 cp -R "$OUT" "$DEST"
 
-# The go command: the in-tree src/go.mjs, staged as bin/go.mjs (no build step).
 mkdir -p "$HOMESCOOP_PKG/package/bin"
 cp "$HOMESCOOP_PKG/src/go.mjs" "$HOMESCOOP_PKG/package/bin/go.mjs"
 chmod 644 "$HOMESCOOP_PKG/package/bin/go.mjs"

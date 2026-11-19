@@ -1,15 +1,3 @@
-/**
- * wasm-go's `go` command (bin/go.mjs, a slicc-kernel JS program), as gopher
- * under users enforce, with wasm-go-std-wasip1 installed beside it:
- * go version / go env; go build and go run of a module (embed, a //go:build
- * tag, a file-name constraint, Go assembly); a required module downloaded
- * from a GOPROXY that ctx.serve() answers, checked against go.sum, cached in
- * GOMODCACHE, with a mixed-case path (escaped as !x); a vendored module; a
- * local replace; the archive cache (an unchanged rebuild compiles nothing);
- * and the failures: a go.sum mismatch (SECURITY ERROR, nothing extracted), a
- * missing go.sum entry, an unknown import, a compile error, unknown commands
- * and refused flags.
- */
 import { createHash } from 'node:crypto';
 import { deflateRawSync } from 'node:zlib';
 
@@ -17,13 +5,12 @@ const MOD = 'example.test/Greet';
 const VER = 'v1.0.0';
 const GREET = 'package greet\n\nfunc Hello(name string) string { return "hello, " + name }\n';
 
-/** A module zip as the proxy serves it: entries named <path>@<version>/<file>. */
-function moduleZip(files) {
+function zipOf(entries) {
   const local = [];
   const central = [];
   let offset = 0;
-  for (const [name, text] of Object.entries(files)) {
-    const n = Buffer.from(`${MOD}@${VER}/${name}`);
+  for (const [name, text] of entries) {
+    const n = Buffer.from(name);
     const data = Buffer.from(text);
     const comp = deflateRawSync(data);
     const crc = crc32(data);
@@ -52,8 +39,8 @@ function moduleZip(files) {
   const cd = Buffer.concat(central);
   const end = Buffer.alloc(22);
   end.writeUInt32LE(0x06054b50, 0);
-  end.writeUInt16LE(Object.keys(files).length, 8);
-  end.writeUInt16LE(Object.keys(files).length, 10);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
   end.writeUInt32LE(cd.length, 12);
   end.writeUInt32LE(offset, 16);
   return Buffer.concat([...local, cd, end]);
@@ -68,14 +55,19 @@ function crc32(buf) {
   return ~c >>> 0;
 }
 
-/** go.sum's h1: dirhash.Hash1 over the zip's files. */
-function h1(files) {
-  const lines = Object.entries(files)
-    .map(([name, text]) => [`${MOD}@${VER}/${name}`, text])
-    .sort(([a], [b]) => (a < b ? -1 : 1))
+function h1(entries) {
+  const lines = [...entries]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([name, text]) => `${createHash('sha256').update(text).digest('hex')}  ${name}\n`)
     .join('');
   return `h1:${createHash('sha256').update(lines).digest('base64')}`;
+}
+
+const escape = (p) => p.replace(/[A-Z]/g, (c) => `!${c.toLowerCase()}`);
+
+function moduleOf(path, version, files, raw = []) {
+  const entries = [...Object.entries(files).map(([name, text]) => [`${path}@${version}/${name}`, text]), ...raw];
+  return { path, version, url: `/${escape(path)}/@v/${version}.zip`, zip: zipOf(entries), sum: h1(entries) };
 }
 
 export default async function go(ctx) {
@@ -85,15 +77,22 @@ export default async function go(ctx) {
   const env = { HOME: home, GOPROXY: 'http://proxy.test', GOFLAGS: '' };
   const run = (argv, cwd = home, extra = {}) => ctx.run(argv, { cwd, user: 'gopher', env: { ...env, ...extra } });
   const out = (r) => `rc=${r.status}\n${r.stdout.slice(0, 3000)}\n${r.stderr.slice(0, 3000)}`;
+  const ls = async (dir) => (await run(['bash', '-c', `ls -a ${dir} 2>&1 || true`])).stdout;
 
-  const files = { 'go.mod': `module ${MOD}\n\ngo 1.21\n`, 'greet.go': GREET };
-  const zip = moduleZip(files);
-  const sum = h1(files);
+  const greet = moduleOf(MOD, VER, { 'go.mod': `module ${MOD}\n\ngo 1.21\n`, 'greet.go': GREET });
+  const escaping = moduleOf(MOD, 'v1.0.1', { 'go.mod': `module ${MOD}\n\ngo 1.21\n`, 'greet.go': GREET }, [[`${MOD}@v1.0.1/../../../../escape.go`, 'package escape\n']]);
+  const wrap = moduleOf('example.test/wrap', VER, {
+    'go.mod': `module example.test/wrap\n\ngo 1.21\n\nrequire ${MOD} ${VER}\n\nreplace ${MOD} => ${home}/evil\n`,
+    'wrap.go': `package wrap\n\nimport greet "${MOD}"\n\nfunc Hi() string { return greet.Hello("wrapped") }\n`,
+  });
+  const served = Object.fromEntries([greet, escaping, wrap].map((m) => [m.url, m.zip.toString('base64')]));
   const responder = new Function(
     'req',
-    `const u = new URL(req.url);
-     if (u.pathname === '/example.test/!greet/@v/${VER}.zip') {
-       const b = atob(${JSON.stringify(zip.toString('base64'))});
+    `const served = ${JSON.stringify(served)};
+     const u = new URL(req.url);
+     const b64 = served[u.pathname];
+     if (b64) {
+       const b = atob(b64);
        const body = new Uint8Array(b.length);
        for (let i = 0; i < b.length; i++) body[i] = b.charCodeAt(i);
        return { status: 200, headers: [['content-type', 'application/zip']], body };
@@ -108,7 +107,6 @@ export default async function go(ctx) {
   r = await run(['go', 'env', 'GOOS', 'GOARCH', 'GOMODCACHE']);
   assert.equal(r.stdout, `wasip1\nwasm\n${home}/go/pkg/mod\n`, out(r));
 
-  // A module with embed, a build tag, a file-name constraint and assembly.
   const app = `${home}/app`;
   await write(`${app}/go.mod`, 'module example.com/app\n\ngo 1.27\n');
   await write(`${app}/static/a.txt`, 'hi\n');
@@ -132,7 +130,8 @@ export default async function go(ctx) {
     'func main() {',
     '\tfs.WalkDir(files, ".", func(p string, d fs.DirEntry, err error) error {',
     '\t\tif !d.IsDir() {',
-    '\t\t\tfmt.Println("embed", p)',
+    '\t\t\tb, _ := files.ReadFile(p)',
+    '\t\t\tfmt.Printf("embed %s %q\\n", p, b)',
     '\t\t}',
     '\t\treturn nil',
     '\t})',
@@ -150,7 +149,7 @@ export default async function go(ctx) {
   assert.equal(r.status, 0, out(r));
   r = await run(['./app', 'x'], app);
   assert.equal(r.status, 0, out(r));
-  assert.equal(r.stdout, 'embed static/a.txt\nembed static/sub/b.txt\ntag default asm 42 args [x]\n', out(r));
+  assert.equal(r.stdout, 'embed static/a.txt "hi\\n"\nembed static/sub/b.txt "deep\\n"\ntag default asm 42 args [x]\n', out(r));
   r = await run(['go', 'run', '-tags', 'special', '.', 'y', 'z'], app);
   assert.equal(r.status, 0, out(r));
   assert.match(r.stdout, /^tag special asm 42 args \[y z\]$/m, out(r));
@@ -158,29 +157,82 @@ export default async function go(ctx) {
   assert.equal(r.status, 0, out(r));
   assert.doesNotMatch(r.stderr, /\/compile /, `an unchanged rebuild compiles nothing (archive cache): ${out(r)}`);
   assert.match(r.stderr, /\/link /, out(r));
+  await write(`${app}/static/a.txt`, 'edited\n');
+  r = await run(['go', 'run', '-x', '.'], app);
+  assert.equal(r.status, 0, out(r));
+  assert.match(r.stderr, /\/compile /, `an edited embedded file is compiled again: ${out(r)}`);
+  assert.match(r.stdout, /^embed static\/a\.txt "edited\\n"$/m, out(r));
 
-  // A required module from the proxy, checked against go.sum.
   const use = `${home}/use`;
   await write(`${use}/go.mod`, `module example.com/use\n\ngo 1.27\n\nrequire ${MOD} ${VER}\n`);
   await write(`${use}/main.go`, `package main\n\nimport (\n\t"fmt"\n\n\tgreet "${MOD}"\n)\n\nfunc main() { fmt.Println(greet.Hello("slicc")) }\n`);
-  await write(`${use}/go.sum`, `${MOD} ${VER} ${sum.replace(/^h1:./, 'h1:A')}\n`);
+  await write(`${use}/go.sum`, `${MOD} ${VER} ${greet.sum.replace(/^h1:./, (m) => (m === 'h1:A' ? 'h1:B' : 'h1:A'))}\n`);
   r = await run(['go', 'build'], use);
   assert.equal(r.status, 1, `a go.sum mismatch stops the build: ${out(r)}`);
   assert.match(r.stderr, /checksum mismatch[\s\S]*SECURITY ERROR/, out(r));
-  r = await run(['bash', '-c', `ls ${home}/go/pkg/mod/example.test 2>&1 || true`]);
-  assert.doesNotMatch(r.stdout, /!greet@/, `nothing extracted after a mismatch: ${out(r)}`);
+  assert.doesNotMatch(await ls(`${home}/go/pkg/mod/example.test`), /!greet@/, 'nothing extracted after a mismatch');
   await write(`${use}/go.sum`, '');
   r = await run(['go', 'build'], use);
   assert.equal(r.status, 1, out(r));
   assert.match(r.stderr, /missing go\.sum entry for module providing example\.test\/Greet@v1\.0\.0/, out(r));
-  await write(`${use}/go.sum`, `${MOD} ${VER} ${sum}\n`);
+  await write(`${use}/go.sum`, `${MOD} ${VER} ${greet.sum}\n`);
   r = await run(['go', 'run', '.'], use);
   assert.equal(r.status, 0, out(r));
   assert.equal(r.stdout, 'hello, slicc\n', out(r));
-  r = await run(['bash', '-c', `ls ${home}/go/pkg/mod/example.test/`]);
-  assert.match(r.stdout, /^!greet@v1\.0\.0$/m, `the module cache escapes upper case: ${out(r)}`);
+  assert.match(await ls(`${home}/go/pkg/mod/example.test/`), /^!greet@v1\.0\.0$/m, 'the module cache escapes upper case');
 
-  // vendor/ and a local replace, with an empty GOPROXY: nothing is fetched.
+  const other = `${home}/other`;
+  await write(`${other}/go.mod`, `module example.com/other\n\ngo 1.27\n\nrequire ${MOD} ${VER}\n`);
+  await write(`${other}/main.go`, `package main\n\nimport greet "${MOD}"\n\nfunc main() { println(greet.Hello("other")) }\n`);
+  await write(`${other}/go.sum`, `${MOD} ${VER} h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\n`);
+  r = await run(['go', 'build'], other);
+  assert.equal(r.status, 1, `a cached module is checked against each go.sum: ${out(r)}`);
+  assert.match(r.stderr, /checksum mismatch\n\tcached: [\s\S]*SECURITY ERROR/, out(r));
+  await write(`${other}/go.sum`, '');
+  r = await run(['go', 'build'], other);
+  assert.equal(r.status, 1, `a cached module still needs a go.sum line: ${out(r)}`);
+  assert.match(r.stderr, /missing go\.sum entry/, out(r));
+
+  const esc = `${home}/esc`;
+  await write(`${esc}/go.mod`, `module example.com/esc\n\ngo 1.27\n\nrequire ${MOD} v1.0.1\n`);
+  await write(`${esc}/main.go`, `package main\n\nimport greet "${MOD}"\n\nfunc main() { println(greet.Hello("esc")) }\n`);
+  await write(`${esc}/go.sum`, `${MOD} v1.0.1 ${escaping.sum}\n`);
+  r = await run(['go', 'build'], esc);
+  assert.equal(r.status, 1, `a zip entry with ../ is refused even when go.sum matches: ${out(r)}`);
+  assert.match(r.stderr, /bad zip entry example\.test\/Greet@v1\.0\.1\/\.\.\/\.\.\/\.\.\/\.\.\/escape\.go/, out(r));
+  assert.doesNotMatch(await ls(`${home}/go/pkg/mod/example.test`), /!greet@v1\.0\.1/, 'nothing extracted from it');
+  for (const dir of [`${home}/go/pkg/mod`, `${home}/go/pkg`, `${home}/go`, home]) {
+    assert.doesNotMatch(await ls(dir), /^escape\.go$/m, `nothing written to ${dir}`);
+  }
+
+  await write(`${home}/evil/go.mod`, `module ${MOD}\n\ngo 1.21\n`);
+  await write(`${home}/evil/greet.go`, 'package greet\n\nfunc Hello(name string) string { return "evil, " + name }\n');
+  const dep = `${home}/dep`;
+  await write(`${dep}/go.mod`, `module example.com/dep\n\ngo 1.27\n\nrequire (\n\t${MOD} ${VER}\n\texample.test/wrap ${VER}\n)\n`);
+  await write(`${dep}/go.sum`, `${MOD} ${VER} ${greet.sum}\nexample.test/wrap ${VER} ${wrap.sum}\n`);
+  await write(`${dep}/main.go`, 'package main\n\nimport "example.test/wrap"\n\nfunc main() { println(wrap.Hi()) }\n');
+  r = await run(['go', 'run', '.'], dep);
+  assert.equal(r.status, 0, out(r));
+  assert.equal(r.stderr, 'hello, wrapped\n', `a dependency's replace (to ${home}/evil, outside it) is ignored, as go ignores it: ${out(r)}`);
+  const gone = `${home}/gone`;
+  await write(`${gone}/go.mod`, `module example.com/gone\n\ngo 1.27\n\nrequire ${MOD} ${VER}\n\nreplace ${MOD} => ../missing\n`);
+  await write(`${gone}/main.go`, `package main\n\nimport greet "${MOD}"\n\nfunc main() { println(greet.Hello("gone")) }\n`);
+  r = await run(['go', 'build'], gone, { GOPROXY: 'off' });
+  assert.equal(r.status, 1, out(r));
+  assert.match(r.stderr, /replacement directory \.\.\/missing does not exist/, out(r));
+  r = await run(['go', 'build'], use, { GOPRIVATE: 'example.test', GOMODCACHE: `${home}/private` });
+  assert.equal(r.status, 1, out(r));
+  assert.match(r.stderr, /matches GONOPROXY\/GOPRIVATE \(example\.test\)/, out(r));
+  await write(`${home}/ws/go.work`, 'go 1.27\n\nuse ./m\n');
+  await write(`${home}/ws/m/go.mod`, 'module example.com/m\n\ngo 1.27\n');
+  await write(`${home}/ws/m/main.go`, 'package main\n\nfunc main() { println("ws") }\n');
+  r = await run(['go', 'build'], `${home}/ws/m`);
+  assert.equal(r.status, 2, out(r));
+  assert.match(r.stderr, /go\.work files are not supported by this go driver yet; set GOWORK=off/, out(r));
+  r = await run(['go', 'run', '.'], `${home}/ws/m`, { GOWORK: 'off' });
+  assert.equal(r.status, 0, out(r));
+  assert.equal(r.stderr, 'ws\n', out(r));
+
   const ven = `${home}/ven`;
   await write(`${ven}/go.mod`, `module example.com/ven\n\ngo 1.27\n\nrequire ${MOD} ${VER}\n`);
   await write(`${ven}/main.go`, `package main\n\nimport greet "${MOD}"\n\nfunc main() { println(greet.Hello("vendor")) }\n`);
@@ -198,7 +250,6 @@ export default async function go(ctx) {
   assert.equal(r.status, 0, out(r));
   assert.equal(r.stderr, 'local, replace\n', out(r));
 
-  // Failures.
   await write(`${home}/bad/ce.go`, 'package main\n\nfunc main() { x := 1 }\n');
   r = await run(['go', 'run', 'ce.go'], `${home}/bad`);
   assert.equal(r.status, 1, out(r));
@@ -207,12 +258,14 @@ export default async function go(ctx) {
   r = await run(['go', 'build', 'imp.go'], `${home}/bad`);
   assert.equal(r.status, 1, out(r));
   assert.match(r.stderr, /no required module provides package example\.org\/nope/, out(r));
-  r = await run(['go', 'test']);
-  assert.equal(r.status, 2, out(r));
-  assert.match(r.stderr, /go test: not supported by this go driver yet/, out(r));
+  for (const cmd of ['test', 'get', 'install', 'list', 'vet', 'work']) {
+    r = await run(['go', cmd], app);
+    assert.equal(r.status, 2, out(r));
+    assert.equal(r.stderr, `go ${cmd}: not supported by this go driver yet\n`, out(r));
+  }
   r = await run(['go', 'build', '-race'], app);
   assert.equal(r.status, 2, out(r));
   r = await run(['go', 'frob']);
   assert.equal(r.status, 2, out(r));
-  console.log('go: version, env, build/run with embed, tags, file-name constraints and asm; archive cache; proxy download checked against go.sum (mismatch refused, missing entry refused, !-escaped cache path); vendor; local replace; compile/import errors rc 1; go test, -race and an unknown command rc 2');
+  console.log('go: version, env, build/run with embed (an edited asset recompiles), tags, file-name constraints and asm; archive cache; proxy download checked against go.sum (mismatch, missing entry, a cached module against another go.sum, a ../ zip entry: all refused; !-escaped cache path); a dependency\'s replace outside it ignored, a missing replace directory refused; GOPRIVATE not fetched; go.work refused; vendor; local replace; compile/import errors rc 1; test/get/install/list/vet/work, -race and an unknown command rc 2');
 }
