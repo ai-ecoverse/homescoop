@@ -71,6 +71,12 @@ rm -rf "$DEST"
 mkdir -p "$(dirname "$DEST")"
 cp -R "$OUT" "$DEST"
 
+# The go command: the in-tree src/go.mjs, staged as bin/go.mjs (no build step).
+mkdir -p "$HOMESCOOP_PKG/package/bin"
+cp "$HOMESCOOP_PKG/src/go.mjs" "$HOMESCOOP_PKG/package/bin/go.mjs"
+chmod 644 "$HOMESCOOP_PKG/package/bin/go.mjs"
+node --check "$HOMESCOOP_PKG/package/bin/go.mjs"
+
 homescoop_stage_license "$GO_SRC/LICENSE"
 cp "$GO_SRC/PATENTS" "$HOMESCOOP_PKG/package/PATENTS"
 grep -q '^Additional IP Rights Grant (Patents)$' "$HOMESCOOP_PKG/package/PATENTS"
