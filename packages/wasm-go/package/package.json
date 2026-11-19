@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-go",
-  "version": "1.27.4-1",
-  "description": "The Go 1.27 compiler, linker and assembler that slicc's go command runs.",
+  "version": "1.27.4-2",
+  "description": "The Go 1.27 compiler, linker and assembler, with a go command (build, run, mod download) that drives them in slicc-kernel.",
   "license": "BSD-3-Clause",
   "repository": {
     "type": "git",
@@ -22,6 +22,7 @@
     "README.md",
     "LICENSE",
     "PATENTS",
+    "bin",
     "goroot"
   ],
   "publishConfig": {
@@ -36,6 +37,15 @@
     "go": {
       "version": "go1.27.4",
       "goroot": "goroot"
+    },
+    "commands": {
+      "go": {
+        "abi": "js",
+        "module": "bin/go.mjs",
+        "env": {
+          "SLICC_GO_PACKAGE": "${package}"
+        }
+      }
     }
   }
 }
