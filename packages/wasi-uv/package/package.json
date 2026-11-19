@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-uv",
-  "version": "0.13.7-2",
+  "version": "0.13.8-1",
   "description": "Astral's uv for SLICC, with uvx, to manage Python environments and packages.",
   "license": "MIT OR Apache-2.0",
   "repository": {
@@ -35,7 +35,7 @@
   },
   "homescoop": {
     "recipe": "wasi-uv",
-    "upstream": "0.13.7"
+    "upstream": "0.13.8"
   },
   "slicc": {
     "abi": "wasi",
