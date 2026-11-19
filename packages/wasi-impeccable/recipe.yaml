@@ -13,14 +13,14 @@ inputs:
   - scripts/build-common.sh
   - scripts/rust-wasm-refresh-alloc.rs
 # renovate: datasource=github-releases depName=pbakaus/impeccable extractVersion=^engine-v(?<version>.*)$
-version: "0.1.22"
+version: "0.1.23"
 npm: "@ai-ecoverse/wasi-impeccable"
 toolchain:
   rust: "1.98.1"
-summary: "impeccable engine 0.1.22 for slicc WASI preview1 (command impeccable; file-local, HTTP and live verbs)"
+summary: "impeccable engine 0.1.23 for slicc WASI preview1 (command impeccable; file-local, HTTP and live verbs)"
 source:
   url: "https://github.com/pbakaus/impeccable/archive/refs/tags/engine-v{{version}}.tar.gz"
-  sha256: "8fa3f2bfcdbb79d9a53686aeeb01cddedbf7bdf0c258698bef2c274899757f7d"
+  sha256: "78a9f6bb9dfe3ba7de3260ded7d765346ee2e057ce9810956a380627eebec7a9"
 # homescoop#1287: the initial heap from the measured peak, with headroom.
 wasm:
   initial-memory: 64MiB
@@ -99,3 +99,19 @@ about:
     arms and health upload), so on WASI those verbs refuse with "not
     available in this build yet" and detect never uploads. The new loop
     verb builds as is and refuses off macOS (cert/account.mjs).
+    0.1.23-1: 0001 rebased onto engine-v0.1.23. The account crate grew
+    setup reporting (setup, and a setup-report worker the cli schedules
+    from detect, context, doctor, whoami, agents, the skills verbs and a
+    successful login),
+    critique sync (critiques, critiques-refresh, and critique-storage
+    uploading each saved critique) and health-design-refresh; 0001 keeps
+    them native with the rest of account (the cli's setup_report module,
+    its schedule calls, the new arms and critique-storage's upload), so on
+    WASI those verbs refuse with "needs Impeccable account sign-in; not
+    available in this build yet" and critique-storage saves locally only
+    (cert/setup.mjs). audit-storage and reports.enabled build as is
+    (cert/reports.mjs); loop connect / disconnect refuse off macOS, and
+    the toml_edit they parse with stays a dependency on every target. The
+    shared HTTP builder now takes the request's URL and skips the proxy
+    for loopback and NO_PROXY hosts, following redirects hop by hop; on
+    wasm only its TLS config is left out (wasix-ureq).
