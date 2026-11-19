@@ -1,10 +1,10 @@
 # `@ai-ecoverse/wasm-cmake`
 
-CMake 4.4.5 for slicc's wasm realm, built in CI from the release tarball with
+CMake 4.5.0 for slicc's wasm realm, built in CI from the release tarball with
 the patched emscripten 6.0.9 tree and linked against libslicc (spawn,
 select/poll for libuv, sockets, signals, kernel credentials) and wasm-curl's
 libcurl with Mbed TLS, so https downloads work. Honors `CMAKE_ROOT` (manifest default:
-`${package}/share/cmake-4.4`) so modules resolve when argv0 is `/usr/bin/cmake`.
+`${package}/share/cmake-4.5`) so modules resolve when argv0 is `/usr/bin/cmake`.
 
 ```bash
 pnpm add -g @ai-ecoverse/wasm-cmake
@@ -31,7 +31,7 @@ backend here. Up to 4.4.3-13, `file(DOWNLOAD https://…)` returned
 
 ### TLS defaults
 
-These are CMake 4.4.5's upstream defaults, unchanged:
+These are CMake 4.5.0's upstream defaults, unchanged:
 
 - **Verification is on.** `TLS_VERIFY` on the call wins. Without it, the
   `CMAKE_TLS_VERIFY` variable applies, then the `CMAKE_TLS_VERIFY` environment
@@ -110,3 +110,12 @@ Mbed TLS's entropy source, `shims/slicc/webcrypto-entropy.c`, is compiled
 with the tree into libslicc instead of using wasm-curl's prebuilt `.o`. The
 build fails if `cmake.wasm` still links `Utilities/cmcurl`, `cmnghttp2` or
 `cmzlib`.
+
+`libuv-emscripten.patch` gives CMake's bundled libuv the posix poll backend
+and no thread names on Emscripten. It starts every `uv_spawn` child
+(`execute_process`, the build tool `cmake --build` runs) through
+`slicc_spawn_capture` from `shims/slicc`, ahead of libuv's own posix_spawn and
+fork paths, because the realm has no fork. The child gets the child ends of
+the stdio pipes, and waitpid and SIGCHLD come through the kernel.
+`scripts/test/cmake-series.test.mjs` checks that the block still comes before
+libuv's posix_spawn probe.

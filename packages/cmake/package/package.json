@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-cmake",
-  "version": "4.4.5-1",
+  "version": "4.5.0-1",
   "description": "CMake, the build system generator, to configure and build C and C++ projects.",
   "license": "BSD-3-Clause",
   "repository": {
@@ -28,7 +28,7 @@
   },
   "homescoop": {
     "recipe": "cmake",
-    "upstream": "4.4.5"
+    "upstream": "4.5.0"
   },
   "slicc": {
     "abi": "emscripten",
@@ -37,12 +37,12 @@
         "glue": "bin/cmake",
         "wasm": "bin/cmake.wasm",
         "env": {
-          "CMAKE_ROOT": "${package}/share/cmake-4.4"
+          "CMAKE_ROOT": "${package}/share/cmake-4.5"
         }
       }
     },
     "env": {
-      "CMAKE_ROOT": "${package}/share/cmake-4.4"
+      "CMAKE_ROOT": "${package}/share/cmake-4.5"
     }
   }
 }

@@ -1,10 +1,4 @@
 #!/usr/bin/env node
-/**
- * Host smoke for wasm-cmake 4.4.3-4 (CMAKE_ROOT env).
- *
- * Reproduces the SLICC layout: bin/cmake sits away from share/, CMAKE_ROOT
- * points at the package module tree. Single callMain per process (EXIT_RUNTIME).
- */
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
@@ -23,17 +17,25 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = join(root, 'packages/cmake/package');
 const glueSrc = join(pkg, 'bin/cmake');
 const runCli = join(root, 'scripts/run-wasm-cli.mjs');
-const modules = join(pkg, 'share/cmake-4.4');
+const manifestRoot = JSON.parse(readFileSync(join(pkg, 'package.json'), 'utf8')).slicc.env.CMAKE_ROOT;
+const PREFIX = '${package}/';
+if (typeof manifestRoot !== 'string' || !manifestRoot.startsWith(PREFIX)) {
+  console.error(`cmake smoke: package.json slicc.env.CMAKE_ROOT is not under \${package}: ${manifestRoot}`);
+  process.exit(1);
+}
+const modules = join(pkg, manifestRoot.slice(PREFIX.length));
+if (!existsSync(join(modules, 'Modules/CMake.cmake'))) {
+  console.error(`cmake smoke: the manifest's CMAKE_ROOT ${manifestRoot} has no Modules/CMake.cmake in ${pkg}`);
+  process.exit(1);
+}
 
 chmodSync(glueSrc, 0o755);
 
 const work = mkdtempSync(join(tmpdir(), 'cmake-smoke-'));
-// Binaries alone under /work/bin — no share tree next to them (SLICC /usr/bin case).
 mkdirSync(join(work, 'bin'));
 copyFileSync(glueSrc, join(work, 'bin/cmake'));
 copyFileSync(join(pkg, 'bin/cmake.wasm'), join(work, 'bin/cmake.wasm'));
 chmodSync(join(work, 'bin/cmake'), 0o755);
-// Modules only reachable via CMAKE_ROOT (not via install-tree from argv0).
 spawnSync('rsync', ['-a', modules + '/', join(work, 'cmake-root') + '/'], { stdio: 'inherit' });
 mkdirSync(join(work, 'proj'));
 writeFileSync(
@@ -52,7 +54,6 @@ function run(args) {
     env: {
       ...process.env,
       SMOKE_WORKDIR: work,
-      // Mimic registry argv0 (/usr/bin/cmake): prefix /work → would look in /work/share.
       SMOKE_THISPROGRAM: '/work/bin/cmake',
       CMAKE_ROOT: '/work/cmake-root',
     },
@@ -73,7 +74,6 @@ function badRuntime(out) {
 }
 
 let fail = 0;
-// --version is not a sufficient ABI smoke (passes with stride-20 sigaction).
 const echo = run(['-E', 'echo', 'hello']);
 fail += echo !== 0;
 fail += run(['-E', 'sha256sum', '/work/d.txt']) !== 0;
