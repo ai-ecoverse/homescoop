@@ -99,3 +99,19 @@ about:
     arms and health upload), so on WASI those verbs refuse with "not
     available in this build yet" and detect never uploads. The new loop
     verb builds as is and refuses off macOS (cert/account.mjs).
+    0.1.23-1: 0001 rebased onto engine-v0.1.23. The account crate grew
+    setup reporting (setup, and a setup-report worker the cli schedules
+    from detect, context, doctor, whoami, agents, the skills verbs and a
+    successful login),
+    critique sync (critiques, critiques-refresh, and critique-storage
+    uploading each saved critique) and health-design-refresh; 0001 keeps
+    them native with the rest of account (the cli's setup_report module,
+    its schedule calls, the new arms and critique-storage's upload), so on
+    WASI those verbs refuse with "needs Impeccable account sign-in; not
+    available in this build yet" and critique-storage saves locally only
+    (cert/setup.mjs). audit-storage and reports.enabled build as is
+    (cert/reports.mjs); loop connect / disconnect refuse off macOS, and
+    the toml_edit they parse with stays a dependency on every target. The
+    shared HTTP builder now takes the request's URL and skips the proxy
+    for loopback and NO_PROXY hosts, following redirects hop by hop; on
+    wasm only its TLS config is left out (wasix-ureq).
