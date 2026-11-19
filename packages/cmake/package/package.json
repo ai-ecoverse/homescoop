@@ -37,12 +37,12 @@
         "glue": "bin/cmake",
         "wasm": "bin/cmake.wasm",
         "env": {
-          "CMAKE_ROOT": "${package}/share/cmake-4.4"
+          "CMAKE_ROOT": "${package}/share/cmake-4.5"
         }
       }
     },
     "env": {
-      "CMAKE_ROOT": "${package}/share/cmake-4.4"
+      "CMAKE_ROOT": "${package}/share/cmake-4.5"
     }
   }
 }

@@ -110,3 +110,12 @@ Mbed TLS's entropy source, `shims/slicc/webcrypto-entropy.c`, is compiled
 with the tree into libslicc instead of using wasm-curl's prebuilt `.o`. The
 build fails if `cmake.wasm` still links `Utilities/cmcurl`, `cmnghttp2` or
 `cmzlib`.
+
+`libuv-emscripten.patch` gives CMake's bundled libuv the posix poll backend
+and no thread names on Emscripten. It starts every `uv_spawn` child
+(`execute_process`, the build tool `cmake --build` runs) through
+`slicc_spawn_capture` from `shims/slicc`, ahead of libuv's own posix_spawn and
+fork paths, because the realm has no fork. The child gets the child ends of
+the stdio pipes, and waitpid and SIGCHLD come through the kernel.
+`scripts/test/cmake-series.test.mjs` checks that the block still comes before
+libuv's posix_spawn probe.
