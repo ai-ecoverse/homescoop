@@ -1,0 +1,28 @@
+{
+  "dependencies": {
+    "hyper-util": ["wasix-net"],
+    "indicatif": ["web-time"],
+    "uv": ["libc"],
+    "uv-auth": ["wasix-command"],
+    "uv-build-frontend": ["wasix-command"],
+    "uv-command-support": ["wasix-command"],
+    "uv-installer": ["wasix-command"],
+    "uv-project-commands": ["wasix-command"],
+    "uv-python-interpreter": ["wasix-command"],
+    "uv-shell": ["wasix-command"],
+    "uv-tool-commands": ["wasix-command"]
+  },
+  "packages": [
+    {
+      "name": "wasix-command",
+      "version": "0.1.0",
+      "dependencies": ["libc", "tokio"]
+    },
+    {
+      "name": "wasix-net",
+      "version": "0.1.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "966dbac17aacf0e6e9743a1b497aa384b89f3270343a3e5e7adc2fc05d975f93"
+    }
+  ]
+}

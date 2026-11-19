@@ -34,7 +34,7 @@ choices. WASI has no permission bits, file locks or descriptor dup:
  15 files changed, 371 insertions(+), 42 deletions(-)
 
 diff --git a/crates/uv-cache/src/lib.rs b/crates/uv-cache/src/lib.rs
-index 7123db1..9b85ad9 100644
+index f574081..2143dc3 100644
 --- a/crates/uv-cache/src/lib.rs
 +++ b/crates/uv-cache/src/lib.rs
 @@ -867,7 +867,7 @@ impl Cache {
@@ -87,10 +87,10 @@ index 0fd46a3..1262456 100644
                  .interpreter()
                  .await
 diff --git a/crates/uv-environment-operations/src/environment.rs b/crates/uv-environment-operations/src/environment.rs
-index 1ff2815..d05ac1c 100644
+index 48feca5..594f5ef 100644
 --- a/crates/uv-environment-operations/src/environment.rs
 +++ b/crates/uv-environment-operations/src/environment.rs
-@@ -307,7 +307,7 @@ impl CachedEnvironment {
+@@ -321,7 +321,7 @@ impl CachedEnvironment {
          interpreter: &Interpreter,
          cache: &Cache,
      ) -> Result<Interpreter, uv_python_discovery::Error> {
@@ -100,7 +100,7 @@ index 1ff2815..d05ac1c 100644
          } else {
              interpreter.to_base_python()?
 diff --git a/crates/uv-fs/src/lib.rs b/crates/uv-fs/src/lib.rs
-index bff547f..c615ab5 100644
+index 542bfe9..45eb075 100644
 --- a/crates/uv-fs/src/lib.rs
 +++ b/crates/uv-fs/src/lib.rs
 @@ -1,3 +1,5 @@
@@ -152,8 +152,8 @@ index bff547f..c615ab5 100644
      }
  
      Ok(())
-@@ -542,12 +553,19 @@ pub async fn write_atomic_preserve(
-     let parent = path.parent().expect("Write path must have a parent");
+@@ -553,12 +564,19 @@ pub async fn write_atomic_with_permissions(
+     let permissions = permissions.or(existing_permissions);
      let temp_file = tempfile_in_with_permissions(parent, permissions.clone())?;
      // Write through the open handle: the umask may prevent reopening the temporary file.
 -    let mut file = fs_err::tokio::File::from_std(fs_err::File::from_parts(
@@ -170,13 +170,13 @@ index bff547f..c615ab5 100644
 +        .open::<&Path>(temp_file.as_ref())?;
 +    let mut file =
 +        fs_err::tokio::File::from_std(fs_err::File::from_parts(handle, temp_file.as_ref()));
-     file.write_all(data.as_ref()).await?;
+     file.write_all(data).await?;
      file.flush().await?;
 +    #[cfg(not(target_os = "wasi"))]
      if let Some(permissions) = permissions {
          temp_file.as_file().set_permissions(permissions)?;
      }
-@@ -1235,3 +1253,25 @@ mod tests {
+@@ -1246,3 +1264,25 @@ mod tests {
          Ok(())
      }
  }
@@ -220,7 +220,7 @@ index 04e2e54..44da017 100644
  #[cfg(windows)]
  fn create_symlink(original: &Path, link: &Path) -> io::Result<()> {
 diff --git a/crates/uv-fs/src/locked_file.rs b/crates/uv-fs/src/locked_file.rs
-index d9647a5..afbf617 100644
+index 8fe14d4..9036eb2 100644
 --- a/crates/uv-fs/src/locked_file.rs
 +++ b/crates/uv-fs/src/locked_file.rs
 @@ -110,7 +110,7 @@ impl LockedFileMode {
@@ -498,8 +498,8 @@ index d9647a5..afbf617 100644
 +        Self(std::mem::ManuallyDrop::new(file))
 +    }
 +
-     /// Inner implementation for [`LockedFile::acquire`].
-     async fn lock_file(
+     /// Acquire a cross-process lock using an open file.
+     pub async fn lock_file(
          file: fs_err::File,
 @@ -211,7 +453,7 @@ impl LockedFile {
          let file = match try_lock_exclusive.await? {
@@ -635,7 +635,7 @@ index 3230ed7..ec563e5 100644
          use std::os::unix::fs::PermissionsExt;
  
 diff --git a/crates/uv-install-wheel/src/wheel.rs b/crates/uv-install-wheel/src/wheel.rs
-index c290296..8b109f9 100644
+index 7da775c..564a4ed 100644
 --- a/crates/uv-install-wheel/src/wheel.rs
 +++ b/crates/uv-install-wheel/src/wheel.rs
 @@ -413,6 +413,8 @@ pub(crate) fn write_script_entrypoints(
@@ -679,10 +679,10 @@ index 9a5c388..4409030 100644
              return None;
          }
 diff --git a/crates/uv-python-managed/src/managed.rs b/crates/uv-python-managed/src/managed.rs
-index b799a23..c8b6a93 100644
+index 6ebd2fd..ef13368 100644
 --- a/crates/uv-python-managed/src/managed.rs
 +++ b/crates/uv-python-managed/src/managed.rs
-@@ -409,7 +409,7 @@ impl ManagedPythonInstallation {
+@@ -391,7 +391,7 @@ impl ManagedPythonInstallation {
      pub fn executable(&self, windowed: bool) -> PathBuf {
          let version = match self.implementation() {
              ImplementationName::CPython => {
@@ -691,7 +691,7 @@ index b799a23..c8b6a93 100644
                      format!("{}.{}", self.key.major, self.key.minor)
                  } else {
                      String::new()
-@@ -426,7 +426,7 @@ impl ManagedPythonInstallation {
+@@ -408,7 +408,7 @@ impl ManagedPythonInstallation {
          // GraalPy always uses `graalpy.exe` as the main executable
          let variant = if self.implementation() == ImplementationName::GraalPy {
              ""
@@ -700,7 +700,7 @@ index b799a23..c8b6a93 100644
              self.key.variant.executable_suffix()
          } else if cfg!(windows) && windowed {
              // Use windowed Python that doesn't open a terminal.
-@@ -598,7 +598,7 @@ impl ManagedPythonInstallation {
+@@ -580,7 +580,7 @@ impl ManagedPythonInstallation {
  
      /// Ensure that the `sysconfig` data is patched to match the installation path.
      pub async fn ensure_sysconfig_patched(&self) -> Result<(), Error> {
@@ -709,7 +709,7 @@ index b799a23..c8b6a93 100644
              if self.key.os().is_emscripten() {
                  // Emscripten's stdlib is a zip file so we can't update the
                  // sysconfig directly
-@@ -653,7 +653,7 @@ impl ManagedPythonInstallation {
+@@ -635,7 +635,7 @@ impl ManagedPythonInstallation {
      /// Returns `true` if the path is a link to this installation's binary, e.g., as created by
      /// [`create_link_to_executable`].
      pub fn is_bin_link(&self, path: &Path) -> bool {
@@ -718,7 +718,7 @@ index b799a23..c8b6a93 100644
              same_file::is_same_file(path, self.executable(false)).unwrap_or_default()
          } else if cfg!(windows) {
              let Some(launcher) = Launcher::try_from_path(path).unwrap_or_default() else {
-@@ -828,7 +828,7 @@ impl PythonMinorVersionLink {
+@@ -810,7 +810,7 @@ impl PythonMinorVersionLink {
              .expect("Executable should have parent directory");
  
          // The home directory of the Python installation
@@ -727,7 +727,7 @@ index b799a23..c8b6a93 100644
              if parent
                  .components()
                  .next_back()
-@@ -924,7 +924,7 @@ impl PythonMinorVersionLink {
+@@ -906,7 +906,7 @@ impl PythonMinorVersionLink {
          };
  
          cfg_select! {
@@ -736,7 +736,7 @@ index b799a23..c8b6a93 100644
                  self.symlink_directory
                      .symlink_metadata()
                      .is_ok_and(|metadata| metadata.file_type().is_symlink())
-@@ -1013,7 +1013,7 @@ pub fn create_link_to_executable(
+@@ -995,7 +995,7 @@ pub fn create_link_to_executable(
      let link_parent = link.parent().ok_or(Error::NoExecutableDirectory)?;
      fs_err::create_dir_all(link_parent).map_err(Error::ExecutableDirectory)?;
  
@@ -745,7 +745,7 @@ index b799a23..c8b6a93 100644
          // Note this will never copy on Unix — we use it here to allow compilation on Windows
          match symlink_or_copy_file(executable.path, link) {
              Ok(()) => Ok(()),
-@@ -1050,7 +1050,7 @@ pub fn replace_link_to_executable(
+@@ -1032,7 +1032,7 @@ pub fn replace_link_to_executable(
      let link_parent = link.parent().ok_or(Error::NoExecutableDirectory)?;
      fs_err::create_dir_all(link_parent).map_err(Error::ExecutableDirectory)?;
  
@@ -777,10 +777,10 @@ index 09dd61b..0fab72d 100644
  
              #[cfg(windows)]
 diff --git a/crates/uv-tool/src/tool.rs b/crates/uv-tool/src/tool.rs
-index bab3c5e..4a521de 100644
+index 87419a7..2e010b1 100644
 --- a/crates/uv-tool/src/tool.rs
 +++ b/crates/uv-tool/src/tool.rs
-@@ -130,7 +130,7 @@ impl Display for ToolEntrypoint {
+@@ -132,7 +132,7 @@ impl Display for ToolEntrypoint {
                          .replace('/', "\\")
                  )
              },
@@ -790,7 +790,7 @@ index bab3c5e..4a521de 100644
                      f,
                      "{} ({})",
 diff --git a/crates/uv-virtualenv/src/virtualenv.rs b/crates/uv-virtualenv/src/virtualenv.rs
-index aeaac96..6693ef5 100644
+index de31e51..9eecbc9 100644
 --- a/crates/uv-virtualenv/src/virtualenv.rs
 +++ b/crates/uv-virtualenv/src/virtualenv.rs
 @@ -199,7 +199,7 @@ pub(crate) fn create(

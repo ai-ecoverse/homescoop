@@ -4,12 +4,12 @@
 name: wasi-uv
 builder: host
 # renovate: datasource=github-releases depName=astral-sh/uv
-version: "0.13.7"
+version: "0.13.8"
 npm: "@ai-ecoverse/wasi-uv"
 summary: "uv 0.13 for slicc WASI (command uv: venv, pip, add, lock, sync, run against wasix-python)"
 source:
   url: "https://github.com/astral-sh/uv/archive/refs/tags/{{version}}.tar.gz"
-  sha256: "c742acebb931cae69d88c68274d00ba21ae5669ea9fdfaba00c33cf9f86f2727"
+  sha256: "53744fdb07f37e99e393e3247087dfbcda04340837fc83b2ae8e7326261399ad"
   epoch: "1792457197"
 # ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#675).
 reproducible: true
@@ -71,6 +71,15 @@ about:
     0.13.7-2: THIRD-PARTY-NOTICES.md includes the eight [patch.crates-io]
     path crates under homescoop-crates/ (homescoop#2035); the notices
     generator and check-rust-notices no longer skip them.
+    0.13.8-1: Cargo.lock is apply.sh's (lock.mjs with lock.json, after
+    the series): the eight crates/ entries lose their registry source,
+    lock.json's crates gain wasix-command / wasix-net / web-time / libc,
+    and wasix-command and wasix-net are inserted by name, so a uv bump
+    that moves the lock needs no patch refresh (0001's lock hunk did not
+    apply to 0.13.8); cargo --locked checks the result. 0003 rebased for
+    0.13.8's write_atomic_with_permissions and the now public
+    LockedFile::lock_file (the credentials store locks through it; on
+    WASI that is the same slicc.fcntl_lock path).
     crates/: hyper-util (dial via wasix-net), rustls-native-certs,
     cargo-util (compile on WASI), reqsign-core/-google/-http-send-reqwest
     and astral-reqwest-middleware/-retry (mechanical: wasm32 means

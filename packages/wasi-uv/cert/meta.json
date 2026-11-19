@@ -49,7 +49,8 @@
     "crates/astral-reqwest-middleware-0.5.1.patch": "build; every client request",
     "crates/astral-reqwest-retry-0.9.1.patch": "build; every client request",
     "rust/0001-std-wasi-paths-home-temp-and-no-exe-suffix.patch": "uv python find (PATH split, python not python.wasm), cache under $HOME, temp files",
-    "0006-wasi-homescoop-s-allocator-refresh.patch": "stress.mjs: uv's threaded install under load gives 0 traps with homescoop's allocator refresh as the global allocator on wasm; build.sh sets HOMESCOOP_WASM_ALLOC_RS"
+    "0006-wasi-homescoop-s-allocator-refresh.patch": "stress.mjs: uv's threaded install under load gives 0 traps with homescoop's allocator refresh as the global allocator on wasm; build.sh sets HOMESCOOP_WASM_ALLOC_RS",
+    "lock.json": "build: apply.sh (lock.mjs) edits Cargo.lock by crate name and cargo build --locked holds on it"
   },
   "network": "The cert kernel has no network: the spec fetches pinned distributions (sha256-checked) and uv resolves them alone (no-index, find-links in /home/uv.toml via UV_CONFIG_FILE). PyPI over the kernel's CONNECT proxy (TLS with SSL_CERT_FILE) was checked by hand on the Node entry with nodeTransport: uv venv && uv pip install requests && uv run python -c 'import requests' → 2.34.2 /home/u/.venv."
 }
