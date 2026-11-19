@@ -1,8 +1,3 @@
-/**
- * wasi-okf under users enforce: alice validates and indexes her own bundle,
- * and the index files are hers; bob may read her 0755 bundle but his index
- * into it is refused, and her 0700 bundle is closed to him.
- */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 

@@ -1,11 +1,3 @@
-/**
- * wasi-okf: okf on a real bundle in OPFS. version; init; validate, lint,
- * list, show, search, backlinks, graph and index on test/fixtures/valid
- * (upstream's testdata/valid); a concept with no type makes validate exit 1;
- * usage and I/O errors exit 4 and 2. The command sets "preopenRoot": true,
- * so a missing absolute path is ENOENT ("no such file or directory"), not
- * EBADF, and a cwd of / works (slicc-kernel#1868).
- */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -77,8 +69,6 @@ export default async function (ctx) {
   assert.equal(r.status, 0, out(r));
   assert.equal(json(r).count, 4, out(r));
   assert.match(await read(`${bundle}/tables/index.md`), /events_/, 'tables/index.md lists its concept');
-
-  // A concept without a type is a spec violation: exit 1, the rule named.
   await write(`${bundle}/tables/bad.md`, '---\ntitle: x\n---\nbody\n');
   r = await run(['okf', 'validate', bundle]);
   assert.equal(r.status, 1, out(r));
@@ -86,8 +76,6 @@ export default async function (ctx) {
   assert.equal(v.valid, false, out(r));
   assert.equal(v.errors, 1, out(r));
   assert.ok(v.findings.some((f) => f.concept_id === 'tables/bad' && f.rule === 'okf/frontmatter/type-required'), out(r));
-
-  // Usage and I/O errors keep upstream's exit codes; a missing path is ENOENT.
   r = await run(['okf', 'bogus']);
   assert.equal(r.status, 4, out(r));
   assert.match(r.stderr, /unknown command: bogus/, out(r));

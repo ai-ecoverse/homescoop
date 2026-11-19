@@ -5,7 +5,6 @@
 #   build.module                directory of the Go module inside the archive ("." for its root)
 #   build.package               import path or ./dir of the main package
 #   build.command               command name: package/bin/<command>.wasm
-#   build.ldflags               optional, appended to -s -w -buildid= ({{version}} is the recipe version)
 # packages/<package>/*.patch apply to the source (homescoop_apply_patches).
 # The module's go.sum is checked as its dependencies download.
 set -euo pipefail
