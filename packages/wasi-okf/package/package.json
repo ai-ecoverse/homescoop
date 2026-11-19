@@ -1,0 +1,47 @@
+{
+  "name": "@ai-ecoverse/wasi-okf",
+  "version": "0.5.2-1",
+  "description": "Create, validate, lint, index, search and graph Open Knowledge Format (OKF) bundles in SLICC.",
+  "license": "Apache-2.0",
+  "engines": {
+    "slicc-kernel": ">=1.30.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-okf/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-okf",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "okf",
+    "knowledge-base",
+    "markdown"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-okf",
+    "upstream": "0.5.2",
+    "source": "okfcli/okf@802abaa946c2980c180a4cdc1ab378cc84898364"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "okf": {
+        "wasm": "bin/okf.wasm",
+        "preopenRoot": true
+      }
+    }
+  }
+}

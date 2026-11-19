@@ -5,6 +5,7 @@
 #   build.module                directory of the Go module inside the archive ("." for its root)
 #   build.package               import path or ./dir of the main package
 #   build.command               command name: package/bin/<command>.wasm
+#   build.ldflags               optional, appended to -s -w -buildid= ({{version}} is the recipe version)
 # packages/<package>/*.patch apply to the source (homescoop_apply_patches).
 # The module's go.sum is checked as its dependencies download.
 set -euo pipefail
@@ -20,6 +21,8 @@ GO_VERSION="$(field toolchain.go)"
 MODULE="$(field build.module)"
 PACKAGE="$(field build.package)"
 COMMAND="$(field build.command)"
+EXTRA_LDFLAGS="$(field build.ldflags)"
+EXTRA_LDFLAGS="${EXTRA_LDFLAGS//\{\{version\}\}/$VERSION}"
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64) go_arch=linux-amd64; host=linux_x64 ;;
   Darwin-arm64) go_arch=darwin-arm64; host=macos_arm64 ;;
@@ -52,7 +55,7 @@ homescoop_apply_patches "$SRC"
 DEST="$HOMESCOOP_PKG/package"
 mkdir -p "$DEST/bin"
 (cd "$SRC/$MODULE" && GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0 \
-  go build -trimpath -buildvcs=false -ldflags='-s -w -buildid=' -o "$DEST/bin/$COMMAND.wasm" "$PACKAGE")
+  go build -trimpath -buildvcs=false -ldflags="-s -w -buildid=${EXTRA_LDFLAGS:+ $EXTRA_LDFLAGS}" -o "$DEST/bin/$COMMAND.wasm" "$PACKAGE")
 chmod 755 "$DEST/bin/$COMMAND.wasm"
 
 rm -f "$DEST/LICENSE" "$DEST/NOTICE"

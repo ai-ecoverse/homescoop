@@ -1,0 +1,47 @@
+# okf (okfcli/okf) for slicc WASI preview1: the Open Knowledge Format CLI,
+# so an agent can create, validate, lint, index, search and graph OKF
+# bundles (Markdown knowledge bases) in slicc-kernel.
+name: wasi-okf
+builder: host
+runner: pool
+reproducible: true
+inputs:
+  - scripts/build-wasip1-go-command.sh
+# renovate: datasource=github-tags depName=okfcli/okf extractVersion=^v(?<version>.*)$
+version: "0.5.2"
+npm: "@ai-ecoverse/wasi-okf"
+summary: "okf 0.5 for slicc WASI preview1 (command okf)"
+source:
+  url: "https://github.com/okfcli/okf/archive/802abaa946c2980c180a4cdc1ab378cc84898364.tar.gz"
+  sha256: "7369719e0bce0292bb5133c63f0d5c9c0119e048f30aea0cf92c78a04c818676"
+  tag: "v{{version}}"
+  commit: "802abaa946c2980c180a4cdc1ab378cc84898364"
+  tree: "d6b1b450ea1e705818bb612b5a0ef53e703e0839"
+toolchain:
+  # go.mod says go 1.27.0; the same pin as wasi-yq
+  go: "1.27.3"
+  go_sha256_linux_x64: "65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40"
+  go_sha256_macos_arm64: "dd3908cf20959d798c1e06ebe5b72213f0505ce01373b40ce3110975a6cd99c2"
+build:
+  module: "."
+  package: "./cmd/okf"
+  command: "okf"
+  # upstream's release ldflags (.goreleaser.yaml) set main.version; commit
+  # and date stay unset so the build is reproducible
+  ldflags: "-X main.version={{version}}"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/okfcli/okf
+  license: Apache-2.0
+  notes: |
+    scripts/build-wasip1-go-command.sh builds cmd/okf from the pinned
+    source with the pinned Go (GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0
+    -trimpath -buildvcs=false -ldflags='-s -w -buildid= -X
+    main.version=<version>'), unpatched. okf links one module besides the
+    standard library, gopkg.in/yaml.v3 v3.0.1 (MIT AND Apache-2.0), checked
+    against go.sum as it downloads. The command sets "preopenRoot": true, so
+    a bundle path anywhere (and a cwd of /) resolves; without it Go reports
+    a missing top-level path as EBADF (slicc-kernel#1868).
