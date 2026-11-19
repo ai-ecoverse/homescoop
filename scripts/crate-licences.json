@@ -3,6 +3,10 @@
     "url": "https://raw.githubusercontent.com/astral-sh/astral-codec/147d8d21524d5610e9488c93a7eac4a1cca7f3ab/LICENSE-MIT",
     "sha256": "860e3d7a86b84e6a7012c7a635fc64df475cebc6cce34dfeb73a5982ec58176c"
   },
+  "archive-trait 0.0.16": {
+    "url": "https://raw.githubusercontent.com/astral-sh/astral-codec/072c722cbe4632ac4e938fa53bf15ce27ad4d5df/LICENSE-MIT",
+    "sha256": "860e3d7a86b84e6a7012c7a635fc64df475cebc6cce34dfeb73a5982ec58176c"
+  },
   "astral-mail-headers 0.0.1": {
     "url": "https://raw.githubusercontent.com/astral-sh/astral-mail-headers/9292b7783d8298ad7324c79e4b6c20aa8d6e46f7/LICENSE-MIT",
     "sha256": "7eed948b4bb4122b67f174287f0b6c675916d4cbdf54da8930c2df6f923a7eec"
@@ -108,8 +112,16 @@
     "url": "https://raw.githubusercontent.com/astral-sh/astral-codec/147d8d21524d5610e9488c93a7eac4a1cca7f3ab/LICENSE-MIT",
     "sha256": "860e3d7a86b84e6a7012c7a635fc64df475cebc6cce34dfeb73a5982ec58176c"
   },
+  "tar-codec 0.0.16": {
+    "url": "https://raw.githubusercontent.com/astral-sh/astral-codec/072c722cbe4632ac4e938fa53bf15ce27ad4d5df/LICENSE-MIT",
+    "sha256": "860e3d7a86b84e6a7012c7a635fc64df475cebc6cce34dfeb73a5982ec58176c"
+  },
   "tar-framing 0.0.15": {
     "url": "https://raw.githubusercontent.com/astral-sh/astral-codec/147d8d21524d5610e9488c93a7eac4a1cca7f3ab/LICENSE-MIT",
+    "sha256": "860e3d7a86b84e6a7012c7a635fc64df475cebc6cce34dfeb73a5982ec58176c"
+  },
+  "tar-framing 0.0.16": {
+    "url": "https://raw.githubusercontent.com/astral-sh/astral-codec/072c722cbe4632ac4e938fa53bf15ce27ad4d5df/LICENSE-MIT",
     "sha256": "860e3d7a86b84e6a7012c7a635fc64df475cebc6cce34dfeb73a5982ec58176c"
   },
   "tokio-io-mock-fork 0.1.0": {
