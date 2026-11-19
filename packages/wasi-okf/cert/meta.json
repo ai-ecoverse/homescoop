@@ -1,0 +1,18 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.191.2",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-23",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-15"
+  ],
+  "checklist": [
+    "cert/checklist.mjs: okf version → 0.5.2; okf init /home/kb from cwd / creates tables/, datasets/, playbooks/ and index.md; on test/fixtures/valid (upstream's testdata/valid): validate (valid, 0 errors, 4 warnings), lint, list (3 concepts), show, search --tag ga4 (2 hits), backlinks (2), graph (3 edges), index (4 index files); a concept without a type → rc 1, okf/frontmatter/type-required; an unknown command → rc 4; validate of /nonexistent and /home/app/nope → rc 2, no such file or directory, not Bad file number (\"preopenRoot\": true, slicc-kernel#1868)",
+    "cert/users.mjs (users enforce): alice indexes her own bundle and the index is hers; bob validates her 0755 bundle, but his index into it and his validate of her 0700 bundle are refused with rc 2, permission denied"
+  ],
+  "preopenRoot": "The okf command sets \"preopenRoot\": true; slicc-kernel >= 1.30.0 then preopens / and ./ (slicc-kernel#144), so a missing absolute path is ENOENT and a cwd of / works."
+}
