@@ -38,4 +38,6 @@ about:
     compile/link/asm by path; SLICC_GO_PACKAGE (${package}) tells it where
     goroot is. compile/link/asm stay out of slicc.commands. Std archives
     ship in wasm-go-std-* packages; the driver unions slicc.go.std by
-    (version, target), as SLICC's webapp driver does.
+    (version, target), as SLICC's webapp driver does. The webapp runs that
+    driver (slicc#3657), which takes precedence there and ignores this entry
+    (homescoop#2178); the entry serves slicc-kernel shells such as SLICC 7.

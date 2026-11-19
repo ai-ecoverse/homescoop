@@ -51,4 +51,16 @@ Runs: PR #2177's CI at cb78a580, the cert job on the cert kernel slicc-kernel 1.
   AssertionError [ERR_ASSERTION]: an edited embedded file is compiled again: rc=0 embed static/a.txt "hi\n" …
   ```
   The driver's other defects in that version (a module cache trusted without go.sum, module and import paths with `..`, unbounded zips, GOPRIVATE modules fetched through GOPROXY, `-asmflags` ignored, go.work ignored, no version check) fail `scripts/test/wasm-go-driver.test.mjs`: 11 of its 14 tests fail on bbfc9642's go.mjs.
-- **This PR's 1.27.4-2**: go.mjs passes on 1.191.2 and on the `engines.slicc-kernel` floor, 1.88.0 (an `extra_kernels` run). On 1.85.0, 1.80.0, 1.76.0 and 1.65.0 it fails with `go: cannot run asm: EACCES`: those kernels have no chmod (no `ctx.fs.chmod` for JS programs, no `kernel.chmod`, slicc-kernel#515 in 1.88.0), so the tools keep the default modes and the driver cannot make what it links executable.
+- **This PR's 1.27.4-2**: go.mjs passes on 1.191.2 and on the `engines.slicc-kernel` floor, 1.88.0 (an `extra_kernels` run), the oldest kernel verified green; 1.86.0 and 1.87.0 were not tried. On 1.85.0, 1.80.0, 1.76.0 and 1.65.0 it fails with `go: cannot run asm: EACCES`: those kernels have no chmod (no `ctx.fs.chmod` for JS programs, no `kernel.chmod`; slicc-kernel#515 brought both in 1.86.0), so the tools keep the default modes and the driver cannot make what it links executable.
+
+### The module cache is hashed again on use (homescoop#2181)
+
+0dcc9075 compared only the h1 in `.slicc-ok` with go.sum, so files changed under a valid marker were compiled. With 0dcc9075's driver in this build, cert/go.mjs fails (slicc-kernel 1.191.2, users enforce, run by hand):
+
+```
+browser-cert: FAIL packages/wasm-go/cert/go.mjs
+AssertionError [ERR_ASSERTION]: a modified file under a valid .slicc-ok is refused: rc=0
+evil, slicc
+```
+
+With the fix it passes, and the driver tests for a modified, extra, new-directory and removed file fail on 0dcc9075.

@@ -29,7 +29,7 @@
   "extra_kernels": [
     {
       "kernel": "@ai-ecoverse/slicc-kernel@1.88.0",
-      "why": "the engines.slicc-kernel floor of the go command (>=1.88.0: ctx.fs.chmod for JS programs, slicc-kernel#515): cert/go.mjs passes there",
+      "why": "the engines.slicc-kernel floor of the go command (>=1.88.0, the oldest kernel verified green; it needs ctx.fs.chmod for JS programs, slicc-kernel#515 in 1.86.0, and 1.86.0 and 1.87.0 were not tried): cert/go.mjs passes there",
       "specs": [
         "go.mjs"
       ]

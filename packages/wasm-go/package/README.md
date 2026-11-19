@@ -31,11 +31,16 @@ file that starts with `#include "textflag.h"` stops at
 
 The command needs slicc-kernel 1.88.0 or later (`engines.slicc-kernel`):
 it runs the tools with `ctx.sync.run`, downloads with `ctx.fetch`, and marks
-what it links executable with `ctx.fs.chmod`, which older kernels lack.
+what it links executable with `ctx.fs.chmod` (slicc-kernel#515, from slicc-kernel 1.86.0). The
+floor is the oldest kernel its cert has passed on; slicc-kernel 1.86.0 and
+slicc-kernel 1.87.0 were not tried, and slicc-kernel 1.85.0 fails.
 
 cmd/go can't drive the toolchain in WASI (wasip1 has no processes), so
 `bin/go.mjs` plans the build and runs `compile`, `link` and `asm` by path,
-as cmd/go would. It is the only command the package registers; `compile`,
+as cmd/go would. The SLICC webapp runs its own go driver (slicc#3657), which
+takes precedence there: the webapp ignores this entry (homescoop#2178). The
+entry is for other runtimes, slicc-kernel shells such as SLICC 7. It is the
+only command the package registers; `compile`,
 `link` and `asm` stay under `goroot/pkg/tool/wasip1_wasm/`.
 
 - **Commands:** `go build`, `go run`, `go mod download [-x]`, `go env
@@ -86,13 +91,15 @@ as cmd/go would. It is the only command the package registers; `compile`,
   error, and `off` stops. `direct` is never done, so a module that matches
   `GONOPROXY` (or `GOPRIVATE`) is not asked of any proxy and fails.
 - **What is checked:** `go.sum` is the only root of trust. There is no
-  checksum database (`GOSUMDB` is off; `GONOSUMDB`, `GONOSUMCHECK`,
+  checksum database (`go env` always reports `GOSUMDB=off`; `GONOSUMDB`, `GONOSUMCHECK`,
   `GOINSECURE` and `GOFLAGS=-insecure` change nothing or are refused). A
   module with no `go.sum` line fails closed: nothing is fetched or added.
   A download's `h1:` must equal the line before anything is written, and
-  the module cache records it (`.slicc-ok`), so a cached module is checked
-  against each project's `go.sum` again; a cache directory this driver
-  never verified is refused. `/go.mod` lines are not needed: the `go.mod`
+  a cached module's files are hashed again (the same Hash1, once per module
+  per run) and checked against each project's `go.sum`, so a modified,
+  extra or removed file fails; `.slicc-ok` only marks a finished
+  extraction, and a cache directory without it, or with a symlink or
+  special file in it, is refused. `/go.mod` lines are not needed: the `go.mod`
   read is the one inside the checked zip.
 - **Zips:** at most 500 MiB, packed and unpacked. Every entry must sit under
   `<module>@<version>/` without `..`, `.`, empty or control-character
@@ -103,6 +110,12 @@ as cmd/go would. It is the only command the package registers; `compile`,
 - **Paths:** module paths, versions and import paths are checked as go
   checks them, so none can name a directory outside the module cache or
   its module.
+- **Trusted without a hash:** `vendor/` (and `vendor/modules.txt` is not
+  checked against `go.mod`, homescoop#2182); a main-module `replace`
+  directory; anyone who can write `GOCACHE` (a hit is used as is); `go.sum` itself, trusted on first use
+  since there is no checksum database; and the environment, which picks
+  the tools (`GOROOT`, `SLICC_GO_PACKAGE`), the source (`GOPROXY`,
+  `http://` included) and vendoring (`GOFLAGS=-mod=`).
 - **The standard library:** the archives of any installed package whose
   `package.json` declares `slicc.go.std` for this Go version and target
   (the first one found wins), so installing a package is trusting it, as
