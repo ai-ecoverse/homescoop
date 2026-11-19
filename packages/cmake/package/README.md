@@ -1,10 +1,10 @@
 # `@ai-ecoverse/wasm-cmake`
 
-CMake 4.4.5 for slicc's wasm realm, built in CI from the release tarball with
+CMake 4.5.0 for slicc's wasm realm, built in CI from the release tarball with
 the patched emscripten 6.0.9 tree and linked against libslicc (spawn,
 select/poll for libuv, sockets, signals, kernel credentials) and wasm-curl's
 libcurl with Mbed TLS, so https downloads work. Honors `CMAKE_ROOT` (manifest default:
-`${package}/share/cmake-4.4`) so modules resolve when argv0 is `/usr/bin/cmake`.
+`${package}/share/cmake-4.5`) so modules resolve when argv0 is `/usr/bin/cmake`.
 
 ```bash
 pnpm add -g @ai-ecoverse/wasm-cmake
@@ -31,7 +31,7 @@ backend here. Up to 4.4.3-13, `file(DOWNLOAD https://…)` returned
 
 ### TLS defaults
 
-These are CMake 4.4.5's upstream defaults, unchanged:
+These are CMake 4.5.0's upstream defaults, unchanged:
 
 - **Verification is on.** `TLS_VERIFY` on the call wins. Without it, the
   `CMAKE_TLS_VERIFY` variable applies, then the `CMAKE_TLS_VERIFY` environment
