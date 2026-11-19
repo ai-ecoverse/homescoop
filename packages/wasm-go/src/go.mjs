@@ -1,24 +1,3 @@
-/**
- * go: a Go driver for slicc-kernel (a JS program, "abi": "js").
- *
- * cmd/go itself can't drive the toolchain in WASI (wasip1 has no processes),
- * so this file plans the build and runs this package's compile, link and asm
- * (WASI programs) by path, as cmd/go would:
- *
- *   go build [-o out] [-v] [-x] [-trimpath] [-tags t] [-ldflags f] [-gcflags f] [pkgs | files]
- *   go run [build flags] pkg|files [args]
- *   go mod download [modules]
- *   go version | go env [-json] [VAR...]
- *
- * Packages: the standard library (precompiled archives from an installed
- * wasm-go-std-* package of the same Go version and target), the main
- * module's packages, and required modules, from vendor/ when it is there,
- * else from GOMODCACHE, downloaded from GOPROXY and checked against go.sum
- * (h1 hashes) first. Build constraints (file names, //go:build, // +build),
- * //go:embed and Go assembly (.s) are handled; cgo is not (CGO_ENABLED=0).
- * Compiled archives are cached in GOCACHE by a hash of their inputs.
- */
-
 const TE = new TextEncoder();
 const TD = new TextDecoder();
 
@@ -51,8 +30,6 @@ Builds are for GOOS=wasip1 GOARCH=wasm unless the environment says otherwise.
 No cgo, tests (go test), go.work or go get yet.
 `;
 
-// ---------------------------------------------------------------- utilities
-
 const dirname = (p) => (p.lastIndexOf('/') <= 0 ? '/' : p.slice(0, p.lastIndexOf('/')));
 const basename = (p) => p.slice(p.lastIndexOf('/') + 1);
 function normalize(p) {
@@ -76,14 +53,80 @@ function base64(b) {
   return btoa(s);
 }
 
-/** Module path escaping for the proxy and the module cache: A → !a. */
 const escapePath = (p) => p.replace(/[A-Z]/g, (c) => `!${c.toLowerCase()}`);
+
+const PATH_ELEM = /^[A-Za-z0-9_.~+-]+$/;
+const SEMVER = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+const MAX_ZIP = 500 << 20;
+
+function pathOK(p) {
+  return typeof p === 'string' && p !== '' && p.split('/').every((e) => PATH_ELEM.test(e) && !e.startsWith('.') && !e.endsWith('.'));
+}
+
+function checkModule(path, version) {
+  if (!pathOK(path)) throw new GoError(`go: malformed module path ${JSON.stringify(path)}`);
+  if (typeof version !== 'string' || !SEMVER.test(version)) throw new GoError(`go: ${path}@${version}: malformed version: want a canonical semantic version such as v1.2.3`);
+}
+
+function compareVersions(a, b) {
+  const x = SEMVER.exec(a);
+  const y = SEMVER.exec(b);
+  for (let i = 1; i <= 3; i++) if (Number(x[i]) !== Number(y[i])) return Number(x[i]) < Number(y[i]) ? -1 : 1;
+  if (!x[4] || !y[4]) return x[4] === y[4] ? 0 : x[4] ? -1 : 1;
+  const p = x[4].split('.');
+  const q = y[4].split('.');
+  for (let i = 0; i < Math.max(p.length, q.length); i++) {
+    if (p[i] === undefined) return -1;
+    if (q[i] === undefined) return 1;
+    const pn = /^\d+$/.test(p[i]);
+    const qn = /^\d+$/.test(q[i]);
+    if (pn && qn && Number(p[i]) !== Number(q[i])) return Number(p[i]) < Number(q[i]) ? -1 : 1;
+    if (pn !== qn) return pn ? -1 : 1;
+    if (p[i] !== q[i]) return p[i] < q[i] ? -1 : 1;
+  }
+  return 0;
+}
+
+function matchPrefixPatterns(globs, target) {
+  for (const glob of globs.split(',').map((g) => g.trim()).filter(Boolean)) {
+    const segs = glob.split('/');
+    const prefix = target.split('/').slice(0, segs.length);
+    if (prefix.length < segs.length) continue;
+    try {
+      if (segs.every((s, i) => globToRegExp(s).test(prefix[i]))) return glob;
+    } catch {}
+  }
+  return undefined;
+}
+
+function proxyList(value) {
+  const parts = value.split(/([,|])/);
+  const out = [];
+  for (let i = 0; i < parts.length; i += 2) {
+    const url = parts[i].trim();
+    if (url) out.push({ url, anyError: parts[i + 1] === '|' });
+  }
+  return out;
+}
+
+function pkgFlag(name, value) {
+  if (value === '' || /^[-'"]/.test(value)) return { all: false, flags: splitQuoted(value) };
+  const eq = value.indexOf('=');
+  if (eq < 0) throw new GoError(`go: invalid ${name}=${value}: missing =<value> in <pattern>=<value>`, 2);
+  const pattern = value.slice(0, eq);
+  if (pattern !== 'all') throw new GoError(`go: ${name}=${pattern}=...: package patterns other than all are not supported by this go driver`, 2);
+  return { all: true, flags: splitQuoted(value.slice(eq + 1)) };
+}
+
+function flagsFor(list, isRoot) {
+  let flags = [];
+  for (const f of list) if (f.all || isRoot) flags = f.flags;
+  return flags;
+}
 
 function splitQuoted(value) {
   return (value.match(/'[^']*'|"[^"]*"|\S+/g) ?? []).map((s) => s.replace(/^(['"])(.*)\1$/, '$2'));
 }
-
-// ------------------------------------------------------------------- driver
 
 class Driver {
   constructor(ctx) {
@@ -138,8 +181,6 @@ class Driver {
     await this.fs.mkdir(p, { recursive: true });
   }
 
-  // ------------------------------------------------------------ environment
-
   async setup() {
     const e = this.env;
     this.home = e.HOME || '/tmp';
@@ -157,11 +198,22 @@ class Driver {
     this.modcache = e.GOMODCACHE || `${this.gopath}/pkg/mod`;
     this.gocache = e.GOCACHE || `${this.home}/.cache/go-build-slicc`;
     this.goproxy = e.GOPROXY || 'https://proxy.golang.org,direct';
+    this.gonoproxy = e.GONOPROXY || e.GOPRIVATE || '';
     this.goflags = e.GOFLAGS ? splitQuoted(e.GOFLAGS) : [];
     this.tmp = e.TMPDIR || '/tmp';
   }
 
-  /** The std archives for the target: import path → .a, from every installed wasm-go-std-* part. */
+  async checkWork(dir) {
+    const gowork = this.env.GOWORK ?? '';
+    if (gowork === 'off') return;
+    const unsupported = (where) => new GoError(`go: ${where}: go.work files are not supported by this go driver yet; set GOWORK=off to build the module on its own`, 2);
+    if (gowork) throw unsupported(`GOWORK=${gowork}`);
+    for (let d = dir; ; d = dirname(d)) {
+      if (await this.exists(`${d}/go.work`)) throw unsupported(`${d === '/' ? '' : d}/go.work`);
+      if (d === '/') return;
+    }
+  }
+
   async stdArchives() {
     if (this.std) return this.std;
     const target = `${this.goos}/${this.goarch}`;
@@ -224,7 +276,6 @@ class Driver {
     return { ...this.env, GOOS: this.goos, GOARCH: this.goarch, GOROOT: this.goroot, CGO_ENABLED: '0' };
   }
 
-  /** Runs a tool to its end; a failure prints go's `# pkg` header and the tool's output. */
   tool(name, args, pkg) {
     const argv = [`${this.tools}/${name}`, ...args];
     if (this.flags?.trace) this.ctx.sync.write(2, `${argv.join(' ')}\n`);
@@ -237,8 +288,6 @@ class Driver {
       throw new GoError(`# ${pkg}\n${shown}${shown.endsWith('\n') || !shown ? '' : '\n'}`);
     }
   }
-
-  // ---------------------------------------------------------------- modules
 
   async findMainModule(dir) {
     for (let d = dir; ; d = dirname(d)) {
@@ -261,7 +310,6 @@ class Driver {
     return mod;
   }
 
-  /** The module that provides `path`: [module, dir of the package] or undefined. */
   async resolveImport(path) {
     const main = this.main;
     if (main && (path === main.path || path.startsWith(`${main.path}/`))) {
@@ -285,83 +333,137 @@ class Driver {
     return [mod, mod.dir + path.slice(best.length)];
   }
 
-  /** A required module's source in the module cache (downloaded on first use), as a module record. */
   async moduleDir(path, version) {
     this.modules ??= new Map();
     const key = `${path}@${version}`;
     if (this.modules.has(key)) return this.modules.get(key);
+    checkModule(path, version);
     const rep = this.main.replace.get(`${path}@${version}`) ?? this.main.replace.get(path);
     let mod;
     if (rep && rep.dir) {
-      const dir = rep.dir.startsWith('/') ? rep.dir : join(this.main.dir, rep.dir);
-      mod = (await this.exists(`${dir}/go.mod`)) ? await this.loadModule(dir, false) : { path, dir };
+      const dir = rep.dir.startsWith('/') ? normalize(rep.dir) : join(this.main.dir, rep.dir);
+      if (!(await this.isDir(dir))) throw new GoError(`go: ${path}@${version}: replacement directory ${rep.dir} does not exist`);
+      mod = (await this.exists(`${dir}/go.mod`)) ? await this.loadModule(dir, false) : { path, dir, require: new Map() };
       mod.path = path;
     } else {
       const [p, v] = rep ? [rep.path, rep.version] : [path, version];
+      checkModule(p, v);
       const dir = `${this.modcache}/${escapePath(p)}@${escapePath(v)}`;
-      if (!(await this.exists(`${dir}/.slicc-ok`)) && !(await this.exists(`${dir}/go.mod`))) await this.download(p, v, dir);
-      mod = (await this.exists(`${dir}/go.mod`)) ? await this.loadModule(dir, false) : { path: p, dir };
+      await this.verified(p, v, dir);
+      mod = (await this.exists(`${dir}/go.mod`)) ? await this.loadModule(dir, false) : { path: p, dir, require: new Map() };
       mod.path = path;
       mod.version = v;
+    }
+    for (const [p, v] of mod.require) {
+      const have = this.main.require.get(p);
+      if (have && SEMVER.test(v) && SEMVER.test(have) && compareVersions(v, have) > 0) {
+        throw new GoError(`go: updates to go.mod needed: ${path}@${version} requires ${p}@${v}, but go.mod has ${p} ${have}\n\tthis go driver does no version selection; run go mod tidy with a full go toolchain`);
+      }
     }
     this.modules.set(key, mod);
     return mod;
   }
 
-  async download(path, version, dir) {
+  sumFor(path, version) {
     const want = this.main.sum.get(`${path} ${version}`);
     if (!want) {
       throw new GoError(`go: missing go.sum entry for module providing ${path}@${version}; add it to go.sum (go mod download ${path} on another machine)`);
     }
-    const proxies = this.goproxy.split(/[,|]/).filter((p) => p && p !== 'direct' && p !== 'off');
-    if (proxies.length === 0) throw new GoError(`go: ${path}@${version}: GOPROXY=${this.goproxy} has no proxy to download from (direct VCS fetches are not supported)`);
-    if (typeof this.ctx.fetch !== 'function') {
+    return want;
+  }
+
+  async verified(path, version, dir) {
+    const want = this.sumFor(path, version);
+    if (!(await this.exists(dir))) return this.download(path, version, dir, want);
+    let have;
+    try {
+      have = (await this.readText(`${dir}/.slicc-ok`)).trim();
+    } catch {
+      throw new GoError(`go: ${path}@${version}: ${dir} is in the module cache, but this go driver did not verify it (no .slicc-ok); remove it to download it again`);
+    }
+    if (have !== want) throw mismatch(path, version, have, want, 'the module cache');
+  }
+
+  async download(path, version, dir, want) {
+    const noproxy = matchPrefixPatterns(this.gonoproxy, path);
+    if (noproxy) {
+      throw new GoError(`go: ${path}@${version}: matches GONOPROXY/GOPRIVATE (${noproxy}), so it is not fetched through GOPROXY, and this go driver does no direct (VCS) fetches; vendor it or replace it with a local directory`);
+    }
+    const proxies = proxyList(this.goproxy);
+    if (proxies.some((p) => p.url !== 'direct' && p.url !== 'off') && typeof this.ctx.fetch !== 'function') {
       throw new GoError(`go: ${path}@${version}: this slicc-kernel gives JS programs no fetch; vendor the modules (vendor/) to build offline`);
     }
     let zip;
-    let lastErr = '';
-    for (const proxy of proxies) {
+    let lastErr = `GOPROXY=${this.goproxy} names no proxy`;
+    for (const { url: proxy, anyError } of proxies) {
+      if (proxy === 'off') {
+        lastErr = 'module lookup disabled by GOPROXY=off';
+        break;
+      }
+      if (proxy === 'direct') {
+        lastErr = 'direct (VCS) fetches are not supported by this go driver';
+        if (anyError) continue;
+        break;
+      }
       const url = `${proxy.replace(/\/$/, '')}/${escapePath(path)}/@v/${escapePath(version)}.zip`;
       if (this.flags?.verbose || this.flags?.trace) this.ctx.sync.write(2, `go: downloading ${path} ${version}\n`);
       try {
         const r = await this.ctx.fetch(url);
         if (r.status === 200) {
+          const length = Number(r.headers?.get?.('content-length') ?? 0);
+          if (length > MAX_ZIP) throw new GoError(`go: ${path}@${version}: module zip is larger than ${MAX_ZIP} bytes`);
           zip = new Uint8Array(await r.arrayBuffer());
+          if (zip.length > MAX_ZIP) throw new GoError(`go: ${path}@${version}: module zip is larger than ${MAX_ZIP} bytes`);
           break;
         }
         lastErr = `${url}: ${r.status}`;
-        if (r.status !== 404 && r.status !== 410) break;
+        if (!anyError && r.status !== 404 && r.status !== 410) break;
       } catch (e) {
+        if (e instanceof GoError) throw e;
         lastErr = `${url}: ${e.message ?? e}`;
-        break;
+        if (!anyError) break;
       }
     }
     if (!zip) throw new GoError(`go: ${path}@${version}: ${lastErr}`);
-    const files = await unzip(zip);
+    let files;
+    try {
+      files = await unzip(zip);
+    } catch (e) {
+      if (e instanceof GoError) throw new GoError(`go: ${path}@${version}: ${e.message.replace(/^go: /, '')}`);
+      throw new GoError(`go: ${path}@${version}: module zip: ${e.message ?? e}`);
+    }
     const lines = [];
     for (const f of [...files].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
       if (f.name.includes('\n')) throw new GoError(`go: ${path}@${version}: bad file name in zip`);
       lines.push(`${hex(await sha256(f.data))}  ${f.name}\n`);
     }
     const got = `h1:${base64(await sha256(lines.join('')))}`;
-    if (got !== want) {
-      throw new GoError(`go: ${path}@${version}: verifying module: checksum mismatch\n\tdownloaded: ${got}\n\tgo.sum:     ${want}\n\nSECURITY ERROR\nThis download does NOT match an earlier download recorded in go.sum.`);
-    }
+    if (got !== want) throw mismatch(path, version, got, want, 'the download');
     const prefix = `${path}@${version}/`;
-    const tmp = `${dir}.tmp-${Date.now()}`;
+    const seen = new Set();
     for (const f of files) {
       if (!f.name.startsWith(prefix)) throw new GoError(`go: ${path}@${version}: zip entry ${f.name} outside ${prefix}`);
       const rel = f.name.slice(prefix.length);
-      if (rel.split('/').some((s) => s === '..' || s === '')) throw new GoError(`go: ${path}@${version}: bad zip entry ${f.name}`);
-      await this.mkdirp(dirname(`${tmp}/${rel}`));
-      await this.fs.writeFile(`${tmp}/${rel}`, f.data);
+      if (/[\\\x00-\x1f\x7f]/.test(rel) || rel.split('/').some((s) => s === '..' || s === '.' || s === '')) throw new GoError(`go: ${path}@${version}: bad zip entry ${f.name}`);
+      const folded = rel.toLowerCase();
+      if (seen.has(folded)) throw new GoError(`go: ${path}@${version}: zip has more than one entry for ${f.name} (or a case-insensitive collision)`);
+      seen.add(folded);
     }
-    await this.fs.writeFile(`${tmp}/.slicc-ok`, `${got}\n`);
-    await this.mkdirp(dirname(dir));
-    await this.fs.rename(tmp, dir);
+    const tmp = `${dir}.tmp-${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      for (const f of files) {
+        const rel = f.name.slice(prefix.length);
+        await this.mkdirp(dirname(`${tmp}/${rel}`));
+        await this.fs.writeFile(`${tmp}/${rel}`, f.data);
+      }
+      await this.fs.writeFile(`${tmp}/.slicc-ok`, `${got}\n`);
+      await this.mkdirp(dirname(dir));
+      await this.fs.rename(tmp, dir);
+    } catch (e) {
+      await this.fs.rm(tmp, { recursive: true }).catch(() => {});
+      throw e;
+    }
   }
-
-  // --------------------------------------------------------------- packages
 
   tagSet() {
     const tags = new Set([this.goos, this.goarch, 'gc', ...(this.flags?.tags ?? [])]);
@@ -391,9 +493,8 @@ class Driver {
     return true;
   }
 
-  /** Loads the package in `dir` with import path `path`. */
   async loadPackage(dir, path, mod, files) {
-    const pkg = { path, dir, mod, goFiles: [], sFiles: [], imports: new Set(), embeds: [], name: undefined };
+    const pkg = { path, dir, mod, goFiles: [], sFiles: [], hFiles: [], imports: new Set(), embeds: [], name: undefined };
     const names = files ?? (await this.entries(dir)).filter((e) => e.file).map((e) => e.name);
     let sawGo = false;
     for (const name of names) {
@@ -411,7 +512,10 @@ class Driver {
         pkg.sFiles.push(file);
         continue;
       }
-      if (ext === '.h') continue;
+      if (ext === '.h') {
+        pkg.hFiles.push(file);
+        continue;
+      }
       if (ext !== '.go') {
         if (ext === '.syso') continue;
         throw new GoError(`package ${path}: ${base}: C/C++/Fortran sources need cgo, and this go builds with CGO_ENABLED=0`);
@@ -436,9 +540,12 @@ class Driver {
     return pkg;
   }
 
-  /** Resolves `path` (an import) to a package, loading its dependencies; returns 'std' for std. */
   async importPackage(path, from) {
     if (this.pkgs.has(path)) return this.pkgs.get(path);
+    if (path === '.' || path === '..' || path.startsWith('./') || path.startsWith('../')) {
+      throw new GoError(`${from ?? 'go'}: local import "${path}" in non-local package`);
+    }
+    if (!pathOK(path)) throw new GoError(`invalid import path ${JSON.stringify(path)}${from ? `\n\timported by ${from}` : ''}`);
     const std = await this.stdArchives();
     const first = path.split('/')[0];
     if (!first.includes('.') && !(this.main && (path === this.main.path || path.startsWith(`${this.main.path}/`)))) {
@@ -468,7 +575,6 @@ class Driver {
     return pkg;
   }
 
-  /** Expands build arguments into root packages. */
   async roots(args) {
     this.pkgs = new Map();
     this.loading = new Set();
@@ -478,10 +584,12 @@ class Driver {
       const files = args.map((a) => (a.startsWith('/') ? normalize(a) : join(this.cwd, a)));
       const dirs = new Set(files.map(dirname));
       if (dirs.size > 1) throw new GoError('named files must all be in one directory; have ' + [...dirs].join(' and '));
+      await this.checkWork([...dirs][0]);
       this.main ??= await this.findMainModule([...dirs][0]);
       const pkg = await this.loadPackage([...dirs][0], 'command-line-arguments', this.main, files);
       return [await this.addPackage(pkg)];
     }
+    await this.checkWork(this.cwd);
     this.main ??= await this.findMainModule(this.cwd);
     const out = [];
     for (const arg of args) {
@@ -533,8 +641,6 @@ class Driver {
     await walk(base);
     return out;
   }
-
-  // ------------------------------------------------------------------ build
 
   langOf(pkg) {
     if (pkg.path === 'command-line-arguments' || pkg.mod?.main) return this.main?.go ? [`-lang=go${langVersion(this.main.go)}`] : [];
@@ -590,6 +696,7 @@ class Driver {
     this.work = work;
     const archives = new Map();
     const keys = new Map();
+    const rootSet = new Set(roots.map((p) => p.path));
     try {
       let n = 0;
       for (const pkg of this.order) {
@@ -599,10 +706,15 @@ class Driver {
         const trim = this.flags.trimpath ? [`-trimpath=${pkg.dir}=>${pkg.path === 'command-line-arguments' ? pkg.path : pkg.path}`] : [`-trimpath=${obj}=>`];
         const lang = this.langOf(pkg);
         const embed = await this.embedCfg(pkg, obj);
-        // cache key: everything compile sees
-        const parts = [this.version, this.goos, this.goarch, pkg.path, pathArg, lang.join(' '), (this.flags.gcflags ?? []).join(' '), this.flags.trimpath ? 'trim' : '', pkg.dir];
-        for (const f of [...pkg.goFiles, ...pkg.sFiles]) parts.push(f, hex(await sha256(await this.fs.readFile(f))));
-        for (const e of embed) parts.push(await this.readText(e.slice('-embedcfg='.length)));
+        const gcflags = flagsFor(this.flags.gcflags, rootSet.has(pkg.path));
+        const asmflags = flagsFor(this.flags.asmflags, rootSet.has(pkg.path));
+        const parts = [this.version, this.goos, this.goarch, pkg.path, pathArg, lang.join(' '), JSON.stringify(gcflags), JSON.stringify(asmflags), this.flags.trimpath ? 'trim' : '', pkg.dir];
+        for (const f of [...pkg.goFiles, ...pkg.sFiles, ...(pkg.sFiles.length ? pkg.hFiles : [])]) parts.push(f, hex(await sha256(await this.fs.readFile(f))));
+        for (const e of embed) {
+          const cfg = await this.readText(e.slice('-embedcfg='.length));
+          parts.push(cfg);
+          for (const file of Object.values(JSON.parse(cfg).Files).sort()) parts.push(file, hex(await sha256(await this.fs.readFile(file))));
+        }
         for (const imp of [...pkg.imports].sort()) parts.push(imp, keys.get(imp) ?? 'std');
         const key = hex(await sha256(parts.join('\0')));
         keys.set(pkg.path, key);
@@ -624,14 +736,14 @@ class Driver {
         const inc = ['-I', obj, '-I', `${this.goroot}/pkg/include`, '-D', `GOOS_${this.goos}`, '-D', `GOARCH_${this.goarch}`];
         if (asm) {
           await this.fs.writeFile(`${obj}/go_asm.h`, '');
-          this.tool('asm', ['-p', pathArg, ...inc, '-gensymabis', '-o', `${obj}/symabis`, ...pkg.sFiles], pkg.path);
+          this.tool('asm', ['-p', pathArg, ...inc, ...asmflags, '-gensymabis', '-o', `${obj}/symabis`, ...pkg.sFiles], pkg.path);
         }
-        this.tool('compile', ['-o', out, ...trim, '-p', pathArg, ...lang, ...(asm ? ['-symabis', `${obj}/symabis`, '-asmhdr', `${obj}/go_asm.h`] : ['-complete']), ...embed, '-importcfg', cfg, ...(this.flags.gcflags ?? []), '-pack', ...pkg.goFiles], pkg.path);
+        this.tool('compile', ['-o', out, ...trim, '-p', pathArg, ...lang, ...(asm ? ['-symabis', `${obj}/symabis`, '-asmhdr', `${obj}/go_asm.h`] : ['-complete']), ...embed, '-importcfg', cfg, ...gcflags, '-pack', ...pkg.goFiles], pkg.path);
         if (asm) {
           const objs = [];
           for (const s of pkg.sFiles) {
             const o = `${obj}/${basename(s).replace(/\.s$/, '.o')}`;
-            this.tool('asm', ['-p', pathArg, ...inc, '-o', o, s], pkg.path);
+            this.tool('asm', ['-p', pathArg, ...inc, ...asmflags, '-o', o, s], pkg.path);
             objs.push(o);
           }
           await this.appendArchive(out, objs);
@@ -655,7 +767,7 @@ class Driver {
         let exe = output ?? join(this.cwd, exeName(root, this.goos));
         if (output !== undefined && (output.endsWith('/') || (await this.isDir(output)))) exe = join(output, exeName(root, this.goos));
         const tmpExe = `${work}/exe-${written.length}`;
-        this.tool('link', ['-o', tmpExe, '-importcfg', linkcfg, '-buildmode=exe', ...(this.flags.ldflags ?? []), archives.get(root.path)], root.path);
+        this.tool('link', ['-o', tmpExe, '-importcfg', linkcfg, '-buildmode=exe', ...flagsFor(this.flags.ldflags, true), archives.get(root.path)], root.path);
         await this.fs.writeFile(exe, await this.fs.readFile(tmpExe));
         await this.fs.chmod(exe, 0o755);
         written.push(exe);
@@ -670,7 +782,6 @@ class Driver {
     }
   }
 
-  /** Appends objects to a Go archive (what `go tool pack r` does). */
   async appendArchive(archive, objects) {
     const chunks = [await this.fs.readFile(archive)];
     for (const o of objects) {
@@ -690,10 +801,8 @@ class Driver {
     await this.fs.writeFile(archive, buf);
   }
 
-  // --------------------------------------------------------------- commands
-
   parseBuildFlags(args, { stopAtFirstArg }) {
-    const flags = { tags: [], ldflags: [], gcflags: [] };
+    const flags = { tags: [], ldflags: [], gcflags: [], asmflags: [] };
     const takesValue = new Set(['-o', '-tags', '-ldflags', '-gcflags', '-mod', '-C', '-p', '-modfile', '-asmflags', '-pgo', '-overlay', '-installsuffix']);
     const boolean = new Set(['-v', '-x', '-a', '-n', '-trimpath', '-work', '-buildvcs=false', '-buildvcs', '-modcacherw', '-race=false', '-linkshared=false']);
     const refused = new Set(['-race', '-msan', '-asan', '-cover', '-linkshared', '-buildmode']);
@@ -701,6 +810,7 @@ class Driver {
     const all = [...this.goflags, ...args];
     let i = 0;
     for (; i < all.length; i++) {
+      const at = i;
       let a = all[i];
       if (a === '--') {
         i++;
@@ -737,11 +847,20 @@ class Driver {
         if (i + 1 >= all.length) throw new GoError(`flag needs an argument: ${name}`, 2);
         value = all[++i];
       }
+      if (name === '-C' && at !== this.goflags.length) throw new GoError('go: -C flag must be first flag on command line', 2);
       if (name === '-o') flags.output = value.startsWith('/') ? normalize(value) + (value.endsWith('/') ? '/' : '') : join(this.cwd, value) + (value.endsWith('/') ? '/' : '');
-      else if (name === '-tags') flags.tags.push(...value.split(/[,\s]+/).filter(Boolean));
-      else if (name === '-ldflags') flags.ldflags = splitQuoted(value.replace(/^all=/, ''));
-      else if (name === '-gcflags') flags.gcflags = splitQuoted(value.replace(/^all=/, ''));
-      else if (name === '-mod') flags.mod = value;
+      else if (name === '-tags') flags.tags = value.split(/[,\s]+/).filter(Boolean);
+      else if (name === '-ldflags' || name === '-gcflags' || name === '-asmflags') {
+        const f = pkgFlag(name, value);
+        if (f.all && name !== '-ldflags' && !this.warnedStd) {
+          this.warnedStd = true;
+          this.ctx.sync.write(2, `go: warning: ${name}=all= does not reach the standard library, which is prebuilt\n`);
+        }
+        flags[name.slice(1)].push(f);
+      } else if (name === '-mod') {
+        if (!['readonly', 'vendor', 'mod'].includes(value)) throw new GoError(`go: -mod=${value}: want readonly, vendor or mod`, 2);
+        flags.mod = value;
+      }
       else if (name === '-C') this.cwd = value.startsWith('/') ? normalize(value) : join(this.cwd, value);
       else if (['-modfile', '-overlay', '-pgo'].includes(name) && !(name === '-pgo' && value === 'off')) {
         throw new GoError(`go: ${name} is not supported by this go driver`, 2);
@@ -789,11 +908,18 @@ class Driver {
 
   async cmdMod(args) {
     if (args[0] !== 'download') throw new GoError(`go mod ${args[0] ?? ''}: not supported by this go driver (only go mod download)`, 2);
-    const { flags, rest } = this.parseBuildFlags(args.slice(1).filter((a) => a !== '-json'), { stopAtFirstArg: false });
+    const flags = {};
+    const rest = [];
+    for (const a of args.slice(1)) {
+      if (a === '-x') flags.trace = true;
+      else if (a.startsWith('-')) throw new GoError(`go mod download: ${a.replace(/=.*/, '')} is not supported by this go driver (only -x)`, 2);
+      else rest.push(a);
+    }
     this.flags = flags;
+    await this.checkWork(this.cwd);
     this.main = await this.findMainModule(this.cwd);
     if (!this.main) throw new GoError('go: go.mod file not found in current directory or any parent directory');
-    const want = rest.length ? rest.map((r) => r.split('@')) : [...this.main.require];
+    const want = rest.length ? rest.map((r) => (r.lastIndexOf('@') > 0 ? [r.slice(0, r.lastIndexOf('@')), r.slice(r.lastIndexOf('@') + 1)] : [r, undefined])) : [...this.main.require];
     for (const [path, v] of want) {
       const version = v ?? this.main.require.get(path);
       if (!version) throw new GoError(`go: module ${path} is not required by ${this.main.path}`);
@@ -813,14 +939,17 @@ class Driver {
       GOHOSTOS: 'wasip1',
       GOMOD: '',
       GOMODCACHE: this.modcache,
+      GONOPROXY: this.gonoproxy,
       GOOS: this.goos,
       GOPATH: this.gopath,
+      GOPRIVATE: this.env.GOPRIVATE ?? '',
       GOPROXY: this.goproxy,
       GOROOT: this.goroot,
       GOSUMDB: 'off',
       GOTOOLCHAIN: 'local',
       GOTOOLDIR: this.tools,
       GOVERSION: this.version,
+      GOWORK: this.env.GOWORK === 'off' ? 'off' : '',
     };
     const main = await this.findMainModule(this.cwd).catch(() => undefined);
     vars.GOMOD = main ? `${main.dir}/go.mod` : '/dev/null';
@@ -842,7 +971,11 @@ class Driver {
 
   async run(argv) {
     const [cmd, ...args] = argv;
-    if (!cmd || cmd === 'help' || cmd === '-h' || cmd === '--help') {
+    if (cmd === 'help') {
+      await this.out(USAGE);
+      return 0;
+    }
+    if (!cmd || cmd === '-h' || cmd === '--help') {
       await this.err(USAGE);
       return 2;
     }
@@ -873,14 +1006,16 @@ class Driver {
       case 'tool':
       case 'fmt':
       case 'clean':
+      case 'doc':
+      case 'fix':
+      case 'bug':
+      case 'telemetry':
         throw new GoError(`go ${cmd}: not supported by this go driver yet`, 2);
       default:
         throw new GoError(`go ${cmd}: unknown command\nRun 'go help' for usage.`, 2);
     }
   }
 }
-
-// ---------------------------------------------------------------- go.mod/sum
 
 function parseGoMod(text, file) {
   const mod = { path: undefined, go: undefined, require: new Map(), replace: new Map() };
@@ -937,7 +1072,6 @@ function versionAtLeast(v, want) {
   return true;
 }
 
-/** go 1.21.3 → 1.21 (compile's -lang takes the language version). */
 const langVersion = (v) => v.split('.').slice(0, 2).join('.').replace(/(rc|beta)\d*$/, '');
 
 function exeName(pkg, goos) {
@@ -968,16 +1102,8 @@ function globToRegExp(seg) {
   return new RegExp(`^${re}$`);
 }
 
-// ------------------------------------------------------------------ sources
-
-/**
- * The parts of a Go (or assembly) file go/build reads: the //go:build and
- * // +build lines before the package clause, the package name, the imports,
- * import "C" and //go:embed patterns.
- */
 function parseHeader(text, isGo) {
   const out = { build: undefined, plusBuild: [], pkg: undefined, imports: [], cgo: false, embeds: [] };
-  // Build lines: only in the leading run of comments and blank lines.
   let i = 0;
   const n = text.length;
   while (i < n) {
@@ -1036,7 +1162,6 @@ function parseHeader(text, isGo) {
   return out;
 }
 
-/** Just enough of Go's scanner for the package clause and imports (with auto-semicolons). */
 function tokenize(text) {
   const toks = [];
   let i = 0;
@@ -1082,14 +1207,12 @@ function tokenize(text) {
       push({ v: c, k: 'p' });
       lastNeedsSemi = c === ')' || c === ']' || c === '}';
       i++;
-      // past the imports nothing else is needed
       if (c === '{' || c === '=') break;
     }
   }
   return toks;
 }
 
-/** Evaluates a //go:build expression. */
 function evalConstraint(expr, has) {
   const toks = expr.match(/\(|\)|!|&&|\|\||[^\s()!&|]+/g) ?? [];
   let i = 0;
@@ -1125,38 +1248,47 @@ function evalConstraint(expr, has) {
   return v;
 }
 
-/** One // +build line: space-separated OR of comma-separated AND of [!]tag. */
 function evalPlusBuild(line, has) {
   return line.split(/\s+/).some((term) => term.split(',').every((t) => (t.startsWith('!') ? !has(t.slice(1)) : has(t))));
 }
 
-// ---------------------------------------------------------------------- zip
+function mismatch(path, version, got, want, what) {
+  return new GoError(`go: ${path}@${version}: verifying module: checksum mismatch\n\t${what === 'the download' ? 'downloaded' : 'cached'}: ${got}\n\tgo.sum:     ${want}\n\nSECURITY ERROR\nThe module in ${what} does NOT match the hash recorded in go.sum.`);
+}
 
-async function inflate(data) {
+async function inflate(data, size, name) {
   const ds = new DecompressionStream('deflate-raw');
   const writer = ds.writable.getWriter();
-  writer.write(data);
-  writer.close();
+  writer.write(data).catch(() => {});
+  writer.close().catch(() => {});
   const reader = ds.readable.getReader();
   const chunks = [];
-  let total = 0;
+  let at = 0;
   for (;;) {
     const { value, done } = await reader.read();
     if (done) break;
+    if (at + value.length > size) {
+      await reader.cancel().catch(() => {});
+      throw new GoError(`module zip: ${name}: inflates to more than its declared ${size} bytes`);
+    }
     chunks.push(value);
-    total += value.length;
+    at += value.length;
   }
-  const out = new Uint8Array(total);
-  let at = 0;
+  if (at !== size) throw new GoError(`module zip: ${name}: size mismatch`);
+  const out = new Uint8Array(size);
+  let o = 0;
   for (const c of chunks) {
-    out.set(c, at);
-    at += c.length;
+    out.set(c, o);
+    o += c.length;
   }
   return out;
 }
 
 async function unzip(buf) {
   const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const need = (at, n, what) => {
+    if (at < 0 || at + n > buf.length) throw new GoError(`module zip: truncated ${what}`);
+  };
   let eocd = -1;
   for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) {
     if (dv.getUint32(i, true) === 0x06054b50) {
@@ -1164,12 +1296,15 @@ async function unzip(buf) {
       break;
     }
   }
-  if (eocd < 0) throw new GoError('go: module zip: no end of central directory');
+  if (eocd < 0) throw new GoError('module zip: no end of central directory');
   const count = dv.getUint16(eocd + 10, true);
   let p = dv.getUint32(eocd + 16, true);
-  const files = [];
+  const entries = [];
+  let total = 0;
   for (let k = 0; k < count; k++) {
-    if (dv.getUint32(p, true) !== 0x02014b50) throw new GoError('go: module zip: bad central directory');
+    need(p, 46, 'central directory');
+    if (dv.getUint32(p, true) !== 0x02014b50) throw new GoError('module zip: bad central directory');
+    const flags = dv.getUint16(p + 8, true);
     const method = dv.getUint16(p + 10, true);
     const csize = dv.getUint32(p + 20, true);
     const usize = dv.getUint32(p + 24, true);
@@ -1177,24 +1312,33 @@ async function unzip(buf) {
     const elen = dv.getUint16(p + 30, true);
     const clen = dv.getUint16(p + 32, true);
     const off = dv.getUint32(p + 42, true);
+    need(p + 46, nlen + elen + clen, 'central directory');
     const name = TD.decode(buf.subarray(p + 46, p + 46 + nlen));
     p += 46 + nlen + elen + clen;
     if (name.endsWith('/')) continue;
-    const lnlen = dv.getUint16(off + 26, true);
-    const lelen = dv.getUint16(off + 28, true);
-    const start = off + 30 + lnlen + lelen;
+    if (flags & 1) throw new GoError(`module zip: ${name}: encrypted entry`);
+    if (csize === 0xffffffff || usize === 0xffffffff || off === 0xffffffff) throw new GoError(`module zip: ${name}: zip64 entries are not supported`);
+    total += usize;
+    if (total > MAX_ZIP) throw new GoError(`module zip: unzipped size is larger than ${MAX_ZIP} bytes`);
+    entries.push({ name, method, csize, usize, off });
+  }
+  const files = [];
+  for (const { name, method, csize, usize, off } of entries) {
+    need(off, 30, `local header for ${name}`);
+    if (dv.getUint32(off, true) !== 0x04034b50) throw new GoError(`module zip: ${name}: bad local header`);
+    const start = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true);
+    need(start, csize, `data for ${name}`);
     const raw = buf.subarray(start, start + csize);
     let data;
-    if (method === 0) data = raw.slice();
-    else if (method === 8) data = await inflate(raw);
-    else throw new GoError(`go: module zip: ${name}: compression method ${method}`);
-    if (data.length !== usize) throw new GoError(`go: module zip: ${name}: size mismatch`);
+    if (method === 0) {
+      if (csize !== usize) throw new GoError(`module zip: ${name}: size mismatch`);
+      data = raw.slice();
+    } else if (method === 8) data = await inflate(raw, usize, name);
+    else throw new GoError(`module zip: ${name}: compression method ${method}`);
     files.push({ name, data });
   }
   return files;
 }
-
-// --------------------------------------------------------------------- main
 
 export default async function main(ctx) {
   const d = new Driver(ctx);
