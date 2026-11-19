@@ -36,3 +36,31 @@ Runs: slicc-kernel 1.110.1, users enforce, `scripts/browser-cert/run.mjs`, the s
 ## 1.27.2-2: Go's PATENTS (homescoop#897; 2026-10-20)
 
 `cert/licence.mjs` against the published @ai-ecoverse/wasm-go@1.27.2-1: FAIL, `PATENTS is not in the package`, and `files[]` doesn't list it. -1 staged Go's `LICENSE` alone. -2 copies `PATENTS` from the pinned `go1.27.2.src.tar.gz` too.
+
+## 1.27.4-2: the `go` command (PR #2177; 2026-11-19)
+
+Runs: PR #2177's CI at cb78a580, the cert job on the cert kernel slicc-kernel 1.191.2, users enforce, `scripts/browser-cert/run.mjs --spec go.mjs`. The wasm-go-std-wasip1 next to each wasm-go is the peer tarball.
+
+- **The published 1.27.4-1** has no `slicc.commands`, so there is no `go`:
+  ```
+  browser-cert: FAIL packages/wasm-go/cert/go.mjs
+  AssertionError [ERR_ASSERTION]: rc=127  go: command not found
+  ```
+- **This build with the PR's first driver** (`bin/go.mjs` replaced by bbfc9642's `src/go.mjs`, sha256 `623901656236dbb7…`): the archive cache ignored embedded file contents (#2180), so an edited asset is not compiled again:
+  ```
+  AssertionError [ERR_ASSERTION]: an edited embedded file is compiled again: rc=0 embed static/a.txt "hi\n" …
+  ```
+  The driver's other defects in that version (a module cache trusted without go.sum, module and import paths with `..`, unbounded zips, GOPRIVATE modules fetched through GOPROXY, `-asmflags` ignored, go.work ignored, no version check) fail `scripts/test/wasm-go-driver.test.mjs`: 11 of its 14 tests fail on bbfc9642's go.mjs.
+- **This PR's 1.27.4-2**: go.mjs passes on 1.191.2 and on the `engines.slicc-kernel` floor, 1.88.0 (an `extra_kernels` run), the oldest kernel verified green; 1.86.0 and 1.87.0 were not tried. On 1.85.0, 1.80.0, 1.76.0 and 1.65.0 it fails with `go: cannot run asm: EACCES`: those kernels have no chmod (no `ctx.fs.chmod` for JS programs, no `kernel.chmod`; slicc-kernel#515 brought both in 1.86.0), so the tools keep the default modes and the driver cannot make what it links executable.
+
+### The module cache is hashed again on use (homescoop#2181)
+
+0dcc9075 compared only the h1 in `.slicc-ok` with go.sum, so files changed under a valid marker were compiled. With 0dcc9075's driver in this build, cert/go.mjs fails (slicc-kernel 1.191.2, users enforce, run by hand):
+
+```
+browser-cert: FAIL packages/wasm-go/cert/go.mjs
+AssertionError [ERR_ASSERTION]: a modified file under a valid .slicc-ok is refused: rc=0
+evil, slicc
+```
+
+With the fix it passes, and the driver tests for a modified, extra, new-directory and removed file fail on 0dcc9075.
