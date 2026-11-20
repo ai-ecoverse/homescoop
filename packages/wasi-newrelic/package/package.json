@@ -1,0 +1,53 @@
+{
+  "name": "@ai-ecoverse/wasi-newrelic",
+  "version": "0.117.0-1",
+  "description": "The New Relic CLI 0.117.0 (newrelic) for slicc: NerdGraph, NRQL, entities, APM, synthetics and profiles through slicc's network.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-newrelic/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-newrelic",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "newrelic",
+    "nerdgraph",
+    "observability"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin",
+    "host"
+  ],
+  "engines": {
+    "slicc-kernel": ">=1.187.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-newrelic",
+    "upstream": "0.117.0",
+    "source": "newrelic/newrelic-cli@05ba094109ac9db08c72c6e13f213ee8c58f0959",
+    "patches": [
+      "0001-wasip1-build.patch",
+      "0002-wasip1-slicc-host.patch",
+      "0003-wasip1-unavailable-commands.patch"
+    ]
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "newrelic": {
+        "wasm": "bin/newrelic.wasm",
+        "imports": "host/newrelic-host.mjs"
+      }
+    }
+  }
+}
