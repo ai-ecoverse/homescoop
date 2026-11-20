@@ -1,0 +1,183 @@
+Build the New Relic CLI for GOOS=wasip1.
+
+Reason: newrelic v0.117.0 builds for wasip1 except for four packages.
+github.com/sirupsen/logrus v1.9.3 builds terminal_check_notappengine.go
+(which calls isTerminal) for wasip1 but has no wasip1 isTerminal; wasip1
+now takes its js/nacl/plan9 file, which answers "not a terminal".
+github.com/AlecAivazis/survey/v2/terminal's runereader_posix.go sets raw
+mode with termios ioctls, which wasip1 doesn't have; wasip1 gets a file
+without them. A survey prompt can't work without raw mode: on
+slicc-kernel's terminal it asks for the cursor position, the cooked
+terminal holds the answer until Enter, and the prompt hangs. So on wasip1
+survey.Ask refuses before any I/O with "cannot prompt: WASI preview1 has
+no terminal raw mode; pass the value as a flag" (newrelic profile add
+then needs every value as a flag, or -y). mvdan.cc/sh/v3/interp's
+os_unix.go uses unix.Mkfifo and Stat_t owners; wasip1 gets windows' answers (no mkfifo, directories
+searchable). internal/install/validation has the integration directories
+for linux, darwin and windows only; wasip1 takes darwin's /dev/null.
+newrelic install, the only user of sh/interp and the validation, is
+refused on wasip1 (0003).
+
+Upstream: not filed (homescoop does not file upstream reports).
+removeWhen: logrus, survey, sh and newrelic-cli build for GOOS=wasip1
+without it.
+
+diff --git a/vendor/github.com/AlecAivazis/survey/v2/survey.go b/vendor/github.com/AlecAivazis/survey/v2/survey.go
+--- a/vendor/github.com/AlecAivazis/survey/v2/survey.go
++++ b/vendor/github.com/AlecAivazis/survey/v2/survey.go
+@@ -5,6 +5,7 @@
+ 	"errors"
+ 	"io"
+ 	"os"
++	"runtime"
+ 	"strings"
+ 	"unicode/utf8"
+ 
+@@ -12,6 +13,9 @@
+ 	"github.com/AlecAivazis/survey/v2/terminal"
+ )
+ 
++// errNoRawMode is what a prompt answers on wasip1.
++var errNoRawMode = errors.New("cannot prompt: WASI preview1 has no terminal raw mode; pass the value as a flag")
++
+ // DefaultAskOptions is the default options on ask, using the OS stdio.
+ func defaultAskOptions() *AskOptions {
+ 	return &AskOptions{
+@@ -329,6 +333,13 @@
+ 		return errors.New("cannot call Ask() with a nil reference to record the answers")
+ 	}
+ 
++	// wasip1 has no terminal raw mode. A prompt would write its question,
++	// ask the terminal for the cursor position and wait for the answer, which
++	// a cooked terminal keeps until Enter: it hangs. Refuse before any I/O.
++	if runtime.GOOS == "wasip1" {
++		return errNoRawMode
++	}
++
+ 	validate := func(q *Question, val interface{}) error {
+ 		if q.Validate != nil {
+ 			if err := q.Validate(val); err != nil {
+diff --git a/vendor/github.com/AlecAivazis/survey/v2/terminal/runereader_posix.go b/vendor/github.com/AlecAivazis/survey/v2/terminal/runereader_posix.go
+--- a/vendor/github.com/AlecAivazis/survey/v2/terminal/runereader_posix.go
++++ b/vendor/github.com/AlecAivazis/survey/v2/terminal/runereader_posix.go
+@@ -1,5 +1,5 @@
+-//go:build !windows
+-// +build !windows
++//go:build !windows && !wasip1
++// +build !windows,!wasip1
+ 
+ // The terminal mode manipulation code is derived heavily from:
+ // https://github.com/golang/crypto/blob/master/ssh/terminal/util.go:
+diff --git a/vendor/github.com/AlecAivazis/survey/v2/terminal/runereader_wasip1.go b/vendor/github.com/AlecAivazis/survey/v2/terminal/runereader_wasip1.go
+--- /dev/null
++++ b/vendor/github.com/AlecAivazis/survey/v2/terminal/runereader_wasip1.go
+@@ -0,0 +1,46 @@
++//go:build wasip1
++
++package terminal
++
++import (
++	"bufio"
++	"bytes"
++	"errors"
++)
++
++// wasip1 has no terminal ioctls, so survey cannot switch the terminal to raw
++// mode. SetTermMode fails, as it does on a pipe elsewhere (survey.Ask
++// refuses on wasip1 before it gets here).
++var errNoTermios = errors.New("WASI preview1 has no terminal raw mode")
++
++type runeReaderState struct {
++	reader *bufio.Reader
++	buf    *bytes.Buffer
++}
++
++func newRuneReaderState(input FileReader) runeReaderState {
++	buf := new(bytes.Buffer)
++	return runeReaderState{
++		reader: bufio.NewReader(&BufferedReader{
++			In:     input,
++			Buffer: buf,
++		}),
++		buf: buf,
++	}
++}
++
++func (rr *RuneReader) Buffer() *bytes.Buffer {
++	return rr.state.buf
++}
++
++func (rr *RuneReader) SetTermMode() error {
++	return errNoTermios
++}
++
++func (rr *RuneReader) RestoreTermMode() error {
++	return nil
++}
++
++func (rr *RuneReader) ReadRune() (rune, int, error) {
++	return rr.state.reader.ReadRune()
++}
+diff --git a/vendor/github.com/sirupsen/logrus/terminal_check_no_terminal.go b/vendor/github.com/sirupsen/logrus/terminal_check_no_terminal.go
+--- a/vendor/github.com/sirupsen/logrus/terminal_check_no_terminal.go
++++ b/vendor/github.com/sirupsen/logrus/terminal_check_no_terminal.go
+@@ -1,4 +1,4 @@
+-// +build js nacl plan9
++// +build js nacl plan9 wasip1
+ 
+ package logrus
+ 
+diff --git a/vendor/github.com/sirupsen/logrus/terminal_check_notappengine.go b/vendor/github.com/sirupsen/logrus/terminal_check_notappengine.go
+--- a/vendor/github.com/sirupsen/logrus/terminal_check_notappengine.go
++++ b/vendor/github.com/sirupsen/logrus/terminal_check_notappengine.go
+@@ -1,4 +1,4 @@
+-// +build !appengine,!js,!windows,!nacl,!plan9
++// +build !appengine,!js,!windows,!nacl,!plan9,!wasip1
+ 
+ package logrus
+ 
+diff --git a/vendor/mvdan.cc/sh/v3/interp/os_unix.go b/vendor/mvdan.cc/sh/v3/interp/os_unix.go
+--- a/vendor/mvdan.cc/sh/v3/interp/os_unix.go
++++ b/vendor/mvdan.cc/sh/v3/interp/os_unix.go
+@@ -1,8 +1,8 @@
+ // Copyright (c) 2017, Andrey Nering <andrey.nering@gmail.com>
+ // See LICENSE for licensing information
+ 
+-//go:build !windows
+-// +build !windows
++//go:build !windows && !wasip1
++// +build !windows,!wasip1
+ 
+ package interp
+ 
+diff --git a/vendor/mvdan.cc/sh/v3/interp/os_wasip1.go b/vendor/mvdan.cc/sh/v3/interp/os_wasip1.go
+--- /dev/null
++++ b/vendor/mvdan.cc/sh/v3/interp/os_wasip1.go
+@@ -0,0 +1,17 @@
++//go:build wasip1
++
++package interp
++
++import (
++	"fmt"
++	"os"
++)
++
++// wasip1 has no mkfifo, and slicc-kernel checks directory permissions itself.
++func mkfifo(path string, mode uint32) error {
++	return fmt.Errorf("mkfifo %s: not supported on wasip1", path)
++}
++
++func hasPermissionToDir(info os.FileInfo) bool {
++	return true
++}
+diff --git a/internal/install/validation/integration_validator_wasip1.go b/internal/install/validation/integration_validator_wasip1.go
+--- /dev/null
++++ b/internal/install/validation/integration_validator_wasip1.go
+@@ -0,0 +1,6 @@
++package validation
++
++// WASI preview1 has no infrastructure agent or integrations to validate
++// (newrelic install is refused there); darwin's values, which match nothing.
++const IntegrationsDirname = "/dev/null"
++const ConfigurationsDirname = "/dev/null"

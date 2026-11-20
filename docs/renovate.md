@@ -187,6 +187,7 @@ Patches live beside the recipe as `packages/<name>/*.patch` (applied by
 | tzdata | `data.iana.org/time-zones/releases/` | `custom.tzdata` (html listing, `versioning=loose`): releases are `2026f`; npm gets `2026.6.0-N` (docs/versioning.md) |
 | wasix-openssl, wasix-openssl-cli | `openssl/openssl` | github-releases, tags `openssl-3.5.Z` (the 3.5 LTS line); one branch bumps both recipes. wasix-openssl-cli's roots follow `curl-cacert` with tls-engine's |
 | wasi-fastly | `fastly/cli` | github-releases, tags `vX.Y.Z` (`extractVersion=^v(?<version>.*)$`); the source is the tag's commit archive (`tag: v{{version}}`), which the refresh re-pins |
+| wasi-newrelic | `newrelic/newrelic-cli` | github-releases, tags `vX.Y.Z` (`extractVersion=^v(?<version>.*)$`); the source is the tag's commit archive (`tag: v{{version}}`), which the refresh re-pins |
 | wasi-quickjs | `quickjs-ng/quickjs` | github-releases, tags `vX.Y.Z` (`extractVersion=^v(?<version>.*)$`) |
 | xxd | `vim/vim` | tags `vX.Y.Z` (vim patch level) |
 | zlib | `madler/zlib` | github-releases |

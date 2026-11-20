@@ -1,0 +1,287 @@
+Reach slicc-kernel's network and file modes from the New Relic CLI on
+wasip1.
+
+Reason: wasip1 cannot dial, so every NerdGraph and REST call fails at DNS
+(or, with seven's HTTPS_PROXY, at "proxyconnect tcp: dial tcp
+127.0.0.1:3128: connect: Connection refused"). internal/slicchost talks to
+host/newrelic-host.mjs (newrelic_host probe/call/take) and sets
+http.DefaultTransport to it; newrelic-client-go's client (no
+HTTPTransport configured) and the CLI's own http.Get calls use that
+transport. Requests and response bodies cross as JSON; each body read
+yields to other goroutines first. wasip1 mkdir and open pass no mode and
+wasip1 chmod does nothing, so ~/.newrelic (0700) and credentials.json
+and config.json (0600; credentials.json holds API and license keys) are
+set through the host's chmod, the files before anything is written to
+them. (newrelic-cli.log is written only by newrelic install, which 0003
+refuses.) Upstream asks for 0750 and 0640; on
+slicc-kernel the other users of the kernel are not meant to read a user's
+keys, so the group bits are dropped too. Without the host module, HTTP
+fails with "it needs slicc-kernel with @ai-ecoverse/wasi-newrelic's host
+module" and the modes are left alone.
+
+Upstream: not filed (homescoop does not file upstream reports).
+removeWhen: wasip1 can dial and set file modes without a host module.
+
+diff --git a/cmd/newrelic/main.go b/cmd/newrelic/main.go
+--- a/cmd/newrelic/main.go
++++ b/cmd/newrelic/main.go
+@@ -32,6 +32,7 @@
+ 	"github.com/newrelic/newrelic-cli/internal/nrql"
+ 	"github.com/newrelic/newrelic-cli/internal/profile"
+ 	"github.com/newrelic/newrelic-cli/internal/reporting"
++	_ "github.com/newrelic/newrelic-cli/internal/slicchost"
+ 	"github.com/newrelic/newrelic-cli/internal/synthetics"
+ 	"github.com/newrelic/newrelic-cli/internal/usermanagement"
+ 	"github.com/newrelic/newrelic-cli/internal/utils"
+diff --git a/internal/slicchost/slicchost.go b/internal/slicchost/slicchost.go
+--- /dev/null
++++ b/internal/slicchost/slicchost.go
+@@ -0,0 +1,10 @@
++// Package slicchost reaches the host functions that wasi-newrelic's host
++// module (host/newrelic-host.mjs) provides on slicc-kernel: sending HTTP
++// requests and setting file modes. Where the module is missing, HTTP returns
++// ErrUnsupported.
++package slicchost
++
++import "errors"
++
++// ErrUnsupported is returned when the runtime does not provide the host module.
++var ErrUnsupported = errors.New("this runtime cannot open network connections for newrelic (it needs slicc-kernel with @ai-ecoverse/wasi-newrelic's host module)")
+diff --git a/internal/slicchost/slicchost_other.go b/internal/slicchost/slicchost_other.go
+--- /dev/null
++++ b/internal/slicchost/slicchost_other.go
+@@ -0,0 +1,21 @@
++//go:build !wasip1
++
++package slicchost
++
++import (
++	"net/http"
++	"os"
++)
++
++// Restrict does nothing outside wasip1: open and mkdir already set the mode.
++func Restrict(string, os.FileMode) error {
++	return nil
++}
++
++// Transport returns ErrUnsupported outside wasip1.
++type Transport struct{}
++
++// RoundTrip implements http.RoundTripper.
++func (Transport) RoundTrip(*http.Request) (*http.Response, error) {
++	return nil, ErrUnsupported
++}
+diff --git a/internal/slicchost/slicchost_wasip1.go b/internal/slicchost/slicchost_wasip1.go
+--- /dev/null
++++ b/internal/slicchost/slicchost_wasip1.go
+@@ -0,0 +1,168 @@
++//go:build wasip1
++
++package slicchost
++
++import (
++	"bytes"
++	"encoding/json"
++	"errors"
++	"fmt"
++	"io"
++	"net/http"
++	"os"
++	"runtime"
++	"sync"
++	"unsafe"
++)
++
++// probeMagic is the value host/newrelic-host.mjs returns from probe ("nrcl").
++const probeMagic = 0x6e72636c
++
++//go:wasmimport newrelic_host probe
++func hostProbe() uint32
++
++//go:wasmimport newrelic_host call
++func hostCall(request unsafe.Pointer, size uint32) uint32
++
++//go:wasmimport newrelic_host take
++func hostTake(response unsafe.Pointer)
++
++var available = sync.OnceValue(func() bool { return hostProbe() == probeMagic })
++
++func init() {
++	// newrelic-client-go's client (internal/http.NewClient without an
++	// HTTPTransport) and the CLI's own http.Get calls use
++	// http.DefaultTransport. wasip1 cannot dial; the host sends the request
++	// through slicc-kernel's network.
++	http.DefaultTransport = Transport{}
++}
++
++type envelope struct {
++	OK    bool            `json:"ok"`
++	Error string          `json:"error"`
++	Value json.RawMessage `json:"value"`
++}
++
++func call(request any, value any) error {
++	if !available() {
++		return ErrUnsupported
++	}
++	data, err := json.Marshal(request)
++	if err != nil {
++		return err
++	}
++	size := hostCall(unsafe.Pointer(unsafe.SliceData(data)), uint32(len(data)))
++	response := make([]byte, size)
++	if size > 0 {
++		hostTake(unsafe.Pointer(unsafe.SliceData(response)))
++	}
++	var result envelope
++	if err := json.Unmarshal(response, &result); err != nil {
++		return err
++	}
++	if !result.OK {
++		return errors.New(result.Error)
++	}
++	if value == nil || len(result.Value) == 0 || string(result.Value) == "null" {
++		return nil
++	}
++	return json.Unmarshal(result.Value, value)
++}
++
++// Restrict sets mode on path through the host. wasip1 mkdir and open pass
++// no mode, and wasip1 chmod does nothing, so credentials.json (which holds
++// API keys) would otherwise keep the kernel's default mode. Without the host
++// module there is nothing to ask, and nothing else shares the files.
++func Restrict(path string, mode os.FileMode) error {
++	if !available() {
++		return nil
++	}
++	return call(map[string]any{"op": "chmod", "path": path, "mode": uint32(mode.Perm())}, nil)
++}
++
++// Transport sends HTTP requests through the host.
++type Transport struct{}
++
++// RoundTrip implements http.RoundTripper.
++func (Transport) RoundTrip(request *http.Request) (*http.Response, error) {
++	var body []byte
++	if request.Body != nil {
++		data, err := io.ReadAll(request.Body)
++		_ = request.Body.Close()
++		if err != nil {
++			return nil, err
++		}
++		body = data
++	}
++	headers := [][2]string{}
++	for name, values := range request.Header {
++		for _, value := range values {
++			headers = append(headers, [2]string{name, value})
++		}
++	}
++	var head struct {
++		Handle  int         `json:"handle"`
++		Status  int         `json:"status"`
++		Headers [][2]string `json:"headers"`
++	}
++	if err := call(map[string]any{
++		"op":      "http",
++		"method":  request.Method,
++		"url":     request.URL.String(),
++		"headers": headers,
++		"body":    body,
++	}, &head); err != nil {
++		return nil, err
++	}
++	response := &http.Response{
++		Status:        fmt.Sprintf("%d %s", head.Status, http.StatusText(head.Status)),
++		StatusCode:    head.Status,
++		Proto:         "HTTP/1.1",
++		ProtoMajor:    1,
++		ProtoMinor:    1,
++		Header:        http.Header{},
++		Body:          &responseBody{handle: head.Handle},
++		ContentLength: -1,
++		Request:       request,
++	}
++	for _, pair := range head.Headers {
++		response.Header.Add(pair[0], pair[1])
++	}
++	return response, nil
++}
++
++type responseBody struct {
++	handle  int
++	pending bytes.Buffer
++	done    bool
++	closed  bool
++}
++
++func (b *responseBody) Read(p []byte) (int, error) {
++	for b.pending.Len() == 0 {
++		if b.done || b.closed {
++			return 0, io.EOF
++		}
++		// A host read blocks the only thread. Let other goroutines (a
++		// spinner) run first.
++		runtime.Gosched()
++		var chunk []byte
++		if err := call(map[string]any{"op": "http.read", "handle": b.handle}, &chunk); err != nil {
++			return 0, err
++		}
++		if len(chunk) == 0 {
++			b.done = true
++			continue
++		}
++		b.pending.Write(chunk)
++	}
++	return b.pending.Read(p)
++}
++
++func (b *responseBody) Close() error {
++	if b.closed {
++		return nil
++	}
++	b.closed = true
++	return call(map[string]any{"op": "http.close", "handle": b.handle}, nil)
++}
+diff --git a/internal/config/json_store.go b/internal/config/json_store.go
+--- a/internal/config/json_store.go
++++ b/internal/config/json_store.go
+@@ -12,6 +12,8 @@
+ 
+ 	"github.com/tidwall/gjson"
+ 	"github.com/tidwall/sjson"
++
++	"github.com/newrelic/newrelic-cli/internal/slicchost"
+ )
+ 
+ // JSONStore is a configurable json-backed configuration store.
+@@ -545,9 +547,27 @@
+ 			if err != nil {
+ 				return err
+ 			}
++			// wasip1 mkdir passes no mode.
++			if err = slicchost.Restrict(dir, 0700); err != nil {
++				return err
++			}
+ 		}
+ 
+-		if err := ioutil.WriteFile(p.fileName, p.cfg, 0640); err != nil {
++		// wasip1 open passes no mode. credentials.json holds API keys, so
++		// the file is restricted before anything is written to it.
++		f, err := os.OpenFile(p.fileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0640)
++		if err != nil {
++			return err
++		}
++		if err := slicchost.Restrict(p.fileName, 0600); err != nil {
++			_ = f.Close()
++			return err
++		}
++		if _, err := f.Write(p.cfg); err != nil {
++			_ = f.Close()
++			return err
++		}
++		if err := f.Close(); err != nil {
+ 			return err
+ 		}
+ 	}

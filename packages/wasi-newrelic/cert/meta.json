@@ -1,0 +1,26 @@
+{
+  "harness": "slicc-kernel",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-23",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-15"
+  ],
+  "network": "ctx.serve() is NerdGraph at api.newrelic.com and api.eu.newrelic.com (cert/lib/stub.mjs) and logs every request; an unknown Api-Key gets 401 as from the real NerdGraph, and download.newrelic.com answers 500, so a build that asks it shows it",
+  "checklist": [
+    "as cone (addUser, users enforce): newrelic version → newrelic version 0.117.0; newrelic --help lists the commands as newrelic; neither makes a request; nerdgraph query without a key stops with 'could not initialize New Relic client' and no request (checklist.mjs)",
+    "NEW_RELIC_API_KEY: newrelic nerdgraph query '{ actor { user { name } } }' sends one POST https://api.newrelic.com/graphql with Api-Key: <key>, newrelic-cli/0.117.0's User-Agent and the query, and prints the data; nrql query sends one NerdGraph request with the NRQL and prints the results; NEW_RELIC_REGION=EU goes to api.eu.newrelic.com; a refused key exits 1 with the 401 after one request (checklist.mjs)",
+    "newrelic profile add with every value as a flag stores the keys in ~/.newrelic/credentials.json, 0600 in a 0700 directory owned by the user, without a request; another user's cat of it fails; the profile becomes the default and the next nerdgraph query sends its key; config set writes config.json 0600; a value left to a prompt (no --accountId, no -y) fails at once with 'cannot prompt: WASI preview1 has no terminal raw mode', with no question or cursor query written (config.mjs)",
+    "install (with and without -n) and diagnose run, run --list-suites, update and lint exit 1 with their reason and make no request; no ~/.newrelic/bin is created; install --help and diagnose --help still work (unavailable.mjs)",
+    "without the host module, newrelic version still runs and nerdgraph query reports that the runtime cannot open a connection, with no request (z-missing-host.mjs)",
+    "test/e2e/newrelic.test.mjs (Node entry, slicc-kernel 1.191.4, a recording transport): the NerdGraph call on the sync and the async (Dynamic Worker) process host, the 401, the EU region, credentials modes, the prompt refusal, the refused commands, the missing host module; test/newrelic-host.test.mjs: the host module's operations"
+  ],
+  "patches": {
+    "0001-wasip1-build.patch": "every spec: without it logrus, survey's terminal, mvdan.cc/sh's interp and the install validation do not compile for wasip1 and there is no newrelic.wasm; its survey.Ask refusal is the prompt case in config.mjs (cert/NEGATIVE.md).",
+    "0002-wasip1-slicc-host.patch": "the NerdGraph calls in checklist.mjs and config.mjs (HTTP through newrelic_host, newrelic-client-go's client on http.DefaultTransport), the modes and the other user's refused read in config.mjs, the missing-host error in z-missing-host.mjs. Built without it, nerdgraph query fails to dial and credentials.json keeps the kernel's default mode (cert/NEGATIVE.md).",
+    "0003-wasip1-unavailable-commands.patch": "unavailable.mjs (every refusal and its reason, no request, no ~/.newrelic/bin). Built without it, install asks NerdGraph for a license key and diagnose run creates ~/.newrelic/bin and fails on 'unknown operating system: wasip1' (cert/NEGATIVE.md)."
+  }
+}

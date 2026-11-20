@@ -1,0 +1,47 @@
+# The New Relic CLI (newrelic/newrelic-cli) for slicc WASI preview1:
+# newrelic.wasm built by homescoop from newrelic-cli's source with
+# GOOS=wasip1 and patches/, plus a host-import module for slicc-kernel.
+name: wasi-newrelic
+builder: host
+reproducible: true
+# renovate: datasource=github-releases depName=newrelic/newrelic-cli extractVersion=^v(?<version>.*)$
+version: "0.117.0"
+npm: "@ai-ecoverse/wasi-newrelic"
+summary: "New Relic CLI 0.117.0 for slicc WASI preview1 (command newrelic)"
+source:
+  url: "https://github.com/newrelic/newrelic-cli/archive/05ba094109ac9db08c72c6e13f213ee8c58f0959.tar.gz"
+  sha256: "5e9c519026ff955fd5958e02fcf7b0d87d166521d95b62236d6177c9211a89b1"
+  tag: "v{{version}}"
+  commit: "05ba094109ac9db08c72c6e13f213ee8c58f0959"
+  tree: "d940b8865a35d7f9d15afe2cd32f0a61f6c653bd"
+toolchain:
+  # newrelic-cli v0.117.0's go.mod requires go 1.26.9.
+  go: "1.27.4"
+  go_sha256_linux_x64: "7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840"
+  go_sha256_macos_arm64: "91a44a2b8a716600ad94a4f143e156116620db8828086a6e3602291be9bd0bb4"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/newrelic/newrelic-cli
+  license: Apache-2.0
+  notes: |
+    newrelic-cli v0.117.0 (tag v0.117.0, commit 05ba094). build.sh fetches
+    the pinned source and Go 1.27.4, vendors the modules (go.sum checked),
+    applies patches/*.patch and builds ./cmd/newrelic with GOOS=wasip1
+    GOARCH=wasm CGO_ENABLED=0 -trimpath -buildvcs=false and upstream's
+    release ldflags (-s -w, main.version and internal/cli.version
+    <version>, main.appName newrelic).
+    patches/0001-wasip1-build.patch: wasip1 files for logrus, survey's
+    terminal, mvdan.cc/sh's interp and the install validation, the only
+    packages that do not build for wasip1.
+    patches/0002-wasip1-slicc-host.patch: HTTP (http.DefaultTransport,
+    which newrelic-client-go's client uses) through
+    package/host/newrelic-host.mjs (newrelic_host imports), and modes for
+    ~/.newrelic, credentials.json and config.json.
+    patches/0003-wasip1-unavailable-commands.patch: install and diagnose,
+    which install or run native programs on the machine, refuse with a
+    clear error.
+    build.sh fails above 62 MiB, so newrelic.wasm fits a Cloudflare Dynamic
+    Worker (64 MiB of code).

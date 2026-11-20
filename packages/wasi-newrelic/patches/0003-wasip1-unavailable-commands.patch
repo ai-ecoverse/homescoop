@@ -1,0 +1,69 @@
+Refuse, on wasip1, the New Relic CLI commands that install or run native
+programs on the machine.
+
+Reason: newrelic install downloads install recipes and runs them (shell
+scripts through mvdan.cc/sh, the package manager, sudo) to put agents and
+integrations on the machine it runs on, none of which a WASI command can
+do.
+newrelic diagnose run, update and lint download New Relic Diagnostics
+(nrdiag) for linux, darwin or windows into ~/.newrelic/bin and start it.
+On wasip1 these stop before any request with their reason; install
+refuses before it asks for an API key. --help still works, and so does
+newrelic diagnose validate, which only sends an event and queries it.
+
+Upstream: not filed (homescoop does not file upstream reports).
+removeWhen: a WASI command can install and start native programs.
+
+diff --git a/internal/install/command.go b/internal/install/command.go
+--- a/internal/install/command.go
++++ b/internal/install/command.go
+@@ -4,6 +4,7 @@
+ 	"errors"
+ 	"fmt"
+ 	"os"
++	"runtime"
+ 	"strings"
+ 
+ 	log "github.com/sirupsen/logrus"
+@@ -57,11 +58,22 @@
+ 	return extractedNames, nil
+ }
+ 
++// errUnavailable is what newrelic install answers on wasip1: its recipes are
++// shell scripts that install agents and integrations with the machine's
++// package manager, and a WASI command can't start them or install anything.
++var errUnavailable = errors.New("newrelic install is not available in this build: it runs install recipes (shell scripts, the package manager, sudo) on the machine itself, and a WASI command can start none of them; run newrelic install on the host to instrument")
++
+ // Command represents the install command.
+ var Command = &cobra.Command{
+-	Use:    "install",
+-	Short:  "Install New Relic.",
+-	PreRun: client.RequireClient,
++	Use:   "install",
++	Short: "Install New Relic.",
++	PreRunE: func(cmd *cobra.Command, args []string) error {
++		if runtime.GOOS == "wasip1" {
++			return errUnavailable
++		}
++		client.RequireClient(cmd, args)
++		return nil
++	},
+ 	RunE: func(cmd *cobra.Command, args []string) error {
+ 		extractedRecipeNames, err := processRecipeNames(recipeNames)
+ 		if err != nil {
+diff --git a/internal/diagnose/helpers.go b/internal/diagnose/helpers.go
+--- a/internal/diagnose/helpers.go
++++ b/internal/diagnose/helpers.go
+@@ -117,6 +117,12 @@
+ }
+ 
+ func runDiagnostics(args ...string) error {
++	if runtime.GOOS == "wasip1" {
++		// New Relic Diagnostics (nrdiag) is a native program that inspects
++		// the machine it runs on; a WASI command can neither download one
++		// for its platform nor start it.
++		return fmt.Errorf("newrelic diagnose run, update and lint are not available in this build: they download and run New Relic Diagnostics (nrdiag), a native program, on the machine itself; newrelic diagnose validate works")
++	}
+ 	err := ensureBinaryExists()
+ 	if err != nil {
+ 		return err
