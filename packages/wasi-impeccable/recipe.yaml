@@ -115,3 +115,16 @@ about:
     shared HTTP builder now takes the request's URL and skips the proxy
     for loopback and NO_PROXY hosts, following redirects hop by hop; on
     wasm only its TLS config is left out (wasix-ureq).
+    0.1.24-1: 0001 rebased onto engine-v0.1.24. The cli gained regex (a
+    dependency on every target) and the foundations module: the
+    foundations verb's file checks and detector classes build for wasm, its
+    git ls-files goes through wasix-command (a new cli dependency), and its
+    upload (router's health_scan, foundations::from_scan) stays native with
+    account (cert/foundations.mjs). The account verbs world and
+    taste-refresh, and the taste refresh the cli schedules from
+    setup_report, stay native: on WASI they refuse with "needs Impeccable
+    account sign-in; not available in this build yet". walkthrough
+    (base64, the system's ffmpeg and ffprobe) stays native and refuses
+    with "needs ffmpeg" (cert/world.mjs). context's cached taste block,
+    concept-seed's --replace-world and the loop status / connect --json
+    additions build as is. No new crates: regex was already in the lock.

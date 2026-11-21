@@ -1,6 +1,6 @@
 diff -ruN a/crates/agents/src/fs_writer.rs b/crates/agents/src/fs_writer.rs
---- a/crates/agents/src/fs_writer.rs	2026-11-19 23:40:12.375926878 +0100
-+++ b/crates/agents/src/fs_writer.rs	2026-11-19 23:40:12.398916770 +0100
+--- a/crates/agents/src/fs_writer.rs	2026-11-21 08:52:32.073310636 +0100
++++ b/crates/agents/src/fs_writer.rs	2026-11-21 08:52:32.078091565 +0100
 @@ -37,7 +37,7 @@
          .ok_or_else(|| ("unsafe_target", "Target has no parent directory".into(), 4))?;
      let temp = loop {
@@ -11,8 +11,8 @@ diff -ruN a/crates/agents/src/fs_writer.rs b/crates/agents/src/fs_writer.rs
          options.write(true).create_new(true);
          #[cfg(unix)]
 diff -ruN a/crates/agents/src/lib.rs b/crates/agents/src/lib.rs
---- a/crates/agents/src/lib.rs	2026-11-19 23:40:12.434698112 +0100
-+++ b/crates/agents/src/lib.rs	2026-11-19 23:40:12.455057456 +0100
+--- a/crates/agents/src/lib.rs	2026-11-21 08:52:32.098507950 +0100
++++ b/crates/agents/src/lib.rs	2026-11-21 08:52:32.104490465 +0100
 @@ -392,7 +392,7 @@
      let tmp = loop {
          let t = parent.join(format!(
@@ -23,20 +23,23 @@ diff -ruN a/crates/agents/src/lib.rs b/crates/agents/src/lib.rs
          ));
          let mut o = fs::OpenOptions::new();
 diff -ruN a/crates/cli/Cargo.toml b/crates/cli/Cargo.toml
---- a/crates/cli/Cargo.toml	2026-11-19 23:40:12.487465163 +0100
-+++ b/crates/cli/Cargo.toml	2026-11-19 23:40:12.509498553 +0100
-@@ -11,28 +11,36 @@
+--- a/crates/cli/Cargo.toml	2026-11-21 08:52:32.126427021 +0100
++++ b/crates/cli/Cargo.toml	2026-11-21 08:52:32.130071238 +0100
+@@ -11,29 +11,40 @@
  # Staging end-to-end only: lets IMPECCABLE_MCP_URL point loop connect at another https MCP server.
  test-mcp-url = []
  
 +# File-local verbs (detect/html/context/hook/skills/comp-verbs) build for
 +# wasm32-wasip1 (live included, over the kernel's sockets and WASIX spawn).
 +# browser stays native-only (CDP), and so does account (sign-in, setup
-+# reporting, critique sync, design health uploads and Pro dispatch: ring, a
-+# loopback OAuth listener and the OS keychain); on wasm its verbs refuse,
-+# and detect and critique-storage never upload.
++# reporting, taste, worlds, critique sync, design health uploads and Pro
++# dispatch: ring, a loopback OAuth listener and the OS keychain); on wasm
++# its verbs refuse, and detect, foundations and critique-storage never
++# upload. walkthrough (base64, the system's ffmpeg) stays native too.
  [dependencies]
 -impeccable-account = { workspace = true }
++# homescoop: std::process on wasm (WASIX); std's own types elsewhere.
++wasix-command = { path = "../../homescoop-crates/wasix-command" }
  impeccable-common = { path = "../common" }
 -impeccable-context = { path = "../context" }
 -impeccable-browser = { path = "../browser" }
@@ -52,6 +55,7 @@ diff -ruN a/crates/cli/Cargo.toml b/crates/cli/Cargo.toml
  impeccable-comp-verbs = { workspace = true }
  impeccable-agents = { workspace = true }
  serde_json = { workspace = true }
+ regex = { workspace = true }
 -base64 = "0.22"
  sha2 = "0.10"
  semver = "1"
@@ -68,9 +72,51 @@ diff -ruN a/crates/cli/Cargo.toml b/crates/cli/Cargo.toml
  
  [dev-dependencies]
  impeccable-account = { workspace = true, features = ["test-release-keys"] }
+diff -ruN a/crates/cli/src/foundations/local.rs b/crates/cli/src/foundations/local.rs
+--- a/crates/cli/src/foundations/local.rs	2026-11-21 08:52:32.166218247 +0100
++++ b/crates/cli/src/foundations/local.rs	2026-11-21 08:52:32.170639133 +0100
+@@ -8,7 +8,8 @@
+ use serde_json::Value;
+ use std::collections::{BTreeMap, BTreeSet};
+ use std::path::{Path, PathBuf};
+-use std::process::{Command, Stdio};
++// homescoop: git ls-files through WASIX proc_spawn3 on wasm; std elsewhere.
++use wasix_command::{Command, Stdio};
+ use std::rc::Rc;
+ use std::sync::OnceLock;
+ use std::time::{Duration, Instant};
+diff -ruN a/crates/cli/src/foundations.rs b/crates/cli/src/foundations.rs
+--- a/crates/cli/src/foundations.rs	2026-11-21 08:52:32.144939359 +0100
++++ b/crates/cli/src/foundations.rs	2026-11-21 08:52:32.148766744 +0100
+@@ -106,6 +106,8 @@
+ 
+ /// The states a full scan supports: the project's own files, then the
+ /// detector's two classes. A detector failure wins over a file pass.
++/// homescoop WASI: only design health's upload after detect asks for them.
++#[cfg(not(target_family = "wasm"))]
+ pub(crate) fn from_scan(
+     root: &str,
+     full: &impeccable_detect::cli::FullScan,
+@@ -228,6 +230,7 @@
+         io.err(&format!("Not a folder: {}\n", root.display()));
+         return 1;
+     }
++    #[cfg(not(target_family = "wasm"))]
+     let started = std::time::SystemTime::now();
+     let local = local::scan(&root);
+     // The detector's two classes, through the same full scan `detect` runs,
+@@ -266,6 +269,8 @@
+     }
+     // Upload exactly as a full `detect` does: only a real full scan, and
+     // only of a git work tree's top (health checks both).
++    // homescoop WASI: no account, so the roadmap is never uploaded.
++    #[cfg(not(target_family = "wasm"))]
+     if let Some(full) = full {
+         if impeccable_account::health::wanted(io) {
+             let scan = crate::router::health_scan(full, items, started);
 diff -ruN a/crates/cli/src/lib.rs b/crates/cli/src/lib.rs
---- a/crates/cli/src/lib.rs	2026-11-19 23:40:12.551252702 +0100
-+++ b/crates/cli/src/lib.rs	2026-11-19 23:40:12.576855975 +0100
+--- a/crates/cli/src/lib.rs	2026-11-21 08:52:32.187034633 +0100
++++ b/crates/cli/src/lib.rs	2026-11-21 08:52:32.190950602 +0100
 @@ -1,17 +1,25 @@
  //! Embeddable CLI router and native browser adapters.
  //! Downstream binaries call [`run`] with their build's [`InstalledPack`].
@@ -95,15 +141,18 @@ diff -ruN a/crates/cli/src/lib.rs b/crates/cli/src/lib.rs
  
 +#[cfg(not(target_family = "wasm"))]
  mod font_render;
+ mod foundations;
  mod router;
- pub use router::{is_scan, run, InstalledPack};
-@@ -20,9 +28,12 @@
+@@ -21,10 +29,15 @@
  mod loop_connect;
  mod loop_install;
  
-+// homescoop WASI: setup reporting is account work, which stays native.
++// homescoop WASI: setup reporting (and the taste refresh it schedules) is
++// account work, which stays native; walkthrough runs the system's ffmpeg.
 +#[cfg(not(target_family = "wasm"))]
  mod setup_report;
++#[cfg(not(target_family = "wasm"))]
+ mod walkthrough;
  
  /// Schedule the setup worker after an open binary's Pro scan dispatch.
 +#[cfg(not(target_family = "wasm"))]
@@ -111,8 +160,8 @@ diff -ruN a/crates/cli/src/lib.rs b/crates/cli/src/lib.rs
  pub fn schedule_setup_report(io: &impeccable_common::Io) {
      setup_report::schedule(io);
 diff -ruN a/crates/cli/src/main.rs b/crates/cli/src/main.rs
---- a/crates/cli/src/main.rs	2026-11-19 23:40:12.612716025 +0100
-+++ b/crates/cli/src/main.rs	2026-11-19 23:40:12.633035119 +0100
+--- a/crates/cli/src/main.rs	2026-11-21 08:52:32.207407268 +0100
++++ b/crates/cli/src/main.rs	2026-11-21 08:52:32.211626654 +0100
 @@ -15,6 +15,8 @@
      let args: Vec<String> = std::env::args().skip(1).collect();
      let mut io = Io::stdio();
@@ -123,8 +172,8 @@ diff -ruN a/crates/cli/src/main.rs b/crates/cli/src/main.rs
          if let Some(code) = impeccable_account::pro::dispatch(&args, &mut io) {
              if !matches!(
 diff -ruN a/crates/cli/src/router.rs b/crates/cli/src/router.rs
---- a/crates/cli/src/router.rs	2026-11-19 23:40:12.676647397 +0100
-+++ b/crates/cli/src/router.rs	2026-11-19 23:40:12.699835831 +0100
+--- a/crates/cli/src/router.rs	2026-11-21 08:52:32.228280905 +0100
++++ b/crates/cli/src/router.rs	2026-11-21 08:52:32.232689708 +0100
 @@ -1,7 +1,16 @@
 +#[cfg(not(target_family = "wasm"))]
  use crate::font_render;
@@ -162,7 +211,7 @@ diff -ruN a/crates/cli/src/router.rs b/crates/cli/src/router.rs
      if matches!(
          verb,
          "context"
-@@ -45,12 +59,8 @@
+@@ -46,12 +60,8 @@
              0
          }
          "--version" | "-v" => {
@@ -177,15 +226,15 @@ diff -ruN a/crates/cli/src/router.rs b/crates/cli/src/router.rs
              0
          }
          // Launcher handshake: a cheap discriminator so the launchers can tell
-@@ -65,6 +75,7 @@
-         "detect" => detect(rest, io, &engines, pack.rule_pack),
+@@ -67,6 +77,7 @@
+         "foundations" => crate::foundations::run(rest, io, &engines, pack.rule_pack),
          "ignores" | "ignore" => impeccable_detect::run_ignores(rest, io),
          // Account sign-in. These never dispatch to the Pro engine.
 +        #[cfg(not(target_family = "wasm"))]
          "login" => {
              let code = impeccable_account::run_login(rest, io);
              if code == 0 {
-@@ -72,26 +83,43 @@
+@@ -74,29 +85,51 @@
              }
              code
          }
@@ -198,6 +247,10 @@ diff -ruN a/crates/cli/src/router.rs b/crates/cli/src/router.rs
 +        #[cfg(not(target_family = "wasm"))]
          "whoami" => impeccable_account::run_whoami(rest, io),
 +        #[cfg(not(target_family = "wasm"))]
+         "taste-refresh" => impeccable_account::taste::run_refresh(rest, io),
++        #[cfg(not(target_family = "wasm"))]
+         "world" => impeccable_account::world::run(rest, io),
++        #[cfg(not(target_family = "wasm"))]
          "critiques-refresh" => impeccable_account::critiques::run_refresh(rest, io),
 +        #[cfg(not(target_family = "wasm"))]
          "critiques" => impeccable_account::critiques::run(rest, io),
@@ -208,15 +261,19 @@ diff -ruN a/crates/cli/src/router.rs b/crates/cli/src/router.rs
          // Background Pro renewal (pro dispatch spawns it). Not in --help.
 +        #[cfg(not(target_family = "wasm"))]
          "pro-refresh" => impeccable_account::pro::run_refresh(rest, io),
-+        // homescoop WASI: account (sign-in, setup reporting, critique sync,
-+        // design health, Pro) stays native.
++        // homescoop WASI: account (sign-in, setup reporting, taste, worlds,
++        // critique sync, design health, Pro) stays native.
 +        #[cfg(target_family = "wasm")]
-+        "login" | "setup" | "setup-report" | "logout" | "whoami" | "critiques-refresh"
-+        | "critiques" | "health" | "health-design-refresh" | "pro-refresh" => {
-+            unavailable(io, verb, "needs Impeccable account sign-in")
-+        }
++        "login" | "setup" | "setup-report" | "logout" | "whoami" | "taste-refresh" | "world"
++        | "critiques-refresh" | "critiques" | "health" | "health-design-refresh"
++        | "pro-refresh" => unavailable(io, verb, "needs Impeccable account sign-in"),
          "skills" => impeccable_skills::run(rest, io),
          "loop" => crate::loop_install::run(rest, io),
++        #[cfg(not(target_family = "wasm"))]
+         "walkthrough" => crate::walkthrough::run(rest, io),
++        // homescoop WASI: walkthrough runs the system's ffmpeg and ffprobe.
++        #[cfg(target_family = "wasm")]
++        "walkthrough" => unavailable(io, "walkthrough", "needs ffmpeg"),
          "agents" => impeccable_agents::run(rest, io),
          "help" | "install" | "link" | "update" | "check" => impeccable_skills::run(args, io),
 -        // skill scripts
@@ -230,7 +287,7 @@ diff -ruN a/crates/cli/src/router.rs b/crates/cli/src/router.rs
          "critique-storage" => {
              let mut saved = None;
              let code = impeccable_context::critique_storage::run_with_saved(rest, io, &mut |s| {
-@@ -105,6 +133,9 @@
+@@ -110,6 +143,9 @@
              }
              code
          }
@@ -240,7 +297,7 @@ diff -ruN a/crates/cli/src/router.rs b/crates/cli/src/router.rs
          "audit-storage" => impeccable_context::run_audit_storage(rest, io),
          "embed-prompt" => impeccable_context::run_embed_prompt(rest, io),
          "signals" | "context-signals" => impeccable_context::run_signals(rest, io),
-@@ -112,19 +143,29 @@
+@@ -117,19 +153,29 @@
          "concept-seed" => impeccable_context::run_concept_seed(rest, io),
          "telemetry" => impeccable_context::run_telemetry(rest, io),
          "generate-image" => impeccable_context::run_generate_image(rest, io),
@@ -270,7 +327,7 @@ diff -ruN a/crates/cli/src/router.rs b/crates/cli/src/router.rs
          "capture-server" => match crate::capture_service::serve(rest) {
              Ok(()) => 0,
              Err(e) => {
-@@ -132,6 +173,9 @@
+@@ -137,6 +183,9 @@
                  1
              }
          },
@@ -280,7 +337,7 @@ diff -ruN a/crates/cli/src/router.rs b/crates/cli/src/router.rs
          "build-phase" => {
              // Inject the organic-clip-path CSS scanner (a rule that lives in the
              // closed `core` crate) so comp-verbs stays core-free.
-@@ -166,6 +210,8 @@
+@@ -171,6 +220,8 @@
                  }
              }
          }
@@ -289,7 +346,7 @@ diff -ruN a/crates/cli/src/router.rs b/crates/cli/src/router.rs
          "hook" => impeccable_hook::run_hook_with_pack(rest, io, engines.html, pack.rule_pack),
          "hook-before-edit" => {
              impeccable_hook::run_hook_before_edit_with_pack(rest, io, engines.html, pack.rule_pack)
-@@ -193,6 +239,7 @@
+@@ -198,6 +249,7 @@
  /// `detect`, then design health's upload of a full scan once the output is
  /// out (`impeccable_account::health`: it never changes the output or the
  /// exit code). Hook scans don't come through here.
@@ -297,8 +354,16 @@ diff -ruN a/crates/cli/src/router.rs b/crates/cli/src/router.rs
  fn detect(
      args: &[String],
      io: &mut Io,
-@@ -259,6 +306,17 @@
-     code
+@@ -232,6 +284,7 @@
+ }
+ 
+ /// Design health's view of a full scan, with its foundations states.
++#[cfg(not(target_family = "wasm"))]
+ pub(crate) fn health_scan(
+     full: impeccable_detect::cli::FullScan,
+     foundations: std::collections::BTreeMap<String, String>,
+@@ -257,6 +310,17 @@
+     }
  }
  
 +/// homescoop WASI: no account, so detect never uploads a design health scan.
@@ -315,7 +380,7 @@ diff -ruN a/crates/cli/src/router.rs b/crates/cli/src/router.rs
  /// Whether this invocation is a scan the Pro engine may take over: the
  /// verbs that run rule packs (`detect`, its path shorthand, and the hooks).
  pub fn is_scan(args: &[String], io: &Io) -> bool {
-@@ -330,6 +388,7 @@
+@@ -332,6 +396,7 @@
  /// The URL engine, built once from the process environment (browser
  /// discovery reads `IMPECCABLE_BROWSER` / `PUPPETEER_EXECUTABLE_PATH` /
  /// `CHROME_PATH`, sandbox flags read `CI`).
@@ -324,8 +389,8 @@ diff -ruN a/crates/cli/src/router.rs b/crates/cli/src/router.rs
      static ENGINE: std::sync::OnceLock<impeccable_browser::BrowserEngine> =
          std::sync::OnceLock::new();
 diff -ruN a/crates/common/Cargo.toml b/crates/common/Cargo.toml
---- a/crates/common/Cargo.toml	2026-11-19 23:40:12.740640394 +0100
-+++ b/crates/common/Cargo.toml	2026-11-19 23:40:12.763243660 +0100
+--- a/crates/common/Cargo.toml	2026-11-21 08:52:32.250943921 +0100
++++ b/crates/common/Cargo.toml	2026-11-21 08:52:32.256330643 +0100
 @@ -14,6 +14,14 @@
  sha2 = { version = "0.10", optional = true }
  getrandom = { version = "0.2", optional = true }
@@ -342,8 +407,8 @@ diff -ruN a/crates/common/Cargo.toml b/crates/common/Cargo.toml
 +[target.'cfg(target_os = "wasi")'.dependencies]
 +libc = "0.2"
 diff -ruN a/crates/common/src/fsx.rs b/crates/common/src/fsx.rs
---- a/crates/common/src/fsx.rs	2026-11-19 23:40:12.804653016 +0100
-+++ b/crates/common/src/fsx.rs	2026-11-19 23:40:12.825067777 +0100
+--- a/crates/common/src/fsx.rs	2026-11-21 08:52:32.275110649 +0100
++++ b/crates/common/src/fsx.rs	2026-11-21 08:52:32.279599077 +0100
 @@ -23,7 +23,7 @@
          .duration_since(std::time::UNIX_EPOCH)
          .map(|d| d.subsec_nanos())
@@ -354,8 +419,8 @@ diff -ruN a/crates/common/src/fsx.rs b/crates/common/src/fsx.rs
          // A dangling link can point into a directory that does not exist yet
          // (a first-time dotfiles checkout); callers only create the link's own
 diff -ruN a/crates/common/src/git.rs b/crates/common/src/git.rs
---- a/crates/common/src/git.rs	2026-11-19 23:40:12.865527380 +0100
-+++ b/crates/common/src/git.rs	2026-11-19 23:40:12.888672439 +0100
+--- a/crates/common/src/git.rs	2026-11-21 08:52:32.296774537 +0100
++++ b/crates/common/src/git.rs	2026-11-21 08:52:32.301129173 +0100
 @@ -112,7 +112,7 @@
  
      #[test]
@@ -366,8 +431,8 @@ diff -ruN a/crates/common/src/git.rs b/crates/common/src/git.rs
          let tmp = base.to_string_lossy().into_owned();
  
 diff -ruN a/crates/common/src/http.rs b/crates/common/src/http.rs
---- a/crates/common/src/http.rs	2026-11-19 23:40:12.930449546 +0100
-+++ b/crates/common/src/http.rs	2026-11-19 23:40:12.952326977 +0100
+--- a/crates/common/src/http.rs	2026-11-21 08:52:32.318434759 +0100
++++ b/crates/common/src/http.rs	2026-11-21 08:52:32.323336438 +0100
 @@ -11,7 +11,7 @@
  
  use std::collections::HashMap;
@@ -378,8 +443,8 @@ diff -ruN a/crates/common/src/http.rs b/crates/common/src/http.rs
  use std::sync::mpsc::{channel, Receiver, RecvTimeoutError};
  use std::sync::Arc;
 diff -ruN a/crates/common/src/lib.rs b/crates/common/src/lib.rs
---- a/crates/common/src/lib.rs	2026-11-19 23:40:12.993600498 +0100
-+++ b/crates/common/src/lib.rs	2026-11-19 23:40:13.017034225 +0100
+--- a/crates/common/src/lib.rs	2026-11-21 08:52:32.341800193 +0100
++++ b/crates/common/src/lib.rs	2026-11-21 08:52:32.346037538 +0100
 @@ -65,7 +65,7 @@
              stdin: Some(Box::new(std::io::stdin())),
              stdin_cache: None,
@@ -470,8 +535,8 @@ diff -ruN a/crates/common/src/lib.rs b/crates/common/src/lib.rs
 +    wasix_command::process::id()
 +}
 diff -ruN a/crates/common/src/proc.rs b/crates/common/src/proc.rs
---- a/crates/common/src/proc.rs	2026-11-19 23:40:13.056322450 +0100
-+++ b/crates/common/src/proc.rs	2026-11-19 23:40:13.076766294 +0100
+--- a/crates/common/src/proc.rs	2026-11-21 08:52:32.363330915 +0100
++++ b/crates/common/src/proc.rs	2026-11-21 08:52:32.367722968 +0100
 @@ -5,7 +5,7 @@
  //! Unix uses libc; Windows declares the handful of kernel32 entry points it
  //! needs directly so no windows-sys dependency is pulled into every crate.
@@ -549,8 +614,8 @@ diff -ruN a/crates/common/src/proc.rs b/crates/common/src/proc.rs
          let mut child = cmd.spawn().expect("detached spawn");
          let _ = child.wait();
 diff -ruN a/crates/common/src/seed.rs b/crates/common/src/seed.rs
---- a/crates/common/src/seed.rs	2026-11-19 23:40:13.110373422 +0100
-+++ b/crates/common/src/seed.rs	2026-11-19 23:40:13.130501015 +0100
+--- a/crates/common/src/seed.rs	2026-11-21 08:52:32.383115714 +0100
++++ b/crates/common/src/seed.rs	2026-11-21 08:52:32.387020766 +0100
 @@ -37,7 +37,7 @@
  pub fn new_key() -> String {
      random_hex32().unwrap_or_else(|| {
@@ -561,8 +626,8 @@ diff -ruN a/crates/common/src/seed.rs b/crates/common/src/seed.rs
  }
  
 diff -ruN a/crates/comp/src/png_io.rs b/crates/comp/src/png_io.rs
---- a/crates/comp/src/png_io.rs	2026-11-19 23:40:13.168252320 +0100
-+++ b/crates/comp/src/png_io.rs	2026-11-19 23:40:13.187917578 +0100
+--- a/crates/comp/src/png_io.rs	2026-11-21 08:52:32.403562183 +0100
++++ b/crates/comp/src/png_io.rs	2026-11-21 08:52:32.408224945 +0100
 @@ -202,7 +202,7 @@
      fn load_raster_reads_an_edited_non_png_source() {
          let unique = format!(
@@ -573,8 +638,8 @@ diff -ruN a/crates/comp/src/png_io.rs b/crates/comp/src/png_io.rs
                  .duration_since(std::time::UNIX_EPOCH)
                  .unwrap()
 diff -ruN a/crates/context/Cargo.toml b/crates/context/Cargo.toml
---- a/crates/context/Cargo.toml	2026-11-19 23:40:13.219008533 +0100
-+++ b/crates/context/Cargo.toml	2026-11-19 23:40:13.238093082 +0100
+--- a/crates/context/Cargo.toml	2026-11-21 08:52:32.425190113 +0100
++++ b/crates/context/Cargo.toml	2026-11-21 08:52:32.429412290 +0100
 @@ -12,6 +12,8 @@
  core-registry = []
  
@@ -604,8 +669,8 @@ diff -ruN a/crates/context/Cargo.toml b/crates/context/Cargo.toml
  [dev-dependencies]
  # Stand-in upstream APIs in unit tests only; the runtime servers use
 diff -ruN a/crates/context/src/component_review/mod.rs b/crates/context/src/component_review/mod.rs
---- a/crates/context/src/component_review/mod.rs	2026-11-19 23:40:13.270345581 +0100
-+++ b/crates/context/src/component_review/mod.rs	2026-11-19 23:40:13.290357757 +0100
+--- a/crates/context/src/component_review/mod.rs	2026-11-21 08:52:32.445879624 +0100
++++ b/crates/context/src/component_review/mod.rs	2026-11-21 08:52:32.450975137 +0100
 @@ -4,6 +4,7 @@
  mod lifecycle;
  mod manifest;
@@ -642,8 +707,8 @@ diff -ruN a/crates/context/src/component_review/mod.rs b/crates/context/src/comp
                      io.out(&format!("{}\n", json!({
                          "revision": state["packet"]["revision"],
 diff -ruN a/crates/context/src/component_review/server.rs b/crates/context/src/component_review/server.rs
---- a/crates/context/src/component_review/server.rs	2026-11-19 23:40:13.321287128 +0100
-+++ b/crates/context/src/component_review/server.rs	2026-11-19 23:40:13.341655138 +0100
+--- a/crates/context/src/component_review/server.rs	2026-11-21 08:52:32.467986513 +0100
++++ b/crates/context/src/component_review/server.rs	2026-11-21 08:52:32.472488108 +0100
 @@ -93,13 +93,13 @@
      let server =
          SerialServer::bind(("127.0.0.1", port), MAX_DECISION + 1).map_err(|e| e.to_string())?;
@@ -661,8 +726,8 @@ diff -ruN a/crates/context/src/component_review/server.rs b/crates/context/src/c
              }
          }
 diff -ruN a/crates/context/src/component_review/store.rs b/crates/context/src/component_review/store.rs
---- a/crates/context/src/component_review/store.rs	2026-11-19 23:40:13.377634022 +0100
-+++ b/crates/context/src/component_review/store.rs	2026-11-19 23:40:13.402173251 +0100
+--- a/crates/context/src/component_review/store.rs	2026-11-21 08:52:32.489605110 +0100
++++ b/crates/context/src/component_review/store.rs	2026-11-21 08:52:32.494573789 +0100
 @@ -19,7 +19,7 @@
      fs::create_dir_all(parent).map_err(|e| e.to_string())?;
      let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -673,8 +738,8 @@ diff -ruN a/crates/context/src/component_review/store.rs b/crates/context/src/co
          let mut f = fs::File::create(&temp)?;
          f.write_all(bytes)?;
 diff -ruN a/crates/context/src/component_review/tests.rs b/crates/context/src/component_review/tests.rs
---- a/crates/context/src/component_review/tests.rs	2026-11-19 23:40:13.433486998 +0100
-+++ b/crates/context/src/component_review/tests.rs	2026-11-19 23:40:13.453160673 +0100
+--- a/crates/context/src/component_review/tests.rs	2026-11-21 08:52:32.512014833 +0100
++++ b/crates/context/src/component_review/tests.rs	2026-11-21 08:52:32.518513433 +0100
 @@ -141,7 +141,7 @@
      fn new() -> Self {
          let root = std::env::temp_dir().join(format!(
@@ -685,9 +750,9 @@ diff -ruN a/crates/context/src/component_review/tests.rs b/crates/context/src/co
          ));
          let project = root.join("project");
 diff -ruN a/crates/context/src/concept_seed.rs b/crates/context/src/concept_seed.rs
---- a/crates/context/src/concept_seed.rs	2026-11-19 23:40:13.489434558 +0100
-+++ b/crates/context/src/concept_seed.rs	2026-11-19 23:40:13.512757992 +0100
-@@ -824,7 +824,7 @@
+--- a/crates/context/src/concept_seed.rs	2026-11-21 08:52:32.544095082 +0100
++++ b/crates/context/src/concept_seed.rs	2026-11-21 08:52:32.551229892 +0100
+@@ -868,7 +868,7 @@
      }
  
      fn temp_dir(name: &str) -> std::path::PathBuf {
@@ -697,9 +762,9 @@ diff -ruN a/crates/context/src/concept_seed.rs b/crates/context/src/concept_seed
          std::fs::create_dir_all(&dir).unwrap();
          dir
 diff -ruN a/crates/context/src/context_cli.rs b/crates/context/src/context_cli.rs
---- a/crates/context/src/context_cli.rs	2026-11-19 23:40:13.555630185 +0100
-+++ b/crates/context/src/context_cli.rs	2026-11-19 23:40:13.576761448 +0100
-@@ -310,8 +310,8 @@
+--- a/crates/context/src/context_cli.rs	2026-11-21 08:52:32.575941829 +0100
++++ b/crates/context/src/context_cli.rs	2026-11-21 08:52:32.582648221 +0100
+@@ -324,8 +324,8 @@
      ["cwebp", "sips", "magick", "ffmpeg"]
          .into_iter()
          .filter(|tool| {
@@ -711,8 +776,8 @@ diff -ruN a/crates/context/src/context_cli.rs b/crates/context/src/context_cli.r
                  cmd.env("PATH", p);
              }
 diff -ruN a/crates/context/src/critique_storage.rs b/crates/context/src/critique_storage.rs
---- a/crates/context/src/critique_storage.rs	2026-11-19 23:40:13.617107218 +0100
-+++ b/crates/context/src/critique_storage.rs	2026-11-19 23:40:13.638362230 +0100
+--- a/crates/context/src/critique_storage.rs	2026-11-21 08:52:32.608983414 +0100
++++ b/crates/context/src/critique_storage.rs	2026-11-21 08:52:32.615472305 +0100
 @@ -925,7 +925,7 @@
      fn tmp() -> String {
          let base = std::env::temp_dir().join(format!(
@@ -723,9 +788,9 @@ diff -ruN a/crates/context/src/critique_storage.rs b/crates/context/src/critique
              // A per-process counter: Windows' clock is coarse enough that two
              // parallel tests can share a nanosecond stamp and then delete each
 diff -ruN a/crates/context/src/detect_csp.rs b/crates/context/src/detect_csp.rs
---- a/crates/context/src/detect_csp.rs	2026-11-19 23:40:13.672528234 +0100
-+++ b/crates/context/src/detect_csp.rs	2026-11-19 23:40:13.691147532 +0100
-@@ -217,7 +217,7 @@
+--- a/crates/context/src/detect_csp.rs	2026-11-21 08:52:32.640256493 +0100
++++ b/crates/context/src/detect_csp.rs	2026-11-21 08:52:32.646597342 +0100
+@@ -227,7 +227,7 @@
              loop {
                  let root = std::env::temp_dir().join(format!(
                      "impeccable-csp-761-{}-{}",
@@ -735,8 +800,8 @@ diff -ruN a/crates/context/src/detect_csp.rs b/crates/context/src/detect_csp.rs
                  match std::fs::create_dir(&root) {
                      Ok(()) => return Self(root),
 diff -ruN a/crates/context/src/generate_image.rs b/crates/context/src/generate_image.rs
---- a/crates/context/src/generate_image.rs	2026-11-19 23:40:13.724429992 +0100
-+++ b/crates/context/src/generate_image.rs	2026-11-19 23:40:13.744046084 +0100
+--- a/crates/context/src/generate_image.rs	2026-11-21 08:52:32.671911948 +0100
++++ b/crates/context/src/generate_image.rs	2026-11-21 08:52:32.678811799 +0100
 @@ -595,7 +595,7 @@
          let _proxy_lock = crate::http::PROXY_ENV_LOCK.lock().unwrap();
          let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
@@ -756,8 +821,8 @@ diff -ruN a/crates/context/src/generate_image.rs b/crates/context/src/generate_i
          std::fs::create_dir_all(&dir).unwrap();
          dir
 diff -ruN a/crates/context/src/http.rs b/crates/context/src/http.rs
---- a/crates/context/src/http.rs	2026-11-19 23:40:13.776427667 +0100
-+++ b/crates/context/src/http.rs	2026-11-19 23:40:13.797932972 +0100
+--- a/crates/context/src/http.rs	2026-11-21 08:52:32.701618524 +0100
++++ b/crates/context/src/http.rs	2026-11-21 08:52:32.708618167 +0100
 @@ -24,13 +24,24 @@
  //! prefers `ALL_PROXY`, which is often `socks5://`. We opt in on this
  //! builder only, not globally via ureq's `proxy-from-env` feature.
@@ -820,8 +885,8 @@ diff -ruN a/crates/context/src/http.rs b/crates/context/src/http.rs
      use super::*;
      use ureq::rustls::pki_types::pem::PemObject;
 diff -ruN a/crates/context/src/lib.rs b/crates/context/src/lib.rs
---- a/crates/context/src/lib.rs	2026-11-19 23:40:13.829446969 +0100
-+++ b/crates/context/src/lib.rs	2026-11-19 23:40:13.849251061 +0100
+--- a/crates/context/src/lib.rs	2026-11-21 08:52:32.732871478 +0100
++++ b/crates/context/src/lib.rs	2026-11-21 08:52:32.739460495 +0100
 @@ -51,6 +51,7 @@
  pub use generate_image::run as run_generate_image;
  pub mod question_page;
@@ -831,8 +896,8 @@ diff -ruN a/crates/context/src/lib.rs b/crates/context/src/lib.rs
  
  pub mod component_review;
 diff -ruN a/crates/context/src/palette.rs b/crates/context/src/palette.rs
---- a/crates/context/src/palette.rs	2026-11-19 23:40:13.883603774 +0100
-+++ b/crates/context/src/palette.rs	2026-11-19 23:40:13.903568867 +0100
+--- a/crates/context/src/palette.rs	2026-11-21 08:52:32.766332314 +0100
++++ b/crates/context/src/palette.rs	2026-11-21 08:52:32.773425332 +0100
 @@ -14,7 +14,7 @@
  /// JS: Math.random() substitute; only used with no key.
  fn random_unit() -> f64 {
@@ -843,8 +908,8 @@ diff -ruN a/crates/context/src/palette.rs b/crates/context/src/palette.rs
      x = x.wrapping_mul(0xff51afd7ed558ccd);
      x ^= x >> 33;
 diff -ruN a/crates/context/src/serve_question.rs b/crates/context/src/serve_question.rs
---- a/crates/context/src/serve_question.rs	2026-11-19 23:40:13.939516875 +0100
-+++ b/crates/context/src/serve_question.rs	2026-11-19 23:40:13.959724844 +0100
+--- a/crates/context/src/serve_question.rs	2026-11-21 08:52:32.801988279 +0100
++++ b/crates/context/src/serve_question.rs	2026-11-21 08:52:32.809135547 +0100
 @@ -485,7 +485,7 @@
      if !in_repo {
          return vec![];
@@ -1106,8 +1171,8 @@ diff -ruN a/crates/context/src/serve_question.rs b/crates/context/src/serve_ques
          std::fs::write(dir.join(".impeccable/questions/k1.flip.json"), r#"{"buildPath":"comp"}"#).unwrap();
          let (_, out) = run_captured(&dir, &["--wait", "--key", "k1", "--poll", "2"]);
 diff -ruN a/crates/context/src/signals.rs b/crates/context/src/signals.rs
---- a/crates/context/src/signals.rs	2026-11-19 23:40:13.991209840 +0100
-+++ b/crates/context/src/signals.rs	2026-11-19 23:40:14.011486058 +0100
+--- a/crates/context/src/signals.rs	2026-11-21 08:52:32.833168650 +0100
++++ b/crates/context/src/signals.rs	2026-11-21 08:52:32.840071168 +0100
 @@ -7,7 +7,7 @@
  use crate::util::{exists, js_num, js_trim, json_pretty, opt_string, Env};
  use impeccable_common::Io;
@@ -1164,8 +1229,8 @@ diff -ruN a/crates/context/src/signals.rs b/crates/context/src/signals.rs
  
  const SCANNABLE_EXT: [&str; 11] = [".html", ".htm", ".css", ".scss", ".jsx", ".tsx", ".js", ".ts", ".vue", ".svelte", ".astro"];
 diff -ruN a/crates/context/src/staleness_deep.rs b/crates/context/src/staleness_deep.rs
---- a/crates/context/src/staleness_deep.rs	2026-11-19 23:40:14.046499606 +0100
-+++ b/crates/context/src/staleness_deep.rs	2026-11-19 23:40:14.069246623 +0100
+--- a/crates/context/src/staleness_deep.rs	2026-11-21 08:52:32.865511774 +0100
++++ b/crates/context/src/staleness_deep.rs	2026-11-21 08:52:32.873633253 +0100
 @@ -519,7 +519,7 @@
      fn tmp() -> String {
          let base = std::env::temp_dir().join(format!(
@@ -1176,8 +1241,8 @@ diff -ruN a/crates/context/src/staleness_deep.rs b/crates/context/src/staleness_
              // A per-process counter: Windows' clock is coarse enough that two
              // parallel tests can share a nanosecond stamp and then delete each
 diff -ruN a/crates/context/src/surface_briefs.rs b/crates/context/src/surface_briefs.rs
---- a/crates/context/src/surface_briefs.rs	2026-11-19 23:40:14.100700161 +0100
-+++ b/crates/context/src/surface_briefs.rs	2026-11-19 23:40:14.122452426 +0100
+--- a/crates/context/src/surface_briefs.rs	2026-11-21 08:52:32.897803023 +0100
++++ b/crates/context/src/surface_briefs.rs	2026-11-21 08:52:32.904617748 +0100
 @@ -362,7 +362,7 @@
      fn resolves_pre_hash_long_slug_briefs() {
          let root = std::env::temp_dir().join(format!(
@@ -1197,8 +1262,8 @@ diff -ruN a/crates/context/src/surface_briefs.rs b/crates/context/src/surface_br
          ));
          let root = root.to_string_lossy().into_owned();
 diff -ruN a/crates/context/src/telemetry.rs b/crates/context/src/telemetry.rs
---- a/crates/context/src/telemetry.rs	2026-11-19 23:40:14.161716609 +0100
-+++ b/crates/context/src/telemetry.rs	2026-11-19 23:40:14.182387912 +0100
+--- a/crates/context/src/telemetry.rs	2026-11-21 08:52:32.930481523 +0100
++++ b/crates/context/src/telemetry.rs	2026-11-21 08:52:32.937897958 +0100
 @@ -235,7 +235,7 @@
      static COUNTER: AtomicU64 = AtomicU64::new(0);
      let n = COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -1209,8 +1274,8 @@ diff -ruN a/crates/context/src/telemetry.rs b/crates/context/src/telemetry.rs
  
  struct LockGuard(String);
 diff -ruN a/crates/detect/src/engines.rs b/crates/detect/src/engines.rs
---- a/crates/detect/src/engines.rs	2026-11-19 23:40:14.219660549 +0100
-+++ b/crates/detect/src/engines.rs	2026-11-19 23:40:14.240245810 +0100
+--- a/crates/detect/src/engines.rs	2026-11-21 08:52:32.964152233 +0100
++++ b/crates/detect/src/engines.rs	2026-11-21 08:52:32.970506208 +0100
 @@ -167,7 +167,23 @@
  impl UrlEngine for MissingUrlEngine {
      fn detect_url(&self, _url: &str, _options: &ScanOptions) -> Result<Vec<Finding>, EngineError> {
@@ -1237,8 +1302,8 @@ diff -ruN a/crates/detect/src/engines.rs b/crates/detect/src/engines.rs
 +    }
  }
 diff -ruN a/crates/hook/src/before_edit.rs b/crates/hook/src/before_edit.rs
---- a/crates/hook/src/before_edit.rs	2026-11-19 23:40:14.273128602 +0100
-+++ b/crates/hook/src/before_edit.rs	2026-11-19 23:40:14.296822038 +0100
+--- a/crates/hook/src/before_edit.rs	2026-11-21 08:52:32.995171479 +0100
++++ b/crates/hook/src/before_edit.rs	2026-11-21 08:52:33.000634868 +0100
 @@ -515,7 +515,7 @@
      scan: &HookScanOptions,
  ) -> Result<Vec<Finding>, String> {
@@ -1249,8 +1314,8 @@ diff -ruN a/crates/hook/src/before_edit.rs b/crates/hook/src/before_edit.rs
      std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
      let tmp = dir.join(jsp::basename(file_path));
 diff -ruN a/crates/live/Cargo.toml b/crates/live/Cargo.toml
---- a/crates/live/Cargo.toml	2026-11-19 23:40:14.329438955 +0100
-+++ b/crates/live/Cargo.toml	2026-11-19 23:40:14.349264755 +0100
+--- a/crates/live/Cargo.toml	2026-11-21 08:52:33.018886372 +0100
++++ b/crates/live/Cargo.toml	2026-11-21 08:52:33.023056216 +0100
 @@ -15,7 +15,17 @@
  regex = { workspace = true }
  once_cell = { workspace = true }
@@ -1271,8 +1336,8 @@ diff -ruN a/crates/live/Cargo.toml b/crates/live/Cargo.toml
 +[target.'cfg(not(target_family = "wasm"))'.dependencies]
 +ureq = { version = "2", default-features = false, features = ["tls", "json"] }
 diff -ruN a/crates/live/src/bake.rs b/crates/live/src/bake.rs
---- a/crates/live/src/bake.rs	2026-11-19 23:40:14.380317335 +0100
-+++ b/crates/live/src/bake.rs	2026-11-19 23:40:14.400587720 +0100
+--- a/crates/live/src/bake.rs	2026-11-21 08:52:33.047042527 +0100
++++ b/crates/live/src/bake.rs	2026-11-21 08:52:33.053941087 +0100
 @@ -739,7 +739,7 @@
  
      #[test]
@@ -1283,8 +1348,8 @@ diff -ruN a/crates/live/src/bake.rs b/crates/live/src/bake.rs
          std::fs::create_dir_all(dir.join("src")).unwrap();
          std::fs::create_dir_all(dir.join("node_modules/x")).unwrap();
 diff -ruN a/crates/live/src/browser_open.rs b/crates/live/src/browser_open.rs
---- a/crates/live/src/browser_open.rs	2026-11-19 23:40:14.434812891 +0100
-+++ b/crates/live/src/browser_open.rs	2026-11-19 23:40:14.457110614 +0100
+--- a/crates/live/src/browser_open.rs	2026-11-21 08:52:33.080253862 +0100
++++ b/crates/live/src/browser_open.rs	2026-11-21 08:52:33.092766768 +0100
 @@ -12,7 +12,7 @@
  use crate::util::Env;
  use serde_json::Value;
@@ -1304,8 +1369,8 @@ diff -ruN a/crates/live/src/browser_open.rs b/crates/live/src/browser_open.rs
          std::fs::create_dir_all(dir.join(".impeccable")).unwrap();
          let cwd = dir.to_string_lossy().into_owned();
 diff -ruN a/crates/live/src/copy_edit_agent.rs b/crates/live/src/copy_edit_agent.rs
---- a/crates/live/src/copy_edit_agent.rs	2026-11-19 23:40:14.493918459 +0100
-+++ b/crates/live/src/copy_edit_agent.rs	2026-11-19 23:40:14.516514725 +0100
+--- a/crates/live/src/copy_edit_agent.rs	2026-11-21 08:52:33.122198260 +0100
++++ b/crates/live/src/copy_edit_agent.rs	2026-11-21 08:52:33.128822069 +0100
 @@ -11,7 +11,7 @@
  use serde_json::{json, Map, Value};
  use std::collections::HashSet;
@@ -1325,8 +1390,8 @@ diff -ruN a/crates/live/src/copy_edit_agent.rs b/crates/live/src/copy_edit_agent
              return Ok(candidate.to_string_lossy().into_owned());
          }
 diff -ruN a/crates/live/src/dev_url.rs b/crates/live/src/dev_url.rs
---- a/crates/live/src/dev_url.rs	2026-11-19 23:40:14.550531937 +0100
-+++ b/crates/live/src/dev_url.rs	2026-11-19 23:40:14.572970202 +0100
+--- a/crates/live/src/dev_url.rs	2026-11-21 08:52:33.152439879 +0100
++++ b/crates/live/src/dev_url.rs	2026-11-21 08:52:33.159026104 +0100
 @@ -4,7 +4,7 @@
  //! open the page.
  
@@ -1337,8 +1402,8 @@ diff -ruN a/crates/live/src/dev_url.rs b/crates/live/src/dev_url.rs
  
  /// Ports worth a knock when nothing narrows the search: Vite, Next, Astro,
 diff -ruN a/crates/live/src/gitignore.rs b/crates/live/src/gitignore.rs
---- a/crates/live/src/gitignore.rs	2026-11-19 23:40:14.606829497 +0100
-+++ b/crates/live/src/gitignore.rs	2026-11-19 23:40:14.628670095 +0100
+--- a/crates/live/src/gitignore.rs	2026-11-21 08:52:33.183223957 +0100
++++ b/crates/live/src/gitignore.rs	2026-11-21 08:52:33.189553598 +0100
 @@ -170,7 +170,7 @@
      fn linked_worktree_resolves_to_the_common_dir_exclude() {
          let base = std::env::temp_dir().join(format!(
@@ -1349,8 +1414,8 @@ diff -ruN a/crates/live/src/gitignore.rs b/crates/live/src/gitignore.rs
          ));
          let _ = std::fs::remove_dir_all(&base);
 diff -ruN a/crates/live/src/live_accept.rs b/crates/live/src/live_accept.rs
---- a/crates/live/src/live_accept.rs	2026-11-19 23:40:14.668152029 +0100
-+++ b/crates/live/src/live_accept.rs	2026-11-19 23:40:14.688203080 +0100
+--- a/crates/live/src/live_accept.rs	2026-11-21 08:52:33.213179950 +0100
++++ b/crates/live/src/live_accept.rs	2026-11-21 08:52:33.219399216 +0100
 @@ -173,7 +173,7 @@
      let tmp = format!(
          "{}.{}.{}.tmp",
@@ -1360,7 +1425,7 @@ diff -ruN a/crates/live/src/live_accept.rs b/crates/live/src/live_accept.rs
          crate::util::now_ms() as i64
      );
      if std::fs::write(&tmp, format!("{}\n", json_pretty(&Value::Object(m)))).is_ok() {
-@@ -1370,7 +1370,7 @@
+@@ -1461,7 +1461,7 @@
              .unwrap_or(0);
          let dir = std::env::temp_dir().join(format!(
              "impeccable-discard-{}-{nanos}",
@@ -1369,7 +1434,7 @@ diff -ruN a/crates/live/src/live_accept.rs b/crates/live/src/live_accept.rs
          ));
          let _ = std::fs::remove_dir_all(&dir);
          std::fs::create_dir_all(&dir).unwrap();
-@@ -1840,7 +1840,7 @@
+@@ -1931,7 +1931,7 @@
      }
  
      fn project_with(tag: &str, element: Option<Value>) -> PathBuf {
@@ -1379,9 +1444,9 @@ diff -ruN a/crates/live/src/live_accept.rs b/crates/live/src/live_accept.rs
          std::fs::create_dir_all(dir.join("src")).unwrap();
          std::fs::create_dir_all(dir.join(".impeccable/live")).unwrap();
 diff -ruN a/crates/live/src/live_inject.rs b/crates/live/src/live_inject.rs
---- a/crates/live/src/live_inject.rs	2026-11-19 23:40:14.719163201 +0100
-+++ b/crates/live/src/live_inject.rs	2026-11-19 23:40:14.738583709 +0100
-@@ -235,7 +235,7 @@
+--- a/crates/live/src/live_inject.rs	2026-11-21 08:52:33.243528277 +0100
++++ b/crates/live/src/live_inject.rs	2026-11-21 08:52:33.250274752 +0100
+@@ -288,7 +288,7 @@
                  Some(r.name.as_str()),
                  Some(port),
                  &planned,
@@ -1390,7 +1455,7 @@ diff -ruN a/crates/live/src/live_inject.rs b/crates/live/src/live_inject.rs
              );
          }
          let mut out = Map::new();
-@@ -301,7 +301,7 @@
+@@ -354,7 +354,7 @@
          resolved.as_ref().map(|r| r.name.as_str()),
          Some(port),
          &artifacts,
@@ -1400,8 +1465,8 @@ diff -ruN a/crates/live/src/live_inject.rs b/crates/live/src/live_inject.rs
      let mut out = Map::new();
      out.insert("ok".into(), json!(any_inserted));
 diff -ruN a/crates/live/src/live_server.rs b/crates/live/src/live_server.rs
---- a/crates/live/src/live_server.rs	2026-11-19 23:40:14.769734664 +0100
-+++ b/crates/live/src/live_server.rs	2026-11-19 23:40:14.789468923 +0100
+--- a/crates/live/src/live_server.rs	2026-11-21 08:52:33.274357397 +0100
++++ b/crates/live/src/live_server.rs	2026-11-21 08:52:33.282311500 +0100
 @@ -35,7 +35,7 @@
  use crate::util::{exists, jsp, println, read_dir_names_raw, safe_read, Env};
  use impeccable_common::Io;
@@ -1441,8 +1506,8 @@ diff -ruN a/crates/live/src/live_server.rs b/crates/live/src/live_server.rs
                  }
                  active_connections.fetch_add(1, Ordering::SeqCst);
 diff -ruN a/crates/live/src/manual_edits/mod.rs b/crates/live/src/manual_edits/mod.rs
---- a/crates/live/src/manual_edits/mod.rs	2026-11-19 23:40:14.820809836 +0100
-+++ b/crates/live/src/manual_edits/mod.rs	2026-11-19 23:40:14.840932179 +0100
+--- a/crates/live/src/manual_edits/mod.rs	2026-11-21 08:52:33.307285897 +0100
++++ b/crates/live/src/manual_edits/mod.rs	2026-11-21 08:52:33.314264707 +0100
 @@ -39,12 +39,12 @@
  }
  
@@ -1461,8 +1526,8 @@ diff -ruN a/crates/live/src/manual_edits/mod.rs b/crates/live/src/manual_edits/m
      let status = cmd.status();
      matches!(status, Ok(s) if s.success())
 diff -ruN a/crates/live/src/project_ignores.rs b/crates/live/src/project_ignores.rs
---- a/crates/live/src/project_ignores.rs	2026-11-19 23:40:14.875834852 +0100
-+++ b/crates/live/src/project_ignores.rs	2026-11-19 23:40:14.897798200 +0100
+--- a/crates/live/src/project_ignores.rs	2026-11-21 08:52:33.338786727 +0100
++++ b/crates/live/src/project_ignores.rs	2026-11-21 08:52:33.345582703 +0100
 @@ -221,7 +221,7 @@
          fn new() -> Tmp {
              let base = std::env::temp_dir().join(format!(
@@ -1473,8 +1538,8 @@ diff -ruN a/crates/live/src/project_ignores.rs b/crates/live/src/project_ignores
              ));
              let _ = std::fs::remove_dir_all(&base);
 diff -ruN a/crates/live/src/random.rs b/crates/live/src/random.rs
---- a/crates/live/src/random.rs	2026-11-19 23:40:14.928392069 +0100
-+++ b/crates/live/src/random.rs	2026-11-19 23:40:14.948187995 +0100
+--- a/crates/live/src/random.rs	2026-11-21 08:52:33.369593389 +0100
++++ b/crates/live/src/random.rs	2026-11-21 08:52:33.376412948 +0100
 @@ -9,7 +9,7 @@
              .duration_since(std::time::UNIX_EPOCH)
              .map(|d| d.as_nanos())
@@ -1485,8 +1550,8 @@ diff -ruN a/crates/live/src/random.rs b/crates/live/src/random.rs
              x ^= x >> 33;
              x = x.wrapping_mul(0xff51afd7ed558ccd);
 diff -ruN a/crates/live/src/server.rs b/crates/live/src/server.rs
---- a/crates/live/src/server.rs	2026-11-19 23:40:14.982621874 +0100
-+++ b/crates/live/src/server.rs	2026-11-19 23:40:15.002174507 +0100
+--- a/crates/live/src/server.rs	2026-11-21 08:52:33.401214302 +0100
++++ b/crates/live/src/server.rs	2026-11-21 08:52:33.407849902 +0100
 @@ -63,19 +63,20 @@
  /// windows) with ignored stdio, then wait up to 10 s for a `server.json`
  /// written by a pid other than ours and return its record.
@@ -1515,8 +1580,8 @@ diff -ruN a/crates/live/src/server.rs b/crates/live/src/server.rs
      let mut result: Option<Value> = None;
      while Instant::now() < deadline {
 diff -ruN a/crates/live/src/server_state.rs b/crates/live/src/server_state.rs
---- a/crates/live/src/server_state.rs	2026-11-19 23:40:15.039668978 +0100
-+++ b/crates/live/src/server_state.rs	2026-11-19 23:40:15.060319989 +0100
+--- a/crates/live/src/server_state.rs	2026-11-21 08:52:33.433823718 +0100
++++ b/crates/live/src/server_state.rs	2026-11-21 08:52:33.442321990 +0100
 @@ -1549,15 +1549,15 @@
      let exe = std::env::current_exe()
          .map(|p| p.to_string_lossy().into_owned())
@@ -1538,8 +1603,8 @@ diff -ruN a/crates/live/src/server_state.rs b/crates/live/src/server_state.rs
      {
          Ok(c) => c,
 diff -ruN a/crates/live/src/source_lock.rs b/crates/live/src/source_lock.rs
---- a/crates/live/src/source_lock.rs	2026-11-19 23:40:15.099492006 +0100
-+++ b/crates/live/src/source_lock.rs	2026-11-19 23:40:15.119908642 +0100
+--- a/crates/live/src/source_lock.rs	2026-11-21 08:52:33.470384228 +0100
++++ b/crates/live/src/source_lock.rs	2026-11-21 08:52:33.475077698 +0100
 @@ -75,7 +75,7 @@
          .duration_since(std::time::UNIX_EPOCH)
          .map(|d| d.as_nanos())
@@ -1559,8 +1624,8 @@ diff -ruN a/crates/live/src/source_lock.rs b/crates/live/src/source_lock.rs
                      "file": jsp::resolve(cwd, &[file]),
                  });
 diff -ruN a/crates/live/src/source_search.rs b/crates/live/src/source_search.rs
---- a/crates/live/src/source_search.rs	2026-11-19 23:40:15.161600248 +0100
-+++ b/crates/live/src/source_search.rs	2026-11-19 23:40:15.187060147 +0100
+--- a/crates/live/src/source_search.rs	2026-11-21 08:52:33.491996283 +0100
++++ b/crates/live/src/source_search.rs	2026-11-21 08:52:33.496737045 +0100
 @@ -139,12 +139,12 @@
  }
  
@@ -1579,8 +1644,8 @@ diff -ruN a/crates/live/src/source_search.rs b/crates/live/src/source_search.rs
      let status = cmd.status();
      matches!(status, Ok(s) if s.success())
 diff -ruN a/crates/live/src/svelte_bridge.rs b/crates/live/src/svelte_bridge.rs
---- a/crates/live/src/svelte_bridge.rs	2026-11-19 23:40:15.219258646 +0100
-+++ b/crates/live/src/svelte_bridge.rs	2026-11-19 23:40:15.239064196 +0100
+--- a/crates/live/src/svelte_bridge.rs	2026-11-21 08:52:33.512560627 +0100
++++ b/crates/live/src/svelte_bridge.rs	2026-11-21 08:52:33.516612887 +0100
 @@ -14,11 +14,19 @@
  use serde_json::{json, Value};
  use std::collections::HashMap;
@@ -1631,8 +1696,8 @@ diff -ruN a/crates/live/src/svelte_bridge.rs b/crates/live/src/svelte_bridge.rs
                  column: None,
              })?;
 diff -ruN a/crates/skills/Cargo.toml b/crates/skills/Cargo.toml
---- a/crates/skills/Cargo.toml	2026-11-19 23:40:15.276510292 +0100
-+++ b/crates/skills/Cargo.toml	2026-11-19 23:40:15.296176800 +0100
+--- a/crates/skills/Cargo.toml	2026-11-21 08:52:33.536969855 +0100
++++ b/crates/skills/Cargo.toml	2026-11-21 08:52:33.541350450 +0100
 @@ -14,8 +14,18 @@
  regex = { workspace = true }
  once_cell = { workspace = true }
@@ -1655,8 +1720,8 @@ diff -ruN a/crates/skills/Cargo.toml b/crates/skills/Cargo.toml
 +ureq = { version = "2", default-features = false, features = ["tls", "json"] }
  libc = "0.2"
 diff -ruN a/crates/skills/src/bundle.rs b/crates/skills/src/bundle.rs
---- a/crates/skills/src/bundle.rs	2026-11-19 23:40:15.329638886 +0100
-+++ b/crates/skills/src/bundle.rs	2026-11-19 23:40:15.349378770 +0100
+--- a/crates/skills/src/bundle.rs	2026-11-21 08:52:33.566148388 +0100
++++ b/crates/skills/src/bundle.rs	2026-11-21 08:52:33.570980525 +0100
 @@ -1132,7 +1132,7 @@
          static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
          let dir = std::env::temp_dir().join(format!(
@@ -1667,8 +1732,8 @@ diff -ruN a/crates/skills/src/bundle.rs b/crates/skills/src/bundle.rs
          ));
          std::fs::create_dir_all(&dir).unwrap();
 diff -ruN a/crates/skills/src/bundle_signature.rs b/crates/skills/src/bundle_signature.rs
---- a/crates/skills/src/bundle_signature.rs	2026-11-19 23:40:15.391489961 +0100
-+++ b/crates/skills/src/bundle_signature.rs	2026-11-19 23:40:15.411632179 +0100
+--- a/crates/skills/src/bundle_signature.rs	2026-11-21 08:52:33.593499416 +0100
++++ b/crates/skills/src/bundle_signature.rs	2026-11-21 08:52:33.600591517 +0100
 @@ -2,7 +2,6 @@
  //! public keys compiled into this binary, never anything in a download.
  use once_cell::sync::Lazy;
@@ -1712,8 +1777,8 @@ diff -ruN a/crates/skills/src/bundle_signature.rs b/crates/skills/src/bundle_sig
  mod tests {
      use super::*;
 diff -ruN a/crates/skills/src/commands.rs b/crates/skills/src/commands.rs
---- a/crates/skills/src/commands.rs	2026-11-19 23:40:15.450485612 +0100
-+++ b/crates/skills/src/commands.rs	2026-11-19 23:40:15.471265165 +0100
+--- a/crates/skills/src/commands.rs	2026-11-21 08:52:33.633823102 +0100
++++ b/crates/skills/src/commands.rs	2026-11-21 08:52:33.638418863 +0100
 @@ -305,14 +305,26 @@
          if answer.is_empty() && !defaults.is_empty() {
              return Ok(unique_providers(defaults));
@@ -1753,8 +1818,8 @@ diff -ruN a/crates/skills/src/commands.rs b/crates/skills/src/commands.rs
      }
  }
 diff -ruN a/crates/skills/src/prompt.rs b/crates/skills/src/prompt.rs
---- a/crates/skills/src/prompt.rs	2026-11-19 23:40:15.509455763 +0100
-+++ b/crates/skills/src/prompt.rs	2026-11-19 23:40:15.532177321 +0100
+--- a/crates/skills/src/prompt.rs	2026-11-21 08:52:33.655945283 +0100
++++ b/crates/skills/src/prompt.rs	2026-11-21 08:52:33.660876004 +0100
 @@ -27,7 +27,13 @@
          let style = stdout_tty
              && io.env("NO_COLOR").is_none()
@@ -1771,8 +1836,8 @@ diff -ruN a/crates/skills/src/prompt.rs b/crates/skills/src/prompt.rs
  
      /// JS: isInteractivePrompt()
 diff -ruN a/crates/skills/src/util.rs b/crates/skills/src/util.rs
---- a/crates/skills/src/util.rs	2026-11-19 23:40:15.565568281 +0100
-+++ b/crates/skills/src/util.rs	2026-11-19 23:40:15.586548001 +0100
+--- a/crates/skills/src/util.rs	2026-11-21 08:52:33.677932505 +0100
++++ b/crates/skills/src/util.rs	2026-11-21 08:52:33.682818226 +0100
 @@ -245,6 +245,11 @@
      {
          std::os::windows::fs::symlink_dir(target, path).map_err(|e| node_error("symlink", path, &e))

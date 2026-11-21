@@ -31,6 +31,6 @@ export default async function ({ run, write, assert }) {
 
   const usage = await imp(['loop']);
   assert.equal(usage.status, 1, show('loop', usage));
-  assert.match(usage.stderr, /^ +impeccable loop connect$/m, show('loop', usage));
+  assert.match(usage.stderr, /^ +impeccable loop connect( \[--agent claude\|codex\] \[--json\])?$/m, show('loop', usage));
   assert.match(usage.stderr, /^ +impeccable loop disconnect$/m, show('loop', usage));
 }
