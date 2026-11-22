@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -51,11 +51,39 @@ test('homescoop_notice_rust keys the wasi-sdk tag on the Rust version and checks
   assert.ok(versions.length > 0, 'no Rust versions in the table');
   for (const [, rust, entry] of versions) {
     assert.match(entry, /^\s+wasisdk=wasi-sdk-\d+$/m, `Rust ${rust} has no wasisdk= in homescoop_notice_rust's table`);
+    assert.match(entry, /^\s+musl=[0-9a-f]{64}$/m, `Rust ${rust} has no musl= (its wasi-sdk's musl COPYRIGHT sha256) in homescoop_notice_rust's table`);
+  }
+  const muslOf = new Map();
+  for (const [, rust, entry] of versions) {
+    const sdk = /^\s+wasisdk=(wasi-sdk-\d+)$/m.exec(entry)[1];
+    const musl = /^\s+musl=([0-9a-f]{64})$/m.exec(entry)[1];
+    if (!muslOf.has(sdk)) muslOf.set(sdk, musl);
+    assert.equal(musl, muslOf.get(sdk), `Rust ${rust}: ${sdk}'s musl COPYRIGHT sha256 differs from another row's`);
   }
   assert.match(body, /check-rust-wasi-sdk\.mjs" "\$rust" "\$wasisdk"/);
   assert.doesNotMatch(body.slice(body.indexOf('esac')), /wasi-sdk-\d+/, 'a literal wasi-sdk-N after the table');
   assert.match(body, /wasi-libc\/\$wasisdk\n/);
   assert.match(body, /"wasi-libc \(\$wasisdk; Rust's self-contained \$target libc\)"/);
+  assert.match(body, /"\$wl\/libc-top-half\/musl\/COPYRIGHT" "\$musl"/, 'the musl COPYRIGHT sha256 comes from the row');
+});
+
+test('homescoop_notice_rust has a row for every recipe toolchain.rust it is called with', () => {
+  const sh = readFileSync(join(scripts, 'build-common.sh'), 'utf8');
+  const body = sh.slice(sh.indexOf('homescoop_notice_rust() {'), sh.indexOf('\n}\n', sh.indexOf('homescoop_notice_rust() {')));
+  const table = body.slice(body.indexOf('case "$rust" in'), body.indexOf('esac'));
+  const rows = new Set([...table.matchAll(/^\s+(\d+\.\d+\.\d+)\)$/gm)].map((m) => m[1]));
+  const callers = [];
+  for (const name of readdirSync(join(root, 'packages')).sort()) {
+    const build = join(root, 'packages', name, 'build.sh');
+    const recipe = join(root, 'packages', name, 'recipe.yaml');
+    if (!existsSync(build) || !existsSync(recipe)) continue;
+    if (!readFileSync(build, 'utf8').split('\n').some((l) => !/^\s*#/.test(l) && /\bhomescoop_notice_rust\b/.test(l))) continue;
+    const rust = /^toolchain:\n(?:[ \t]+.*\n)*?[ \t]+rust: "(\d+\.\d+\.\d+)"$/m.exec(readFileSync(recipe, 'utf8'));
+    if (!rust) continue;
+    callers.push(name);
+    assert.ok(rows.has(rust[1]), `packages/${name}: recipe.yaml's toolchain.rust ${rust[1]} has no row in homescoop_notice_rust's table`);
+  }
+  assert.ok(callers.includes('wasi-biome'), `no recipe pins a Rust that homescoop_notice_rust gets: ${callers.join(', ')}`);
 });
 
 function wasmOpt(fake) {
