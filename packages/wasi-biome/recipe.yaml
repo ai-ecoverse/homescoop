@@ -10,7 +10,7 @@ npm: "@ai-ecoverse/wasi-biome"
 summary: "Biome 2.6 for slicc WASI preview1 (command biome)"
 source:
   url: "https://github.com/biomejs/biome/archive/refs/tags/@biomejs/biome@{{version}}.tar.gz"
-  sha256: "4a17edfe38a4437040d1f12ebd41a78bebec056522351c446c451b856b7e9cf4"
+  sha256: "14e8a90df2b74e24bcee56065fc076c672deacc26b31767983f3df0860abcc1e"
 toolchain:
   rust: "1.99.1"
 inputs:
