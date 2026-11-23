@@ -6,12 +6,12 @@ builder: host
 runner: pool
 reproducible: true
 # renovate: datasource=github-releases depName=Mbed-TLS/mbedtls extractVersion=^mbedtls-(?<version>.*)$
-version: "4.2.0"
+version: "4.3.0"
 npm: "@ai-ecoverse/wasm-tls-engine"
-summary: "Mbed TLS 4.2.0 TLS engine (ES module + wasm): server sessions for SLICC's realm proxy, verifying client sessions for the kernel"
+summary: "Mbed TLS 4.3.0 TLS engine (ES module + wasm): server sessions for SLICC's realm proxy, verifying client sessions for the kernel"
 source:
   url: "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-{{version}}/mbedtls-{{version}}.tar.bz2"
-  sha256: "2bed9d713b4668f76553b097e72b8aa30bc8f112a940d7ae228d524bbde6ffea"
+  sha256: "1c87cba094cb40f097ebe0eba440a74939b71dab4e1d0d566bc90749ff381d18"
 sources:
   # Mozilla's root store as curl publishes it (dist/roots.der). A bump needs
   # the new sha256; the build fails closed until it is updated.
