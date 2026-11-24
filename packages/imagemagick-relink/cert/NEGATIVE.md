@@ -108,3 +108,7 @@ The kits ship 9.7's objects: constitute.o carries write-temp-then-rename.patch's
 The recipe pin moves to wasm-openjpeg@2.5.4-1 and the package is rebuilt, so the static link includes the opj_jp2_read_header error check from OpenJPEG 2.5.4.
 
 Checked locally by running the new relink-check.mjs against the published 7.1.2-34-9.7 tarball: it fails with `imagemagick: libopenjp2.a differs from wasm-openjpeg@2.5.4-1`, before invoking the linker.
+
+## 7.1.2-36-1: the kits follow wasm-imagemagick(-heif) 7.1.2-36-1 (homescoop#2218, #2217; 2026-11-24)
+
+The kits ship 7.1.2-36-1's objects. constitute.o carries read-own-errors.patch, which judges each read by its own errors so that identify goes on after a non-image, and policy.o carries path-policy-keep-errno.patch, so a refused open reports its own errno. relink-check.mjs checks that each kit's kit.json names this version's `bin/magick.wasm`, so a 7.1.2-35-1 kit can't pass for 7.1.2-36-1. The behaviour negatives are wasm-imagemagick's (see its NEGATIVE.md): on the head before the fix, identify over `*` listed nothing after `.keep`, a refused write reported `Invalid argument`, and `-list policy` under the open policy printed nothing.

@@ -274,3 +274,47 @@ Checked locally against the previous registry tarball: running its unmodified Em
 ## 7.1.2-35-1: upstream ImageMagick 7.1.2-35
 
 Against the published `@ai-ecoverse/wasm-imagemagick` 7.1.2-34-9.8 (npm `latest`), `checklist.mjs` now reads `recipe.yaml`'s version and requires that exact string in `magick -version`. The published package still reports `Version: ImageMagick 7.1.2-34`, so the assertion fails. Upstream 7.1.2-35 also absorbs homescoop#624 (format-prefixed backup writes in mogrify), so `mogrify-format-over-existing.patch` is dropped; the OpenJPEG 2.5.4 pin from #1959 stays.
+
+## 7.1.2-36-1: upstream ImageMagick 7.1.2-36 (homescoop#2218, #2217; 2026-11-24)
+
+The negative is the head before the fix: Renovate's bump with the refreshed sha256 and version (f08dfeb4, ladder-build run 45267771646, kernel 1.110.1, users enforce). The published 7.1.2-35-1 passes the new rows, because each one checks behaviour that upstream 7.1.2-36 broke.
+
+- **#2218, `read-errors.mjs`, and the file lists in `atomic-write.mjs` and `mogrify.mjs`.** Those two specs list the directory with `magick identify -format '%f\n' '*'`, and the directory holds `.keep`. On the head the listing stopped at `.keep`:
+
+  ```text
+  browser-cert: FAIL packages/imagemagick/cert/atomic-write.mjs
+  AssertionError [ERR_ASSERTION]: no temporary file is left beside the target
+  + []
+  - [
+  -   'orig.png'
+  - ]
+  browser-cert: FAIL packages/imagemagick/cert/mogrify.mjs
+  AssertionError [ERR_ASSERTION]: no stray files:
+    [
+  +   ''
+  -   'a.png',
+  -   'b.jpg'
+    ]
+  ```
+
+  No temporary file was left behind; the list was empty. Upstream 7.1.2-36 moved the "Coder generated an image despite an error" check in ReadImageInternal (MagickCore/constitute.c) from a log line to `return(DestroyImageList(image))`. It tests `exception->severity`, and identify (like montage, composite and compare) uses one exception for all of its inputs. Once `.keep` failed, every later image was decoded and then destroyed. That includes the scenes of `f%d.png[0-2]`, which ReadImages reads in a loop with one exception. The new `read-errors.mjs` rows are the same listing (`magick identify` and `identify` over `*`, which fail like the specs above), named files after a missing file and a non-image, and the scene range with `f1.png` missing. `read-own-errors.patch` renames upstream's function to ReadOneImage and calls it through a wrapper. When the caller's exception already holds an error, the read gets an exception of its own, which is then merged back with InheritException. Each read is judged by its own errors (upstream's check stays as it is for that read), and no earlier input's error drops it. Upstream didn't change where temporary files go: write-temp-then-rename.patch still writes `<target>.xxxxxxxx~` beside the target and renames it, and the 7.1.2-36 changes to AcquireUniqueFilename and GetPathTemplate don't touch that path. So the "no temporary file" and "no stray files" rows are kept unchanged and pass again with the listing fixed.
+
+- **#2217, the errno, `read-errors.mjs` (and heif's `atomic-write-users.mjs`).** As a non-root user, a write over a 0444 file on the head reported:
+
+  ```text
+  magick: unable to open image 'ro.png': Invalid argument @ error/blob.c/OpenBlob/3727.
+  ```
+
+  7.1.2-35-1 reports `Permission denied`. OpenBlob calls IsPathAuthorized after the failed open and before ThrowFileException formats errno. In 7.1.2-36, IsRightsAuthorizedByName resolves the path's directory and the path with realpath on every path check (7.1.2-35 did so only when a path policy existed, and neither of our policies has one). In this build those calls leave EINVAL in errno, which replaces the open's EACCES (the head's message). `path-policy-keep-errno.patch` saves errno before those calls and restores it after them. The new rows check a refused write (dana's own 0444 `ro.png`) and a refused read (root's 0600 `sec.png`), each by a relative name. The write is the head's observed failure. The read goes through the same OpenBlob tail.
+
+- **#2217, the policy list, `policy.mjs`.** On the head, `MAGICK_CONFIGURE_PATH=.../etc/ImageMagick-7-open magick -list policy` printed nothing:
+
+  ```text
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Path: \S*\/etc\/ImageMagick-7-open\/policy\.xml/. Input:
+
+  ''
+  ```
+
+  In 7.1.2-36, GetPolicyInfoList skips policies without a name. 7.1.2-35 matched `*` against a NULL name. Upstream's policy-open.xml holds only the nameless `<policy domain="Undefined" rights="none"/>`, and policy-tab.xml's coder rule for `{MPC,CACHE}` had no name either, so the head's tab listing dropped that rule as well. build.sh now names the open entry `open` (and fails if upstream's line is gone), and policy-tab.xml names the rule `mpc`. Neither name changes enforcement: coder and path checks match on domain and pattern, and nothing looks these names up. The new rows require the MPC rule in the tab listing and the open policy's path and entry from `magick-open -list policy`.
+
+Checked locally: both patches apply in order to the 7.1.2-36 tarball (sha256 5ba807e3…, the recipe's), and constitute.c and policy.c compile cleanly with `-Wall -Wextra` in a native configure. No local package build was made (the disk was under the floor). CI builds and certifies the three packages.

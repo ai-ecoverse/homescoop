@@ -6,12 +6,12 @@ inputs:
   - packages/imagemagick/**
   - packages/imagemagick-heif/**
 # renovate: datasource=github-releases depName=ImageMagick/ImageMagick versioning=loose
-version: "7.1.2-35"
+version: "7.1.2-36"
 npm: "@ai-ecoverse/wasm-imagemagick-relink"
 summary: "Relink kits (objects, static libraries, relink.sh) for wasm-imagemagick and wasm-imagemagick-heif"
 source:
   url: "https://github.com/ImageMagick/ImageMagick/archive/refs/tags/{{version}}.tar.gz"
-  sha256: "40b6fefa88fe16ca5a4b3d3db5133eaebfb0157f21f98530bde8aec5dd5b0776"
+  sha256: "5ba807e38a6bcb7c3c96a166485e270c5017aaa6b166f0440dc4b2badf6e6167"
 dependencies:
   build:
     - "@ai-ecoverse/wasm-zlib@1.3.1-4"
@@ -50,3 +50,6 @@ about:
     job downloads host-imagemagick-prN and host-imagemagick-heif-prN) or
     else from the registry; no such runtime, another sha256, or a runtime
     that doesn't name this package (homescoop.relink, notices) fails.
+    7.1.2-36-1: the kits' constitute.o and policy.o carry
+    read-own-errors.patch and path-policy-keep-errno.patch
+    (homescoop#2218, #2217).

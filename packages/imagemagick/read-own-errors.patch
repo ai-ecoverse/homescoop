@@ -1,0 +1,37 @@
+--- a/MagickCore/constitute.c
++++ b/MagickCore/constitute.c
+@@ -605,7 +605,7 @@
+     }
+ }
+ 
+-static Image *ReadImageInternal(const ImageInfo *image_info,
++static Image *ReadOneImage(const ImageInfo *image_info,
+   const MagickBooleanType postprocess,ExceptionInfo *exception)
+ {
+   char
+@@ -995,6 +995,25 @@
+   return(GetFirstImageInList(image));
+ }
+ 
++static Image *ReadImageInternal(const ImageInfo *image_info,
++  const MagickBooleanType postprocess,ExceptionInfo *exception)
++{
++  ExceptionInfo
++    *read_exception;
++
++  Image
++    *image;
++
++  assert(exception != (ExceptionInfo *) NULL);
++  if (exception->severity < ErrorException)
++    return(ReadOneImage(image_info,postprocess,exception));
++  read_exception=AcquireExceptionInfo();
++  image=ReadOneImage(image_info,postprocess,read_exception);
++  InheritException(exception,read_exception);
++  read_exception=DestroyExceptionInfo(read_exception);
++  return(image);
++}
++
+ MagickExport Image *ReadImage(const ImageInfo *image_info,
+   ExceptionInfo *exception)
+ {

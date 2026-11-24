@@ -1,0 +1,21 @@
+--- a/MagickCore/policy.c
++++ b/MagickCore/policy.c
+@@ -921,6 +921,10 @@
+   */
+   if (domain == PathPolicyDomain)
+     {
++      int
++        saved_errno;
++
++      saved_errno=errno;
+       paths_provisioned=MagickTrue;
+       GetPathComponent(pattern,HeadPath,directory);
+       GetPathComponent(pattern,TailPath,filename);
+@@ -938,6 +942,7 @@
+               canonical_directory,DirectorySeparator,filename);
+         }
+       canonical_path=realpath_utf8(pattern);
++      errno=saved_errno;
+     }
+   /*
+     Evaluate policies in order; the last matching policy wins.  A path is
