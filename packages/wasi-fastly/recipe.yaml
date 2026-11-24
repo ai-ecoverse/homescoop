@@ -5,7 +5,7 @@ name: wasi-fastly
 builder: host
 reproducible: true
 # renovate: datasource=github-releases depName=fastly/cli extractVersion=^v(?<version>.*)$
-version: "17.1.0"
+version: "17.2.0"
 npm: "@ai-ecoverse/wasi-fastly"
 summary: "Fastly CLI 17.1.0 for slicc WASI preview1 (command fastly)"
 source:
