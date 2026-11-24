@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasi-impeccable`
 
-[Impeccable](https://impeccable.style) engine **0.1.24** for
+[Impeccable](https://impeccable.style) engine **0.1.25** for
 [slicc](https://github.com/ai-ecoverse/slicc)'s WASI preview1 realm
 (`abi: "wasi"`: a module only, no Emscripten glue).
 
@@ -12,7 +12,7 @@ impeccable install --providers=claude -y   # downloads and verifies the signed s
 impeccable check
 impeccable generate-image --prompt "…" --out comps/hero.png   # needs OPENAI_API_KEY
 impeccable concept-seed --scope surface
-impeccable --version   # prints the engine version (e.g. 0.1.24)
+impeccable --version   # prints the engine version (e.g. 0.1.25)
 ```
 
 **Also wired:** `palette`, `doctor`, `ignores`, `pin`, `detect-csp`,
@@ -61,7 +61,7 @@ running app's DevTools port), `serve-question` and the capture verbs refuse
 with `not available in this build yet` instead of `Unknown command`, and so
 do the account verbs: `login`, `logout`, `whoami`, `health` since 0.1.22,
 `setup`, `critiques` since 0.1.23, and `world`, `taste-refresh` since
-0.1.24. `walkthrough` (since 0.1.24) needs the system's ffmpeg and refuses
+0.1.25. `walkthrough` (since 0.1.24) needs the system's ffmpeg and refuses
 the same way. Without sign-in, `detect` never
 uploads a design health scan and never hands a scan to Impeccable Pro,
 `critique-storage` saves a critique locally and never uploads it, and no

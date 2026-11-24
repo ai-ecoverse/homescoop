@@ -17,10 +17,10 @@ version: "0.1.25"
 npm: "@ai-ecoverse/wasi-impeccable"
 toolchain:
   rust: "1.98.1"
-summary: "impeccable engine 0.1.24 for slicc WASI preview1 (command impeccable; file-local, HTTP and live verbs)"
+summary: "impeccable engine 0.1.25 for slicc WASI preview1 (command impeccable; file-local, HTTP and live verbs)"
 source:
   url: "https://github.com/pbakaus/impeccable/archive/refs/tags/engine-v{{version}}.tar.gz"
-  sha256: "85028aee3ddbecf0de4002fea7c915a725fb66bbc7f7fba9a8036e64ef2acd3a"
+  sha256: "807cb4a6392297a9c0f56bb9d11373e03f280b0c36676555376b9d7c278471f9"
 # homescoop#1287: the initial heap from the measured peak, with headroom.
 wasm:
   initial-memory: 64MiB
