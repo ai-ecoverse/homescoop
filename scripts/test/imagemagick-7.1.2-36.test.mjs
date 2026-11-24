@@ -44,6 +44,17 @@ test('path-policy-keep-errno.patch restores errno around the realpath calls (hom
   assert.doesNotMatch(added(p), /\/\*|\/\//);
 });
 
+test('write-temp-then-rename.patch keeps or drops the temporary file on the write\'s own errors (homescoop#2219)', () => {
+  const p = read(im, 'write-temp-then-rename.patch');
+  assert.match(p, /^\+  ExceptionInfo\n\+    \*write_exception;\n\+\n\+  ExceptionType\n\+    write_severity;$/m);
+  assert.match(p, /^\+  write_exception=exception;\n\+  if \(\(\*atomic_tmp != '\\0'\) && \(exception->severity >= ErrorException\)\)\n\+    write_exception=AcquireExceptionInfo\(\);$/m);
+  assert.match(p, /^-    status&=\(MagickStatusType\) WriteImage\(write_info,p,exception\);\n\+    status&=\(MagickStatusType\) WriteImage\(write_info,p,write_exception\);$/m);
+  assert.match(p, /^ {3}write_info=DestroyImageInfo\(write_info\);\n\+  write_severity=write_exception->severity;\n\+  if \(write_exception != exception\)\n\+ {4}\{\n\+ {6}InheritException\(exception,write_exception\);\n\+ {6}write_exception=DestroyExceptionInfo\(write_exception\);\n\+ {4}\}$/m);
+  assert.match(p, /^\+      if \(\(status != 0\) && \(write_severity < ErrorException\)\)$/m);
+  assert.doesNotMatch(p, /exception->severity < ErrorException/);
+  assert.doesNotMatch(added(p).split('\n').filter((l) => /write_(exception|severity)/.test(l)).join('\n'), /\/\*|\/\//);
+});
+
 test('both policies have a named entry for -list policy (homescoop#2217)', () => {
   assert.match(read(im, 'policy-tab.xml'), /<policy domain="coder" name="mpc" rights="none" pattern="\{MPC,CACHE\}"\/>/);
   assert.doesNotMatch(read(im, 'policy-tab.xml'), /<policy (?![^>]*name=)[^>]*\/>/);

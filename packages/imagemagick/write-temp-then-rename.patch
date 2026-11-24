@@ -8,7 +8,7 @@
  #include "MagickCore/string_.h"
  #include "MagickCore/string-private.h"
  #include "MagickCore/timer.h"
-@@ -1561,6 +1562,258 @@
+@@ -1564,6 +1565,258 @@
  %    o exception: return any errors or warnings in this structure.
  %
  */
@@ -267,7 +267,7 @@
  MagickExport MagickBooleanType WriteImages(const ImageInfo *image_info,
    Image *images,const char *filename,ExceptionInfo *exception)
  {
-@@ -1590,12 +1843,31 @@
+@@ -1593,12 +1846,37 @@
    Image
      *p;
  
@@ -286,6 +286,12 @@
 +  int
 +    atomic_mode;
 +
++  ExceptionInfo
++    *write_exception;
++
++  ExceptionType
++    write_severity;
++
    assert(image_info != (const ImageInfo *) NULL);
    assert(image_info->signature == MagickCoreSignature);
    assert(images != (Image *) NULL);
@@ -299,7 +305,7 @@
    assert(exception != (ExceptionInfo *) NULL);
    write_info=CloneImageInfo(image_info);
    *write_info->magick='\0';
-@@ -1613,6 +1885,155 @@
+@@ -1616,6 +1894,155 @@
    sans_exception=DestroyExceptionInfo(sans_exception);
    if (*write_info->magick == '\0')
      (void) CopyMagickString(write_info->magick,images->magick,MagickPathExtent);
@@ -455,15 +461,38 @@
    p=images;
    for ( ; GetNextImageInList(p) != (Image *) NULL; p=GetNextImageInList(p))
    {
-@@ -1661,5 +2082,28 @@
+@@ -1640,12 +2067,15 @@
+   progress_monitor=(MagickProgressMonitor) NULL;
+   progress=0;
+   number_images=GetImageListLength(images);
++  write_exception=exception;
++  if ((*atomic_tmp != '\0') && (exception->severity >= ErrorException))
++    write_exception=AcquireExceptionInfo();
+   for (p=images; p != (Image *) NULL; p=GetNextImageInList(p))
+   {
+     if (number_images != 1)
+       progress_monitor=SetImageProgressMonitor(p,(MagickProgressMonitor) NULL,
+         p->client_data);
+-    status&=(MagickStatusType) WriteImage(write_info,p,exception);
++    status&=(MagickStatusType) WriteImage(write_info,p,write_exception);
+     if (write_info->blob != (void *) NULL)
+       SyncBlobStream(write_info,p,images);
+     if (number_images != 1)
+@@ -1664,5 +2094,34 @@
        }
    }
    write_info=DestroyImageInfo(write_info);
++  write_severity=write_exception->severity;
++  if (write_exception != exception)
++    {
++      InheritException(exception,write_exception);
++      write_exception=DestroyExceptionInfo(write_exception);
++    }
 +  if (*atomic_tmp != '\0')
 +    {
 +      for (p=images; p != (Image *) NULL; p=GetNextImageInList(p))
 +        (void) CopyMagickString(p->filename,atomic_name,MagickPathExtent);
-+      if ((status != 0) && (exception->severity < ErrorException))
++      if ((status != 0) && (write_severity < ErrorException))
 +        {
 +          if ((atomic_existed != MagickFalse) ?
 +              (HomescoopReplaceFile(atomic_tmp,atomic_path,&atomic_status,

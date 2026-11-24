@@ -55,6 +55,13 @@ exits 1 (homescoop#2218; upstream 7.1.2-36 drops every image after the
 first failure, and this package patches that). A refused open reports the
 real reason, such as `Permission denied` (homescoop#2217).
 
+`magick montage`, `magick composite` and `magick compare` write their output
+when one of their inputs is missing or isn't an image, report that input and
+exit 1 (`compare` 2) (homescoop#2219; until 7.1.2-36-1 the finished output was
+discarded, because the failed read's error was still pending when the write
+decided whether to keep its temporary file). A write that fails by itself
+still leaves the target as it was and no temporary file behind.
+
 ```bash
 pnpm add -g @ai-ecoverse/wasm-imagemagick
 magick -version

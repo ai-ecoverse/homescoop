@@ -53,3 +53,5 @@ about:
     7.1.2-36-1: the kits' constitute.o and policy.o carry
     read-own-errors.patch and path-policy-keep-errno.patch
     (homescoop#2218, #2217).
+    7.1.2-36-2: the kits' constitute.o carries write-temp-then-rename.patch
+    with the rename judged on the write's own errors (homescoop#2219).

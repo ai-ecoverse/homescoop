@@ -318,3 +318,30 @@ The negative is the head before the fix: Renovate's bump with the refreshed sha2
   In 7.1.2-36, GetPolicyInfoList skips policies without a name. 7.1.2-35 matched `*` against a NULL name. Upstream's policy-open.xml holds only the nameless `<policy domain="Undefined" rights="none"/>`, and policy-tab.xml's coder rule for `{MPC,CACHE}` had no name either, so the head's tab listing dropped that rule as well. build.sh now names the open entry `open` (and fails if upstream's line is gone), and policy-tab.xml names the rule `mpc`. Neither name changes enforcement: coder and path checks match on domain and pattern, and nothing looks these names up. The new rows require the MPC rule in the tab listing and the open policy's path and entry from `magick-open -list policy`.
 
 Checked locally: both patches apply in order to the 7.1.2-36 tarball (sha256 5ba807e3…, the recipe's), and constitute.c and policy.c compile cleanly with `-Wall -Wextra` in a native configure. No local package build was made (the disk was under the floor). CI builds and certifies the three packages.
+
+## 7.1.2-36-2: montage, composite and compare keep their output after a failed input (homescoop#2219; 2026-11-24)
+
+The negative is this PR's first head, 53550132: the new `multi-input-write.mjs` and the 7.1.2-36-2 version bump, with 7.1.2-36-1's write-temp-then-rename.patch (ladder-build run 45308971608, kernel 1.110.1, users enforce). Its build is the published 7.1.2-36-1's: the run's reviewer found the head's and npm's 7.1.2-36-1 binaries, archives and file modes identical, and reproduced the failure on npm's 7.1.2-36-1.
+
+- **#2219, `multi-input-write.mjs`.** `magick montage -geometry +0+0 -tile 2x1 a.png missing.png b.png m.png`, the same with `.keep` first (`mk.png`), `magick composite -geometry +5+0 a.png missing.png b.png o.png` and `magick compare -metric AE a.png missing.png a2.png d.png` wrote nothing, and `identify` over those outputs then had nothing to list:
+
+  ```text
+  browser-cert: FAIL packages/imagemagick/cert/multi-input-write.mjs
+  AssertionError [ERR_ASSERTION]: montage, composite and compare write their output after one failed input (homescoop#2219: the failed read left its error pending, and the write was then discarded)
+  + actual - expected
+
+    {
+  +   'd.png': '',
+  +   'm.png': '',
+  +   'mk.png': '',
+  +   'o.png': ''
+  -   'd.png': 'PNG 10 10',
+  -   'm.png': 'PNG 20 10 srgb(255,0,0) srgb(0,0,255)',
+  -   'mk.png': 'PNG 20 10 srgb(255,0,0) srgb(0,0,255)',
+  -   'o.png': 'PNG 10 10 srgb(0,0,255) srgb(255,0,0)'
+    }
+  ```
+
+  The rows before it passed on the head: the control montage (no failed input) writes `ok.png`, and each of the four commands exits as expected (1, and 2 for compare) and names `missing.png` or `.keep`, so only the outputs were missing. In write-temp-then-rename.patch, WriteImages renamed the finished temporary file over the target only when `exception->severity` held no error. montage, composite and compare read every input into that one exception before they write, so the failed read's FileOpenError (or the `.keep` decode error) was still there, and the correct output was removed with the temporary file. The patch now gives a write that starts with an error already pending an exception of its own (the same shape as read-own-errors.patch for reads), keeps or drops the temporary file on that write's severity, and merges its messages into the caller's exception afterwards; a write with nothing pending runs as before. The spec's last rows check that a write that fails by itself is still undone after a failed input: a montage to an 18000x10 `pano.webp` and to a new `new.webp`, and a composite onto a 17000x10 base, each fail with `width or height exceeds limit`, `pano.webp` stays byte-identical, `new.webp` isn't created and `ls -A` shows no temporary file. The existing temporary-file and failed-write rows (atomic-write.mjs, mogrify.mjs and mogrify-users.mjs) are unchanged.
+
+Checked locally: the regenerated write-temp-then-rename.patch (`diff -u` against the 7.1.2-36 tarball, sha256 5ba807e3…, the recipe's) applies after the other patches in their order, with offsets and no fuzz, and constitute.c compiles cleanly with `-Wall -Wextra` in a native configure. A native build of that tree without delegates, with PPM files, shows the same difference as the cert: with 7.1.2-36-1's patch montage, composite and compare after `missing.ppm` write nothing; with the new one they write all three. No local package build was made (the disk was under the floor). CI builds and certifies the three packages.

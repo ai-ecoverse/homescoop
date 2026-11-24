@@ -16,7 +16,8 @@
     "7.1.2-34-9.6 (homescoop#1608): the kits' objects carry write-temp-then-rename.patch's HomescoopReplaceKind and HomescoopFallbackTemp (constitute.o) and their use in mogrify-inplace-keep-mode-owner.patch (mogrify.o); relink-check.mjs relinks both kits as before",
     "7.1.2-34-9.7 (homescoop#1655, #1656): the kits' objects carry write-temp-then-rename.patch's HomescoopFallbackTemp that tries each temporary directory (constitute.o) and mogrify-per-file-status.patch (mogrify.o); relink-check.mjs relinks both kits as before",
     "OpenJPEG 2.5.4 (homescoop#1957): both kits carry the exact libopenjp2.a from wasm-openjpeg@2.5.4-1",
-    "7.1.2-36-1 (homescoop#2218, #2217): the kits' objects carry read-own-errors.patch (constitute.o) and path-policy-keep-errno.patch (policy.o); relink-check.mjs relinks both kits as before"
+    "7.1.2-36-1 (homescoop#2218, #2217): the kits' objects carry read-own-errors.patch (constitute.o) and path-policy-keep-errno.patch (policy.o); relink-check.mjs relinks both kits as before",
+    "7.1.2-36-2 (homescoop#2219): the kits' constitute.o carries write-temp-then-rename.patch, which keeps or drops the temporary file on the write's own errors; relink-check.mjs relinks both kits as before"
   ],
   "ci": [
     "node packages/imagemagick-relink/cert/relink-check.mjs"
