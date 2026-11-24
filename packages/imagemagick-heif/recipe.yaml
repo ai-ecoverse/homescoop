@@ -93,3 +93,7 @@ about:
     7.1.2-36-1: same upstream and patches as wasm-imagemagick
     (read-own-errors.patch, homescoop#2218; path-policy-keep-errno.patch
     and the named policy entries, homescoop#2217).
+    7.1.2-36-2: same patches as wasm-imagemagick (write-temp-then-rename.patch
+    keeps or drops the temporary file on the write's own errors, so montage,
+    composite and compare keep their output after a failed input,
+    homescoop#2219).

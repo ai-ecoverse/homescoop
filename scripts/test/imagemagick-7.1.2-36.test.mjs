@@ -11,7 +11,7 @@ const relink = join(root, 'packages/imagemagick-relink');
 const read = (...p) => readFileSync(join(...p), 'utf8');
 const added = (patch) => patch.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).join('\n');
 
-test('7.1.2-36-1 carries read-own-errors.patch and path-policy-keep-errno.patch; mogrify-format-over-existing.patch stays gone', () => {
+test('7.1.2-36 carries read-own-errors.patch and path-policy-keep-errno.patch; mogrify-format-over-existing.patch stays gone', () => {
   assert.equal(existsSync(join(im, 'mogrify-format-over-existing.patch')), false);
   const patches = readdirSync(im).filter((f) => f.endsWith('.patch')).sort();
   assert.deepEqual(patches, [
@@ -44,6 +44,17 @@ test('path-policy-keep-errno.patch restores errno around the realpath calls (hom
   assert.doesNotMatch(added(p), /\/\*|\/\//);
 });
 
+test('write-temp-then-rename.patch keeps or drops the temporary file on the write\'s own errors (homescoop#2219)', () => {
+  const p = read(im, 'write-temp-then-rename.patch');
+  assert.match(p, /^\+  ExceptionInfo\n\+    \*write_exception;\n\+\n\+  ExceptionType\n\+    write_severity;$/m);
+  assert.match(p, /^\+  write_exception=exception;\n\+  if \(\(\*atomic_tmp != '\\0'\) && \(exception->severity >= ErrorException\)\)\n\+    write_exception=AcquireExceptionInfo\(\);$/m);
+  assert.match(p, /^-    status&=\(MagickStatusType\) WriteImage\(write_info,p,exception\);\n\+    status&=\(MagickStatusType\) WriteImage\(write_info,p,write_exception\);$/m);
+  assert.match(p, /^ {3}write_info=DestroyImageInfo\(write_info\);\n\+  write_severity=write_exception->severity;\n\+  if \(write_exception != exception\)\n\+ {4}\{\n\+ {6}InheritException\(exception,write_exception\);\n\+ {6}write_exception=DestroyExceptionInfo\(write_exception\);\n\+ {4}\}$/m);
+  assert.match(p, /^\+      if \(\(status != 0\) && \(write_severity < ErrorException\)\)$/m);
+  assert.doesNotMatch(p, /exception->severity < ErrorException/);
+  assert.doesNotMatch(added(p).split('\n').filter((l) => /write_(exception|severity)/.test(l)).join('\n'), /\/\*|\/\//);
+});
+
 test('both policies have a named entry for -list policy (homescoop#2217)', () => {
   assert.match(read(im, 'policy-tab.xml'), /<policy domain="coder" name="mpc" rights="none" pattern="\{MPC,CACHE\}"\/>/);
   assert.doesNotMatch(read(im, 'policy-tab.xml'), /<policy (?![^>]*name=)[^>]*\/>/);
@@ -54,9 +65,11 @@ test('both policies have a named entry for -list policy (homescoop#2217)', () =>
   }
 });
 
-test('read-errors.mjs runs for both runtime packages', () => {
-  assert.ok(existsSync(join(im, 'cert/read-errors.mjs')));
-  assert.equal(read(heif, 'cert/read-errors.mjs'), "export { default } from '../../imagemagick/cert/read-errors.mjs';\n");
+test('read-errors.mjs and multi-input-write.mjs run for both runtime packages', () => {
+  for (const spec of ['read-errors.mjs', 'multi-input-write.mjs']) {
+    assert.ok(existsSync(join(im, 'cert', spec)));
+    assert.equal(read(heif, 'cert', spec), `export { default } from '../../imagemagick/cert/${spec}';\n`);
+  }
 });
 
 test('imagemagick and imagemagick-heif certs read recipe.yaml for magick -version; all three recipes are 7.1.2-36', () => {
@@ -68,7 +81,7 @@ test('imagemagick and imagemagick-heif certs read recipe.yaml for magick -versio
   for (const dir of [im, heif, relink]) {
     const ver = /^version: "([^"]+)"$/m.exec(read(dir, 'recipe.yaml'))[1];
     assert.equal(ver, '7.1.2-36');
-    assert.equal(JSON.parse(read(dir, 'package/package.json')).version, '7.1.2-36-1');
+    assert.equal(JSON.parse(read(dir, 'package/package.json')).version, '7.1.2-36-2');
   }
 });
 

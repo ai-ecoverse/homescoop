@@ -112,3 +112,7 @@ Checked locally by running the new relink-check.mjs against the published 7.1.2-
 ## 7.1.2-36-1: the kits follow wasm-imagemagick(-heif) 7.1.2-36-1 (homescoop#2218, #2217; 2026-11-24)
 
 The kits ship 7.1.2-36-1's objects. constitute.o carries read-own-errors.patch, which judges each read by its own errors so that identify goes on after a non-image, and policy.o carries path-policy-keep-errno.patch, so a refused open reports its own errno. relink-check.mjs checks that each kit's kit.json names this version's `bin/magick.wasm`, so a 7.1.2-35-1 kit can't pass for 7.1.2-36-1. The behaviour negatives are wasm-imagemagick's (see its NEGATIVE.md): on the head before the fix, identify over `*` listed nothing after `.keep`, a refused write reported `Invalid argument`, and `-list policy` under the open policy printed nothing.
+
+## 7.1.2-36-2: the kits follow wasm-imagemagick(-heif) 7.1.2-36-2 (homescoop#2219; 2026-11-24)
+
+The kits ship 7.1.2-36-2's objects. constitute.o carries write-temp-then-rename.patch with the rename judged on the write's own errors, so montage, composite and compare keep their output after a failed input. relink-check.mjs checks that each kit's kit.json names this version's `bin/magick.wasm`, so a 7.1.2-36-1 kit can't pass for 7.1.2-36-2. The behaviour negative is wasm-imagemagick's (see its NEGATIVE.md): on this PR's first head (53550132, run 45308971608, 7.1.2-36-1's patch), `multi-input-write.mjs` found none of m.png, mk.png, o.png and d.png written.

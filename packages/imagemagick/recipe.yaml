@@ -107,3 +107,11 @@ about:
     Invalid argument; errno is restored. Upstream lists only named
     policies now, so policy-tab.xml names its MPC rule and build.sh names
     policy-open.xml's entry. Temporary files stay beside the target.
+    7.1.2-36-2 (homescoop#2219): write-temp-then-rename.patch kept the
+    temporary file only while the exception held no error, and montage,
+    composite and compare share one exception across their inputs, so one
+    missing or non-image input discarded a finished output. A write that
+    starts with an error already pending now writes into an exception of
+    its own, merged back afterwards, and the temporary file is kept or
+    dropped on that write's errors alone, as read-own-errors.patch judges
+    a read.
