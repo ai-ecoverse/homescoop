@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { REPORTS, olderThan, recipeVersion, reportsVersion } from '../../packages/wasi-uv/cert/lib/version.mjs';
 import { COMMAND, FIXED_IN, SPURIOUS, checkExport, expectedExport, exportsSpurious } from '../../packages/wasi-uv/cert/export.mjs';
+import { SINCE, WARNING, checkMissingTarget, checkPipInstall, checkPipList, checkPrefix, checkRedirectFile, checkSync } from '../../packages/wasi-uv/cert/redirect.mjs';
 
 const dir = new URL('../../packages/wasi-uv/', import.meta.url);
 const pkg = JSON.parse(readFileSync(new URL('package/package.json', dir), 'utf8'));
@@ -162,4 +163,44 @@ test("timeout.mjs logs the timeout it causes on purpose as expected, not as a 'w
   assert.match(expected(line), /^timeout: expected, the row hangs uv on purpose: uv run .*: no exit within 15 s \(detached, polled; 16 s\)$/);
   const start = 'wasi-uv: /home/t$ uv run --no-project python (detached, polled, budget 15 s)';
   assert.equal(expected(start), start);
+});
+
+const REDIRECT_WARNING = 'warning: Using `.venv` redirect files is experimental and may change without warning. Pass `--preview-features venv-redirect-files` to disable this warning.\n';
+const INSTALLED = 'Resolved 1 package in 4ms\nPrepared 1 package in 7ms\nInstalled 1 package in 11ms\n + idna==3.20\n';
+const INSTALL_0_13_9 = `${REDIRECT_WARNING}Using Python 3.14.2 environment at: /home/uvr/proj/../envs/default\n${INSTALLED}`;
+const MISSING_0_13_9 = 'error: Broken virtual environment `/home/uvr/proj/missing`: missing `pyvenv.cfg`\n';
+const SYNC_0_13_9 = `${REDIRECT_WARNING}Resolved 2 packages in 6ms\n${INSTALLED.split('\n').slice(1).join('\n')}`;
+const NO_VENV_0_13_8 = 'error: No virtual environment found; run `uv venv` to create an environment, or pass `--system` to install into a non-virtual environment\n';
+const LIST = 'Package Version\n------- -------\nidna    3.20\n';
+
+test("redirect: uv 0.13.9's .venv redirect output passes every row", () => {
+  assert.equal(olderThan(recipeVersion(), SINCE), false, `recipe.yaml's uv is ${SINCE} or newer`);
+  assert.match(REDIRECT_WARNING, WARNING);
+  checkPipInstall(assert, 'uv pip install idna', ran('', 0, INSTALL_0_13_9));
+  checkPipInstall(assert, 'uv pip install idna', ran('', 0, INSTALL_0_13_9.replace('/home/uvr/proj/../envs/default', '/home/uvr/envs/default')));
+  checkPipList(assert, 'uv pip list', ran(LIST));
+  checkMissingTarget(assert, 'uv pip install idna', ran('', 2, MISSING_0_13_9));
+  checkSync(assert, 'uv sync', ran('', 0, SYNC_0_13_9));
+  checkPrefix(assert, 'python', ran('3.20 /home/uvr/envs/app\n'), '/home/uvr/envs/app');
+  checkRedirectFile(assert, 'cat proj/.venv', ran('../envs/default\n'), '../envs/default\n');
+});
+
+test('NEGATIVE: the published 0.13.8-1 skips a .venv redirect file and fails the redirect rows', () => {
+  assert.throws(() => checkPipInstall(assert, 'uv pip install idna', ran('', 2, NO_VENV_0_13_8)), /rc=2[\s\S]*an older uv skips a \.venv that is a file/);
+  assert.throws(() => checkMissingTarget(assert, 'uv pip install idna', ran('', 2, NO_VENV_0_13_8)), /a redirect to a missing environment is uv's error/);
+});
+
+test('NEGATIVE: a redirect row fails on a crash, the wrong environment, a lost warning or a rewritten redirect file', () => {
+  assert.throws(() => checkPipInstall(assert, 'uv pip install idna', ran('', 134, "thread 'main' panicked at crates/uv-fs\nuv: wasm trap in thread 2: unreachable\n")), /not a crash/);
+  assert.throws(() => checkPipInstall(assert, 'uv pip install idna', ran('', 0, INSTALL_0_13_9.replace(REDIRECT_WARNING, ''))), /preview feature/);
+  assert.throws(() => checkPipInstall(assert, 'uv pip install idna', ran('', 0, INSTALL_0_13_9.replace('envs/default', 'proj/sub/.venv'))), /the redirect's environment/);
+  assert.throws(() => checkPipInstall(assert, 'uv pip install idna', ran('', 0, INSTALL_0_13_9.replace(' + idna==3.20\n', ''))), /idna is installed/);
+  assert.throws(() => checkPipList(assert, 'uv pip list', ran('Package Version\n------- -------\n')), /reads the redirect's environment/);
+  assert.throws(() => checkPipList(assert, 'uv pip list', ran(LIST, 0, REDIRECT_WARNING)), /silences the warning/);
+  assert.throws(() => checkMissingTarget(assert, 'uv pip install idna', ran('', 0, '')), /rc=0/);
+  assert.throws(() => checkSync(assert, 'uv sync', ran('', 2, 'error: Project virtual environment directory `/home/uvr/app/.venv` cannot be used because it is not a valid Python environment (no Python executable was found)\n')), /rc=2/);
+  assert.throws(() => checkSync(assert, 'uv sync', ran('', 0, SYNC_0_13_9.replace(REDIRECT_WARNING, 'Creating virtual environment at: .venv\n'))), /preview feature/);
+  assert.throws(() => checkPrefix(assert, 'python', ran('3.20 /home/uvr/app/.venv\n'), '/home/uvr/envs/app'), /imports from \/home\/uvr\/envs\/app/);
+  assert.throws(() => checkRedirectFile(assert, 'cat app/.venv', ran('', 1), '../envs/app\n'), /still a regular file/);
+  assert.throws(() => checkRedirectFile(assert, 'cat app/.venv', ran('/home/uvr/envs/app\n'), '../envs/app\n'), /leaves the redirect file as it was/);
 });
