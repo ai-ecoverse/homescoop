@@ -9,7 +9,7 @@ npm: "@ai-ecoverse/wasi-uv"
 summary: "uv 0.13 for slicc WASI (command uv: venv, pip, add, lock, sync, run against wasix-python)"
 source:
   url: "https://github.com/astral-sh/uv/archive/refs/tags/{{version}}.tar.gz"
-  sha256: "53744fdb07f37e99e393e3247087dfbcda04340837fc83b2ae8e7326261399ad"
+  sha256: "66b26bd860dd35790bd7e3b721bbb3d39451cb18e3ff25fb0557d25a26f06c00"
   epoch: "1792457197"
 # ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#675).
 reproducible: true
