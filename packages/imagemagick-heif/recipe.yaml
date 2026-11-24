@@ -90,3 +90,6 @@ about:
     7.1.2-35-1: same upstream as wasm-imagemagick; mogrify-format-over-
     existing.patch dropped (homescoop#624 fixed upstream); OpenJPEG stays
     2.5.4-1 (homescoop#1957).
+    7.1.2-36-1: same upstream and patches as wasm-imagemagick
+    (read-own-errors.patch, homescoop#2218; path-policy-keep-errno.patch
+    and the named policy entries, homescoop#2217).

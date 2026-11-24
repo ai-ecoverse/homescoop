@@ -50,3 +50,6 @@ about:
     job downloads host-imagemagick-prN and host-imagemagick-heif-prN) or
     else from the registry; no such runtime, another sha256, or a runtime
     that doesn't name this package (homescoop.relink, notices) fails.
+    7.1.2-36-1: the kits' constitute.o and policy.o carry
+    read-own-errors.patch and path-policy-keep-errno.patch
+    (homescoop#2218, #2217).

@@ -66,6 +66,12 @@ exits 1; the failed file is left as it was (homescoop#1655; until
 7.1.2-34-9.6, as upstream, every file after the first failure was silently
 left unchanged).
 
+`identify` over several files (`identify '*'`, a list, or `img%d.png[1-5]`)
+goes on after one that isn't an image or can't be read, reports it and
+exits 1 (homescoop#2218; upstream 7.1.2-36 drops every image after the
+first failure, and this package patches that). A refused open reports the
+real reason, such as `Permission denied` (homescoop#2217).
+
 ## Switching
 
 `@ai-ecoverse/wasm-imagemagick` and `@ai-ecoverse/wasm-imagemagick-heif` are

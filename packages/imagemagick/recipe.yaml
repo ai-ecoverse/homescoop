@@ -97,3 +97,13 @@ about:
     backup write with -format when the backup name names no format, so
     mogrify-format-over-existing.patch is dropped; OpenJPEG stays 2.5.4-1
     (homescoop#1957).
+    7.1.2-36-1: upstream 7.1.2-36. read-own-errors.patch (homescoop#2218):
+    upstream's ReadImage now destroys a decoded image whenever the
+    exception already holds an error, and identify shares one exception
+    across its inputs, so identify '*' with .keep first listed no image;
+    a read that starts with an error pending gets its own exception.
+    path-policy-keep-errno.patch (homescoop#2217): the path policy check
+    now calls realpath after a failed open, so a refused open reported
+    Invalid argument; errno is restored. Upstream lists only named
+    policies now, so policy-tab.xml names its MPC rule and build.sh names
+    policy-open.xml's entry. Temporary files stay beside the target.

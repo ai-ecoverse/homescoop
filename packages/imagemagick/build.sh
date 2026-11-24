@@ -147,6 +147,8 @@ find "$SRC/config" -maxdepth 1 -name '*.xml' -exec cp {} "$CFG_OPEN/" \;
 test -f "$CFG_DEST/colors.xml"
 cp "$HOMESCOOP_ROOT/packages/imagemagick/policy-tab.xml" "$CFG_DEST/policy.xml"
 cp "$SRC/config/policy-open.xml" "$CFG_OPEN/policy.xml"
+perl -i -pe 's{<policy domain="Undefined" rights="none"/>}{<policy domain="Undefined" name="open" rights="none"/>}' "$CFG_OPEN/policy.xml"
+if ! grep -q '<policy domain="Undefined" name="open" rights="none"/>' "$CFG_OPEN/policy.xml"; then echo "homescoop: $CFG_OPEN/policy.xml has no named entry, so magick -list policy prints nothing under it (homescoop#2217)" >&2; exit 1; fi
 # homescoop#586: a default font (no fontconfig in slicc). gsfonts' URW Nimbus
 # Sans (Helvetica) Type 1 fonts in etc/fonts, named by type.xml in both config dirs.
 homescoop_load_recipe imagemagick --source gsfonts

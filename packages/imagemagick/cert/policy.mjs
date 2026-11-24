@@ -24,6 +24,7 @@ export default async function policy(ctx) {
   );
   const pol = await run(['magick', '-list', 'policy']);
   assert.match(pol.stdout, /Path: \S*\/etc\/ImageMagick-7\/policy\.xml/);
+  assert.match(pol.stdout, /Policy: Coder\n\s+rights: None\s*\n\s+pattern: \{MPC,CACHE\}/, `-list policy lists the tab policy's MPC rule (homescoop#2217): ${pol.stdout}`);
 
   // 900 MP: within width/height (64KP), refused by area (64MP) before any allocation.
   const huge = await timed(['magick', '-size', '30000x30000', 'xc:white', 'huge.png']);
@@ -103,6 +104,8 @@ export default async function policy(ctx) {
   const envLifted = await run(['magick', ...wide, 'wide-env.png'], { MAGICK_CONFIGURE_PATH: open });
   assert.equal(envLifted.status, 0, `MAGICK_CONFIGURE_PATH=${open}: rc ${envLifted.status} ${envLifted.stderr}`);
   const envPol = await run(['magick', '-list', 'policy'], { MAGICK_CONFIGURE_PATH: open });
-  assert.match(envPol.stdout, /Path: \S*\/etc\/ImageMagick-7-open\/policy\.xml/);
+  assert.match(envPol.stdout, /Path: \S*\/etc\/ImageMagick-7-open\/policy\.xml/, `-list policy under the open policy names its file (homescoop#2217): ${envPol.stdout}${envPol.stderr}`);
+  const openPol = await run(['magick-open', '-list', 'policy']);
+  assert.match(openPol.stdout, /Path: \S*\/etc\/ImageMagick-7-open\/policy\.xml\n\s+Policy: Undefined\n\s+rights: None/, `magick-open -list policy lists the open policy's entry (homescoop#2217): ${openPol.stdout}${openPol.stderr}`);
   console.log(`policy: 30000x30000 refused in ${huge.ms} ms, 70000x10 in ${long.ms} ms, 9000x9000 in ${area.ms} ms, resizes ${photo.ms}; 18000x3000 panorama: identify ${panoSize.ms} ms, thumbnail ${thumb.ms} ms; magick-open and MAGICK_CONFIGURE_PATH lift`);
 }
