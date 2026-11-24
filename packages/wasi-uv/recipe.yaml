@@ -80,6 +80,11 @@ about:
     0.13.8's write_atomic_with_permissions and the now public
     LockedFile::lock_file (the credentials store locks through it; on
     WASI that is the same slicc.fcntl_lock path).
+    0.13.9-1: 0001 rebased for 0.13.9's uv-project-commands manifest
+    (uv-unix moved under cfg(unix) at the end of the file); the rest of
+    the series and lock.json apply unchanged, and no new crate needs a
+    licence pin. cert/redirect.mjs covers 0.13.9's PEP 832 .venv
+    redirect files for uv pip, uv sync and uv run.
     crates/: hyper-util (dial via wasix-net), rustls-native-certs,
     cargo-util (compile on WASI), reqsign-core/-google/-http-send-reqwest
     and astral-reqwest-middleware/-retry (mechanical: wasm32 means

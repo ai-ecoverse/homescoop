@@ -203,7 +203,7 @@ diff --git a/crates/uv-installer/Cargo.toml b/crates/uv-installer/Cargo.toml
 diff --git a/crates/uv-project-commands/Cargo.toml b/crates/uv-project-commands/Cargo.toml
 --- a/crates/uv-project-commands/Cargo.toml
 +++ b/crates/uv-project-commands/Cargo.toml
-@@ -68,7 +68,6 @@
+@@ -67,7 +67,6 @@
  anyhow = { workspace = true }
  async_zip = { workspace = true, features = ["zstd-read"] }
  clap = { workspace = true }
@@ -211,7 +211,7 @@ diff --git a/crates/uv-project-commands/Cargo.toml b/crates/uv-project-commands/
  fs-err = { workspace = true }
  futures = { workspace = true }
  indicatif = { workspace = true }
-@@ -85,3 +84,7 @@
+@@ -84,6 +83,10 @@
  toml = { workspace = true }
  toml_edit = { workspace = true }
  tracing = { workspace = true }
@@ -219,6 +219,9 @@ diff --git a/crates/uv-project-commands/Cargo.toml b/crates/uv-project-commands/
 +
 +[target.'cfg(not(target_os = "wasi"))'.dependencies]
 +ctrlc = { workspace = true }
+ 
+ [target.'cfg(unix)'.dependencies]
+ uv-unix = { workspace = true }
 diff --git a/crates/uv-project-commands/src/edit.rs b/crates/uv-project-commands/src/edit.rs
 --- a/crates/uv-project-commands/src/edit.rs
 +++ b/crates/uv-project-commands/src/edit.rs
