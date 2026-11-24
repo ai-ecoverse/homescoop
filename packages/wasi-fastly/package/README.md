@@ -1,13 +1,13 @@
 # @ai-ecoverse/wasi-fastly
 
-The [Fastly CLI](https://www.fastly.com/documentation/reference/cli/) 17.1.0
+The [Fastly CLI](https://www.fastly.com/documentation/reference/cli/) 17.2.0
 as a WASI preview1 command for SLICC: `fastly`. On
 `@ai-ecoverse/slicc-kernel` ≥ 1.187.0, `host/fastly-host.mjs` (loaded
 through `slicc.commands.fastly.imports`) sends its HTTP requests through the
 kernel's network and sets the modes of its config files.
 
-`bin/fastly.wasm` is built by homescoop from Fastly's source (v17.1.0,
-commit `3e9473d`) with Go 1.27.3 (`GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0
+`bin/fastly.wasm` is built by homescoop from Fastly's source (v17.2.0,
+commit `23a945d`) with Go 1.27.3 (`GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0
 -trimpath`) and upstream's release ldflags, then `wasm-opt -Oz`, so it is not
 an upstream release. The patches:
 
