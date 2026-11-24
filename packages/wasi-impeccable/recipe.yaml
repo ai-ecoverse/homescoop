@@ -128,3 +128,18 @@ about:
     with "needs ffmpeg" (cert/world.mjs). context's cached taste block,
     concept-seed's --replace-world and the loop status / connect --json
     additions build as is. No new crates: regex was already in the lock.
+    0.1.25-1: 0001 rebased onto engine-v0.1.25 (router.rs's account arms
+    were rejected: login now also scans the repository for the account and
+    offers Loop after a sign-in). The new account verb status and that
+    after-login work stay native with account, so status refuses with
+    "needs Impeccable account sign-in"; motion-capture (the browser crate's
+    Chrome) refuses with "needs browser capture". detect --before / --kept
+    (the wiring check, read by the static HTML engine) build as is, and
+    detect --changed runs git through wasix-command (a new dependency of
+    the detect crate; with no git it refuses as outside a work tree).
+    loop connect --mcp-only runs on any OS upstream; its account service
+    origins and IMPECCABLE_HOME come from account's config.rs, which the
+    cli builds as its own module on wasm, and its PATH lookup splits on
+    `:` there, since std's split_paths panics on WASI. The taste block's
+    temp file is named after impeccable_common::process_id()
+    (cert/wiring.mjs, cert/mcp.mjs). No new crates.

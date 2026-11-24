@@ -21,6 +21,17 @@ impeccable --version   # prints the engine version (e.g. 0.1.25)
 `hook-before-edit` / `hooks`, `foundations`, and the skills verbs `help`, `link`,
 `update` and `check`.
 
+**Wiring check** (`impeccable detect --before page.html`, then `--kept`,
+since 0.1.25) records each static HTML file's links, forms, fields, buttons,
+handlers, ids, test hooks, scripts and label targets under the project's
+`.impeccable/wiring/`, and fails when a redesign dropped one.
+`detect --changed` (since 0.1.25) asks `git` for the changed UI files when
+the kernel has it; without it, it refuses as it does outside a git work tree.
+`loop connect --mcp-only` (since 0.1.25) adds the Impeccable MCP server to
+Claude Code's or Codex's own configuration, as upstream does on any OS. It
+adds it through the agent's CLI, which this build can't start, so here it
+finds a server already there or reports the agent as not connected.
+
 **Foundations** (`impeccable foundations [path] [--json]`, since 0.1.24)
 checks the product foundations the project's files show (secrets in the
 repository, giant files, CI that runs the tests, dependency scanning, icons,
@@ -60,9 +71,10 @@ but 4000 take about 40 s and 8000 several minutes (a native build: 15 s and
 running app's DevTools port), `serve-question` and the capture verbs refuse
 with `not available in this build yet` instead of `Unknown command`, and so
 do the account verbs: `login`, `logout`, `whoami`, `health` since 0.1.22,
-`setup`, `critiques` since 0.1.23, and `world`, `taste-refresh` since
-0.1.25. `walkthrough` (since 0.1.24) needs the system's ffmpeg and refuses
-the same way. Without sign-in, `detect` never
+`setup`, `critiques` since 0.1.23, `world`, `taste-refresh` since 0.1.24,
+and `status` since 0.1.25. `motion-capture` (since 0.1.25) drives a Chrome
+and refuses the same way, and so does `walkthrough` (since 0.1.24), which
+needs the system's ffmpeg. Without sign-in, `detect` never
 uploads a design health scan and never hands a scan to Impeccable Pro,
 `critique-storage` saves a critique locally and never uploads it, and no
 setup report is sent. `loop install` refuses as upstream does off macOS,
