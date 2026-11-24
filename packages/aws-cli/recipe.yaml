@@ -14,7 +14,7 @@ source:
   # from. requirements/download-deps/system-sandbox-lock.txt in it pins every
   # dependency with its sha256; build.sh checks each wheel below against it.
   url: "https://awscli.amazonaws.com/awscli-{{version}}.tar.gz"
-  sha256: "4a702e3b623f7d6fc558ac7ac10e597370f70591ac2eb79af4cfe03c936644e5"
+  sha256: "bc38bfa38b7738f527011eb52d05b840c38ba0a115cb103aa1cf86a96e829175"
 # The pure-Python dependencies (the .whl sources), the versions the source
 # distribution's lock file pins (awscrt and ruamel.yaml.clib are native; see
 # about.notes). A version bump whose lock moves one of them fails the build
