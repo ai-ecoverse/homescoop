@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/aws-cli",
-  "version": "2.41.0-1",
+  "version": "2.41.1-1",
   "description": "The AWS Command Line Interface v2: aws, to manage AWS services from slicc.",
   "license": "Apache-2.0",
   "repository": {
@@ -39,7 +39,7 @@
   },
   "homescoop": {
     "recipe": "aws-cli",
-    "upstream": "2.41.0"
+    "upstream": "2.41.1"
   },
   "slicc": {
     "abi": "wasi",
