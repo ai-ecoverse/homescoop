@@ -19,7 +19,7 @@
 //!
 //! This is not a ureq clone. It has exactly:
 //! - `AgentBuilder::{new, timeout, timeout_connect, timeout_read,
-//!   timeout_write, redirects, try_proxy_from_env, build}`
+//!   timeout_write, redirects, user_agent, try_proxy_from_env, build}`
 //! - `Agent::{new, request, get, post}`, and the free `get` and `post`
 //! - `Request::{set, timeout, call, send_string, send_bytes, send_json}`
 //! - `Response::{status, status_text, header, into_string, into_reader,
@@ -113,6 +113,12 @@ impl AgentBuilder {
     pub fn redirects(self, n: u32) -> AgentBuilder {
         AgentBuilder {
             builder: self.builder.redirects(n),
+        }
+    }
+
+    pub fn user_agent(self, user_agent: &str) -> AgentBuilder {
+        AgentBuilder {
+            builder: self.builder.user_agent(user_agent),
         }
     }
 

@@ -13,14 +13,14 @@ inputs:
   - scripts/build-common.sh
   - scripts/rust-wasm-refresh-alloc.rs
 # renovate: datasource=github-releases depName=pbakaus/impeccable extractVersion=^engine-v(?<version>.*)$
-version: "0.1.25"
+version: "0.1.27"
 npm: "@ai-ecoverse/wasi-impeccable"
 toolchain:
   rust: "1.98.1"
-summary: "impeccable engine 0.1.25 for slicc WASI preview1 (command impeccable; file-local, HTTP and live verbs)"
+summary: "impeccable engine 0.1.27 for slicc WASI preview1 (command impeccable; file-local, HTTP and live verbs)"
 source:
   url: "https://github.com/pbakaus/impeccable/archive/refs/tags/engine-v{{version}}.tar.gz"
-  sha256: "807cb4a6392297a9c0f56bb9d11373e03f280b0c36676555376b9d7c278471f9"
+  sha256: "a2e1eebec33eb790c5e553e3d6b8e5fb450a7216d9db87d8c942163944c00250"
 # homescoop#1287: the initial heap from the measured peak, with headroom.
 wasm:
   initial-memory: 64MiB
@@ -143,3 +143,23 @@ about:
     `:` there, since std's split_paths panics on WASI. The taste block's
     temp file is named after impeccable_common::process_id()
     (cert/wiring.mjs, cert/mcp.mjs). No new crates.
+    0.1.27-1: 0001 rebased onto engine-v0.1.27 (the bump skips 0.1.26).
+    The prompts moved from skills into impeccable-common, so the piped
+    stdin rule moved with them; the cli's lib.rs and Cargo.toml and the
+    foundations disk source (whose checks moved into the new
+    foundations-scan crate, which builds for wasm as is) were the rejected
+    hunks. The new mcp crate (an MCP server proxying the account's tools)
+    depends on account, so the cli takes it off wasm only: mcp and
+    switches-refresh (the switch sync) refuse with "needs Impeccable
+    account sign-in", agents running with "needs the Impeccable MCP
+    server", and first-viewport and shot (Chrome) with "needs browser
+    capture"; install registers no browser relay and offers no sign-in,
+    and context prints no ACCOUNT: line. Sampled contrast (local images
+    decoded by image's pure-Rust decoders, base64 newly linked), detect
+    --sarif and --report-unused-ignores, design-compact, design-lookup,
+    font-fetch and switches build as is; the sample cache's and
+    design-compact's temp files, which std::process::id() would trap, are
+    named after impeccable_common::process_id(), switches' git goes
+    through wasix-command, and font-fetch's browser User-Agent needs
+    wasix-ureq's new AgentBuilder::user_agent (cert/sampled.mjs,
+    cert/design.mjs, cert/fonts.mjs, cert/switches.mjs).
