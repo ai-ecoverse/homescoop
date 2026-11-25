@@ -4,12 +4,12 @@
 name: wasi-uv
 builder: host
 # renovate: datasource=github-releases depName=astral-sh/uv
-version: "0.13.8"
+version: "0.13.9"
 npm: "@ai-ecoverse/wasi-uv"
 summary: "uv 0.13 for slicc WASI (command uv: venv, pip, add, lock, sync, run against wasix-python)"
 source:
   url: "https://github.com/astral-sh/uv/archive/refs/tags/{{version}}.tar.gz"
-  sha256: "53744fdb07f37e99e393e3247087dfbcda04340837fc83b2ae8e7326261399ad"
+  sha256: "66b26bd860dd35790bd7e3b721bbb3d39451cb18e3ff25fb0557d25a26f06c00"
   epoch: "1792457197"
 # ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#675).
 reproducible: true
@@ -80,6 +80,11 @@ about:
     0.13.8's write_atomic_with_permissions and the now public
     LockedFile::lock_file (the credentials store locks through it; on
     WASI that is the same slicc.fcntl_lock path).
+    0.13.9-1: 0001 rebased for 0.13.9's uv-project-commands manifest
+    (uv-unix moved under cfg(unix) at the end of the file); the rest of
+    the series and lock.json apply unchanged, and no new crate needs a
+    licence pin. cert/redirect.mjs covers 0.13.9's PEP 832 .venv
+    redirect files for uv pip, uv sync and uv run.
     crates/: hyper-util (dial via wasix-net), rustls-native-certs,
     cargo-util (compile on WASI), reqsign-core/-google/-http-send-reqwest
     and astral-reqwest-middleware/-retry (mechanical: wasm32 means
