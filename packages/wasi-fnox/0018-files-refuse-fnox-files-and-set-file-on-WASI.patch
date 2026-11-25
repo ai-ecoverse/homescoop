@@ -4,7 +4,7 @@ Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 18/19] files: refuse fnox files and set/get --file on WASI
 
 diff --git a/src/commands/get.rs b/src/commands/get.rs
-index 11f7074..c9f3d6c 100644
+index 8233fee..2de9689 100644
 --- a/src/commands/get.rs
 +++ b/src/commands/get.rs
 @@ -57,12 +57,22 @@ impl GetCommand {
@@ -35,10 +35,10 @@ index 11f7074..c9f3d6c 100644
          if self.key.is_none() {
              return Err(FnoxError::Config(
 diff --git a/src/commands/mod.rs b/src/commands/mod.rs
-index 6df59a5..80838a9 100644
+index 7741d53..2f947ae 100644
 --- a/src/commands/mod.rs
 +++ b/src/commands/mod.rs
-@@ -394,6 +394,11 @@ impl Commands {
+@@ -406,6 +406,11 @@ impl Commands {
              #[cfg(not(target_os = "wasi"))]
              Commands::Edit(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Export(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -51,10 +51,10 @@ index 6df59a5..80838a9 100644
              Commands::Get(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Import(cmd) => cmd.run(cli, self.load_config(cli)?).await,
 diff --git a/src/commands/set.rs b/src/commands/set.rs
-index 3f3addf..a14feee 100644
+index 026dde5..cf788e5 100644
 --- a/src/commands/set.rs
 +++ b/src/commands/set.rs
-@@ -266,6 +266,7 @@ impl SetCommand {
+@@ -276,6 +276,7 @@ impl SetCommand {
      }
  
      /// `fnox set --file PATH`
@@ -62,7 +62,7 @@ index 3f3addf..a14feee 100644
      async fn run_file(&self, cli: &Cli, config: &Config, path: &Path) -> Result<()> {
          let unsupported = [
              ("VALUE", self.value.is_some()),
-@@ -299,6 +300,14 @@ impl SetCommand {
+@@ -309,6 +310,14 @@ impl SetCommand {
  
      pub async fn run(&self, cli: &Cli, config: Config) -> Result<()> {
          if let Some(path) = &self.file {

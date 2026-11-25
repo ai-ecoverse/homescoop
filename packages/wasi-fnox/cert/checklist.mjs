@@ -453,6 +453,99 @@ export default async function (ctx) {
   assert.ok(urlToml.includes('https://a.io/n'), `1.48.0 set --url writes the new url: ${urlToml}`);
   assert.ok(urlToml.includes('from-url-toml'), `1.48.0 set --url keeps the value: ${urlToml}`);
   await write(
+    'home/v150/fnox.toml',
+    [
+      '[providers.plain]',
+      'type = "plain"',
+      'cache_ttl = "5m"',
+      'max_cache_ttl = "1h"',
+      '',
+      '[daemon]',
+      'cache_ttl = "30m"',
+      'max_cache_ttl = "8h"',
+      '',
+      '[secrets]',
+      'LVL = { provider = "plain", value = "from-v150-toml", sensitive = false, cache_ttl = "1m", max_cache_ttl = "2m" }',
+      'GH = { provider = "plain", value = "v150-token" }',
+      '',
+      '[proxy]',
+      'max_body_bytes = 1048576',
+      '[[proxy.rules]]',
+      'secret = "GH"',
+      'domain = "api.github.com"',
+      'header = "authorization"',
+      '',
+    ].join('\n'),
+  );
+  await write('home/v150/sub/.keep', '');
+  const v150Get = await run(['fnox', 'get', 'LVL'], { cwd: '/home/v150', env });
+  assert.equal(v150Get.status, 0, `1.49.0 sensitive and cache ttls get: ${v150Get.stderr}`);
+  assert.equal(v150Get.stdout.trim(), 'from-v150-toml', `1.49.0 sensitive and cache ttls get value: ${v150Get.stdout}`);
+  assert.doesNotMatch(v150Get.stderr, /unknown field|invalid_toml|panicked|wasm trap/);
+  const v150Exec = await run(['fnox', 'exec', '--', 'printenv', 'LVL'], { cwd: '/home/v150', env });
+  assert.equal(v150Exec.status, 0, `1.49.0 sensitive and cache ttls exec: ${v150Exec.stderr}`);
+  assert.equal(v150Exec.stdout.trim(), 'from-v150-toml', `1.49.0 sensitive and cache ttls exec value: ${v150Exec.stdout}`);
+  const v150Mask = await run(['fnox', 'ci-redact'], { cwd: '/home/v150', env: { ...env, CI: 'true', GITHUB_ACTIONS: 'true' } });
+  assert.equal(v150Mask.status, 0, `1.49.0 ci-redact: ${v150Mask.stderr}`);
+  assert.match(v150Mask.stdout, /^::add-mask::v150-token$/m, `1.49.0 ci-redact masks a sensitive value: ${v150Mask.stdout}`);
+  assert.ok(!v150Mask.stdout.includes('from-v150-toml'), `1.49.0 ci-redact leaves a sensitive = false value readable: ${v150Mask.stdout}`);
+  const v150Rules = await run(['fnox', 'proxy', 'rules', '--json'], { cwd: '/home/v150', env });
+  assert.equal(v150Rules.status, 0, `1.49.0 proxy max_body_bytes: ${v150Rules.stderr}`);
+  assert.equal(JSON.parse(v150Rules.stdout).max_body_bytes, 1048576, `1.49.0 rules --json keeps max_body_bytes: ${v150Rules.stdout}`);
+  const walked = await run(['fnox', 'set', '--walk-up', 'WALKED', '--provider', 'plain'], { cwd: '/home/v150/sub', env, stdin: 'walked-value\n' });
+  assert.equal(walked.status, 0, `1.49.0 set --walk-up: ${walked.stderr}`);
+  const viaEnv = await run(['fnox', 'set', 'VIA_ENV', '--provider', 'plain'], { cwd: '/home/v150/sub', env: { ...env, FNOX_WALK_UP: '1' }, stdin: 'via-env-value\n' });
+  assert.equal(viaEnv.status, 0, `1.49.0 FNOX_WALK_UP=1 set: ${viaEnv.stderr}`);
+  const walkedToml = await read('home/v150/fnox.toml');
+  assert.ok(walkedToml.includes('WALKED') && walkedToml.includes('walked-value'), `1.49.0 set --walk-up writes the parent's fnox.toml: ${walkedToml}`);
+  assert.ok(walkedToml.includes('VIA_ENV'), `1.49.0 FNOX_WALK_UP=1 writes the parent's fnox.toml: ${walkedToml}`);
+  const walkedSub = await run(['ls', '-a', '/home/v150/sub'], { cwd: '/', env });
+  assert.doesNotMatch(walkedSub.stdout, /fnox\.toml/, `1.49.0 set --walk-up created no fnox.toml in the subdirectory: ${walkedSub.stdout}`);
+  await write(
+    'home/v150zero/fnox.toml',
+    [
+      '[providers.plain]', 'type = "plain"', '',
+      '[secrets]', 'GH = { provider = "plain", value = "token" }', '',
+      '[proxy]', 'max_body_bytes = 0',
+      '[[proxy.rules]]', 'secret = "GH"', 'domain = "api.github.com"', 'header = "authorization"', '',
+    ].join('\n'),
+  );
+  const zeroBody = await run(['fnox', 'proxy', 'rules', '--json'], { cwd: '/home/v150zero', env });
+  assert.notEqual(zeroBody.status, 0, '1.49.0 max_body_bytes = 0 must fail');
+  assert.notEqual(zeroBody.status, 134, `1.49.0 max_body_bytes = 0 trapped: ${zeroBody.stderr}`);
+  assert.ok(flat(zeroBody.stderr).includes('proxy: max_body_bytes must be greater than zero'), `1.49.0 max_body_bytes = 0 refused: ${zeroBody.stderr}`);
+  await write(
+    'home/v150reserved/fnox.toml',
+    [
+      '[providers.plain]', 'type = "plain"', '',
+      '[secrets]', 'GH = { provider = "plain", value = "token" }', '',
+      '[[proxy.rules]]', 'secret = "GH"', 'domain = "api.github.com"', 'header = "authorization"', 'env = "FNOX_PROXY_MCP_WALK_UP"', '',
+    ].join('\n'),
+  );
+  const reserved = await run(['fnox', 'proxy', 'rules', '--json'], { cwd: '/home/v150reserved', env });
+  assert.notEqual(reserved.status, 0, '1.49.0 a rule on FNOX_PROXY_MCP_WALK_UP must fail');
+  assert.notEqual(reserved.status, 134, `1.49.0 reserved env trapped: ${reserved.stderr}`);
+  assert.ok(
+    flat(reserved.stderr).includes("rule for 'GH' can't use the environment variable 'FNOX_PROXY_MCP_WALK_UP', which fnox reserves"),
+    `1.49.0 reserved FNOX_PROXY_MCP_WALK_UP refused: ${reserved.stderr}`,
+  );
+  await write(
+    'home/v150check/fnox.toml',
+    [
+      '[providers.plain]', 'type = "plain"', '',
+      '[secrets]',
+      'LVL = { provider = "plain", value = "x" }',
+      'GONE = { provider = "nope", value = "y", if_missing = "warn" }', '',
+    ].join('\n'),
+  );
+  const lenient = await run(['fnox', 'check'], { cwd: '/home/v150check', env });
+  assert.equal(lenient.status, 0, `1.50.0 check passes with a warning: ${lenient.stdout}${lenient.stderr}`);
+  assert.match(flat(lenient.stdout + lenient.stderr), /Secret 'GONE' references unknown provider 'nope'/);
+  const strict = await run(['fnox', 'check', '--strict'], { cwd: '/home/v150check', env });
+  assert.equal(strict.status, 1, `1.50.0 check --strict fails on the warning: ${strict.stdout}${strict.stderr}`);
+  assert.match(flat(strict.stdout + strict.stderr), /Secret 'GONE' references unknown provider 'nope'/);
+  assert.doesNotMatch(strict.stderr, /unexpected argument|panicked|wasm trap/);
+  await write(
     'home/v146lease/fnox.toml',
     [
       '[providers.plain]',

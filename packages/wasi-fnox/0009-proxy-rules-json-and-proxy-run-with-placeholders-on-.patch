@@ -4,7 +4,7 @@ Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 9/19] proxy: rules --json and proxy run with placeholders on WASI
 
 diff --git a/src/commands/mod.rs b/src/commands/mod.rs
-index 50bd9fe..0678c78 100644
+index c38cb2a..312e381 100644
 --- a/src/commands/mod.rs
 +++ b/src/commands/mod.rs
 @@ -31,7 +31,6 @@ pub mod mcp;
@@ -15,7 +15,7 @@ index 50bd9fe..0678c78 100644
  pub mod proxy;
  #[cfg(not(target_os = "wasi"))]
  pub mod push;
-@@ -200,7 +199,6 @@ pub enum Commands {
+@@ -212,7 +211,6 @@ pub enum Commands {
  
      Provider(provider::ProviderCommand),
  
@@ -23,7 +23,7 @@ index 50bd9fe..0678c78 100644
      Proxy(proxy::ProxyCommand),
  
      #[cfg(not(target_os = "wasi"))]
-@@ -417,7 +415,6 @@ impl Commands {
+@@ -430,7 +428,6 @@ impl Commands {
                  cmd.run(cli, Config::new()).await
              }
              Commands::Provider(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -32,7 +32,7 @@ index 50bd9fe..0678c78 100644
              #[cfg(not(target_os = "wasi"))]
              Commands::Push(cmd) => cmd.run(cli, self.load_config(cli)?).await,
 diff --git a/src/commands/proxy.rs b/src/commands/proxy.rs
-index 12cfc36..d81d09f 100644
+index e799cd8..8926200 100644
 --- a/src/commands/proxy.rs
 +++ b/src/commands/proxy.rs
 @@ -2,10 +2,14 @@ use crate::commands::Cli;
@@ -273,7 +273,7 @@ index 12cfc36..d81d09f 100644
      async fn run(&self, cli: &Cli, config: Config) -> Result<()> {
          if self.command.is_empty() {
              return Err(FnoxError::CommandNotSpecified);
-@@ -615,6 +741,7 @@ impl ProxyRunCommand {
+@@ -628,6 +754,7 @@ impl ProxyRunCommand {
  /// command too, and passing it on would deliver it twice. A `kill -INT` sent
  /// to fnox alone there can't be told apart from Ctrl-C, so it isn't passed
  /// on; `SIGTERM` stops the command instead.
@@ -281,7 +281,7 @@ index 12cfc36..d81d09f 100644
  async fn run_forwarding_signals(mut command: tokio::process::Command) -> std::io::Result<Outcome> {
      #[cfg(unix)]
      {
-@@ -667,6 +794,7 @@ fn terminal_interrupts_us() -> bool {
+@@ -680,6 +807,7 @@ fn terminal_interrupts_us() -> bool {
  }
  
  /// How a command ended.
@@ -289,7 +289,7 @@ index 12cfc36..d81d09f 100644
  enum Outcome {
      Exited(std::process::ExitStatus),
      /// fnox was interrupted by this signal and stopped the command.
-@@ -676,6 +804,7 @@ enum Outcome {
+@@ -689,6 +817,7 @@ enum Outcome {
  /// Runs `command`, and if fnox is interrupted first, stops it so the caller
  /// can remove the sandbox's placeholder files. The sandbox starts a session of
  /// its own, so Ctrl-C reaches fnox and not the command.
@@ -297,7 +297,7 @@ index 12cfc36..d81d09f 100644
  async fn run_until_interrupted(mut command: tokio::process::Command) -> std::io::Result<Outcome> {
      #[cfg(unix)]
      {
-@@ -705,6 +834,7 @@ async fn run_until_interrupted(mut command: tokio::process::Command) -> std::io:
+@@ -718,6 +847,7 @@ async fn run_until_interrupted(mut command: tokio::process::Command) -> std::io:
  mod tests {
      use super::*;
  
@@ -318,10 +318,10 @@ index 91445ec..1d5b269 100644
  pub mod redact;
  #[cfg(not(target_os = "wasi"))]
 diff --git a/src/proxy/mod.rs b/src/proxy/mod.rs
-index 17ac4b0..1de4a7e 100644
+index 1f4014b..8d3b2e6 100644
 --- a/src/proxy/mod.rs
 +++ b/src/proxy/mod.rs
-@@ -3,59 +3,102 @@
+@@ -3,63 +3,106 @@
  
  use crate::config::{ProxyConfig, ProxyEgress, ProxyRule};
  use crate::error::{FnoxError, Result};
@@ -334,7 +334,9 @@ index 17ac4b0..1de4a7e 100644
 +#[cfg(not(target_os = "wasi"))]
  use ipnet::IpNet;
 +#[cfg(not(target_os = "wasi"))]
- use rcgen::{BasicConstraints, Certificate, CertificateParams, IsCa, Issuer, KeyPair};
+ use rcgen::{
+     BasicConstraints, Certificate, CertificateParams, IsCa, Issuer, KeyPair, KeyUsagePurpose,
+ };
 +#[cfg(not(target_os = "wasi"))]
  use reqwest::Method;
 +#[cfg(not(target_os = "wasi"))]
@@ -362,11 +364,12 @@ index 17ac4b0..1de4a7e 100644
  
 +#[cfg(not(target_os = "wasi"))]
  use crate::local_http::{
-     HttpRequest, MAX_HEADER_BYTES, constant_time_eq, read_http_request_limited, read_line_limited,
+     HttpReadError, HttpRequest, MAX_HEADER_BYTES, constant_time_eq, read_http_request_limited,
+     read_line_limited,
  };
  
 +#[cfg(not(target_os = "wasi"))]
- const MAX_BODY_BYTES: usize = 10 * 1024 * 1024;
+ const DEFAULT_MAX_BODY_BYTES: usize = 10 * 1024 * 1024;
  const DEFAULT_HEADER: &str = "authorization";
  /// Clients such as git first connect without credentials and retry after a
  /// 407 on the same connection; give up after this many unauthenticated tries.
@@ -410,7 +413,8 @@ index 17ac4b0..1de4a7e 100644
  
 +#[cfg(not(target_os = "wasi"))]
  pub use handle::{
-     ClientStream, MCP_HOST, MCP_RELAY_ENV, MCP_RELAY_PROFILE_ENV, McpService, ProxyHandle, RuleInfo,
+     ClientStream, MCP_HOST, MCP_RELAY_ENV, MCP_RELAY_PROFILE_ENV, MCP_RELAY_WALK_UP_ENV,
+     McpService, ProxyHandle, RuleInfo,
  };
 +#[cfg(not(target_os = "wasi"))]
  pub use leases::{LeaseSetup, lease_credential};
@@ -427,10 +431,10 @@ index 17ac4b0..1de4a7e 100644
      FnoxError::Config(format!("proxy: {}", message.into()))
 diff --git a/src/proxy/wasi.rs b/src/proxy/wasi.rs
 new file mode 100644
-index 0000000..d34ad8e
+index 0000000..4b8c33e
 --- /dev/null
 +++ b/src/proxy/wasi.rs
-@@ -0,0 +1,236 @@
+@@ -0,0 +1,240 @@
 +use super::*;
 +use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 +use ipnet::IpNet;
@@ -438,6 +442,7 @@ index 0000000..d34ad8e
 +
 +const MCP_RELAY_ENV: &str = "FNOX_PROXY_MCP";
 +const MCP_RELAY_PROFILE_ENV: &str = "FNOX_PROXY_MCP_PROFILE";
++const MCP_RELAY_WALK_UP_ENV: &str = "FNOX_PROXY_MCP_WALK_UP";
 +
 +pub fn target_label(rule: &ProxyRule) -> String {
 +    match &rule.query {
@@ -468,6 +473,9 @@ index 0000000..d34ad8e
 +    }
 +    for entry in &config.allow_private {
 +        parse_allowed(entry)?;
++    }
++    if config.max_body_bytes == Some(0) {
++        return Err(proxy_error("max_body_bytes must be greater than zero"));
 +    }
 +    Ok(())
 +}
@@ -538,7 +546,7 @@ index 0000000..d34ad8e
 +        .or(rule.secret.as_deref())
 +        .or(rule.credential.as_deref())
 +    {
-+        if [MCP_RELAY_ENV, MCP_RELAY_PROFILE_ENV].contains(&env_name) {
++        if [MCP_RELAY_ENV, MCP_RELAY_PROFILE_ENV, MCP_RELAY_WALK_UP_ENV].contains(&env_name) {
 +            return Err(proxy_error(format!(
 +                "rule for '{}' can't use the environment variable '{env_name}', which fnox reserves",
 +                rule.name()

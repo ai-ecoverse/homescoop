@@ -1,6 +1,6 @@
 # @ai-ecoverse/wasi-fnox
 
-[fnox](https://fnox.jdx.dev) 1.48 for [slicc](https://github.com/ai-ecoverse/slicc)'s kernel: a WASI preview1 command, `fnox`, built from upstream jdx/fnox v1.48.0 with [homescoop's patch series](https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-fnox) (`NNNN-*.patch`, listed in `recipe.yaml`). The patches are carried by homescoop, not upstreamed.
+[fnox](https://fnox.jdx.dev) 1.50 for [slicc](https://github.com/ai-ecoverse/slicc)'s kernel: a WASI preview1 command, `fnox`, built from upstream jdx/fnox v1.50.0 with [homescoop's patch series](https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-fnox) (`NNNN-*.patch`, listed in `recipe.yaml`). The patches are carried by homescoop, not upstreamed.
 
 ## In seven
 
@@ -36,7 +36,7 @@ Without `/dev/sealed`, every sealed operation fails with `not running in seven: 
 
 fnox is MIT (see `LICENSE`). `THIRD-PARTY-NOTICES.md` lists the crates, Rust's standard library and wasi-libc that `bin/fnox.wasm` links.
 
-## WASI support for fnox 1.48
+## WASI support for fnox 1.50
 
 `fnox exec --only` and `--except` retain upstream filtering: excluded providers are not resolved, dependencies are resolved without being exported, and excluded configured values are not injected. Inherited environment variables retain their original values unless the child plan replaces or removes them; these flags do not clear the environment. The WASI child starts from the environment captured before resolution, so a resolved interpolation dependency cannot enter it through process-environment mutation. Sealed selections still use the kernel ticket path.
 
@@ -51,3 +51,7 @@ Since 1.46.0, upstream `fnox push` (CI and hosting secret stores), proxy lease c
 Since 1.47.0, upstream adds named and passphrase-protected age identities, named age recipients, and an `azure-container-apps` push target. Passphrase prompts and age plugins stay native-only; this build still refuses age decryption in seven. A project `fnox.toml` with a `[targets]` table (for host `fnox push`) loads in seven: the table is parsed and ignored. Until 1.46.0-1, gating `Config.targets` off made that table an unknown field and every command failed (homescoop#2009).
 
 Since 1.48.0, a secret can record the page where a new value is issued (`url = "https://…"`, `fnox set NAME --url URL`), and `fnox list` shows it. Upstream's `fnox set --open` opens that page in a browser through the platform's opener, which seven doesn't have: this build compiles the opener out and refuses `--open` before reading a value, so open the url yourself and run `fnox set`. The macOS Keychain Touch ID protection, streaming `fnox proxy run` responses, the SIGPIPE handling for servers, vault lease `ttl` and the daemon's `FNOX_AGE_KEY` refresh are native-only and stay compiled out with the keychain provider, the native proxy, leases and the daemon. `fnox get` retrying through provider tokens kept as secrets (upstream #1125) sets those values only in fnox's own environment; the providers built here (`sealed`, `age`, `plain`) take no such tokens.
+
+Since 1.49.0, a secret can set `sensitive = false` so that `ci-redact` and output redaction leave plain configuration such as a log level readable; `fnox exec` redaction stays refused here, as above. `cache_ttl` and `max_cache_ttl` (on secrets, providers and `[daemon]`) only tune the daemon's cache, so they parse and are ignored in seven. `--walk-up` (or `FNOX_WALK_UP=1`) makes `set`, `remove` and `import` write to the nearest parent directory's config when the current directory has none, as upstream; with the `sealed` provider the placeholder goes to that file and the value to the vault as usual. `[proxy] max_body_bytes` is kept in `proxy rules --json`, and the WASI proxy stub refuses `max_body_bytes = 0` and a rule on the reserved `FNOX_PROXY_MCP_WALK_UP`, as upstream's validation does. Azure workload identity (`AZURE_FEDERATED_TOKEN_FILE`), daemon cache expiry, the proxy's audit-log records, request-size answers and certificate changes, the MCP `request_secret` walk-up and the push target fix are native-only and stay compiled out with the Azure providers, the daemon, the native proxy, the MCP server and `fnox push`; the Azure providers' env dependencies, which this build reads from their source, gain `AZURE_FEDERATED_TOKEN_FILE`.
+
+Since 1.50.0, upstream can leave provider families out with Cargo features. This build keeps upstream's default features and gates the same SDKs off for WASI as before, so a provider other than `sealed`, `age` or `plain` still fails with `provider type '…' is not available in the WASI build of fnox`. `fnox check --strict` turns warnings into errors, and `fnox check` now also reports a provider whose own settings can't be resolved, as upstream. Upstream also drops the `atty` crate for the standard library's terminal check, which this build already used on WASI.

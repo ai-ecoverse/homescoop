@@ -4,10 +4,10 @@ Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 14/19] edit: refuse fnox edit on WASI instead of panicking
 
 diff --git a/src/commands/mod.rs b/src/commands/mod.rs
-index 0678c78..6df59a5 100644
+index 312e381..7741d53 100644
 --- a/src/commands/mod.rs
 +++ b/src/commands/mod.rs
-@@ -387,6 +387,11 @@ impl Commands {
+@@ -399,6 +399,11 @@ impl Commands {
              Commands::Check(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::CiRedact(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Doctor(cmd) => cmd.run(cli, self.load_config(cli)?).await,

@@ -4,7 +4,7 @@ Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 1/19] build: gate non-WASI dependencies by target
 
 diff --git a/Cargo.toml b/Cargo.toml
-index 0948569..ba4cfd9 100644
+index 4f02965..3f296a2 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
 @@ -17,7 +17,7 @@ rust-version = "1.91.1"
@@ -16,7 +16,7 @@ index 0948569..ba4cfd9 100644
  aho-corasick = "1"
  anyhow = "1"
  arboard = "3"
-@@ -37,7 +37,7 @@ azure_security_keyvault_secrets = { version = "1" }
+@@ -36,7 +36,7 @@ azure_security_keyvault_secrets = { version = "1" }
  base64 = "0.23"
  blake3 = "1"
  bytes = "1"
@@ -25,7 +25,7 @@ index 0948569..ba4cfd9 100644
  ci_info = "0.14"
  usage-rs = { version = "7", features = ["diagnostics", "completions", "config"] }
  console = "0.16"
-@@ -108,7 +108,7 @@ tempfile = "3"
+@@ -107,7 +107,7 @@ tempfile = "3"
  tera = { version = "2", default-features = false }
  terminal_size = "0.4"
  thiserror = "2"
@@ -34,15 +34,14 @@ index 0948569..ba4cfd9 100644
  tokio-rustls = "0.26"
  toml_edit = { version = "0.25", features = ["serde"] }
  tracing = "0.1"
-@@ -143,7 +143,6 @@ fnox-core = { path = "crates/fnox-core", version = "1" }
+@@ -155,16 +155,13 @@ fnox-core = { path = "crates/fnox-core", version = "1", default-features = false
  # transitively via fnox-core and are not listed here.
  aho-corasick = { workspace = true }
  anyhow = { workspace = true }
 -arboard = { workspace = true }
- atty = { workspace = true }
  base64 = { workspace = true }
  blake3 = { workspace = true }
-@@ -151,9 +150,7 @@ chrono = { workspace = true }
+ chrono = { workspace = true }
  ci_info = { workspace = true }
  usage-rs = { workspace = true }
  console = { workspace = true }
@@ -52,7 +51,7 @@ index 0948569..ba4cfd9 100644
  futures = { workspace = true }
  globset = { workspace = true }
  hex = { workspace = true }
-@@ -163,32 +160,40 @@ ipnet = { workspace = true }
+@@ -174,32 +171,40 @@ ipnet = { workspace = true }
  libc = { workspace = true }
  miette = { workspace = true }
  miniz_oxide = { workspace = true }
@@ -104,26 +103,25 @@ index 0948569..ba4cfd9 100644
  [dev-dependencies]
  async-trait = { workspace = true }
 diff --git a/crates/fnox-core/Cargo.toml b/crates/fnox-core/Cargo.toml
-index ea225f0..7e708e9 100644
+index 67714e7..8d9db19 100644
 --- a/crates/fnox-core/Cargo.toml
 +++ b/crates/fnox-core/Cargo.toml
-@@ -11,51 +11,26 @@ readme = "../../README.md"
+@@ -36,50 +36,25 @@ kubernetes = ["dep:k8s-openapi", "dep:kube"]
  
  [dependencies]
  aes-gcm = { workspace = true }
 -age = { workspace = true }
  arc-swap = { workspace = true }
  async-trait = { workspace = true }
- atty = { workspace = true }
--aws-config = { workspace = true }
--aws-sdk-kms = { workspace = true }
--aws-sdk-secretsmanager = { workspace = true }
--aws-sdk-ssm = { workspace = true }
--aws-sdk-sts = { workspace = true }
--azure_core = { workspace = true }
--azure_identity = { workspace = true }
--azure_security_keyvault_keys = { workspace = true }
--azure_security_keyvault_secrets = { workspace = true }
+-aws-config = { workspace = true, optional = true }
+-aws-sdk-kms = { workspace = true, optional = true }
+-aws-sdk-secretsmanager = { workspace = true, optional = true }
+-aws-sdk-ssm = { workspace = true, optional = true }
+-aws-sdk-sts = { workspace = true, optional = true }
+-azure_core = { workspace = true, optional = true }
+-azure_identity = { workspace = true, optional = true }
+-azure_security_keyvault_keys = { workspace = true, optional = true }
+-azure_security_keyvault_secrets = { workspace = true, optional = true }
  base64 = { workspace = true }
  blake3 = { workspace = true }
  bytes = { workspace = true }
@@ -133,19 +131,19 @@ index ea225f0..7e708e9 100644
  dirs = { workspace = true }
  fnox-client = { workspace = true }
  futures = { workspace = true }
--gcp_auth = { workspace = true }
--google-cloud-kms = { workspace = true }
--google-cloud-secretmanager-v1 = { workspace = true }
+-gcp_auth = { workspace = true, optional = true }
+-google-cloud-kms = { workspace = true, optional = true }
+-google-cloud-secretmanager-v1 = { workspace = true, optional = true }
  hex = { workspace = true }
  hkdf = { workspace = true }
  hmac = { workspace = true }
  indexmap = { workspace = true }
 -jsonwebtoken = { workspace = true }
--k8s-openapi = { workspace = true }
+-k8s-openapi = { workspace = true, optional = true }
 -keepass = { workspace = true }
--keeper-secrets-manager-core = { workspace = true }
+-keeper-secrets-manager-core = { workspace = true, optional = true }
 -keyring-core = { workspace = true }
--kube = { workspace = true }
+-kube = { workspace = true, optional = true }
 -libloading = { workspace = true }
 -mlua = { workspace = true }
  miette = { workspace = true }
@@ -155,11 +153,11 @@ index ea225f0..7e708e9 100644
 -reqwest = { workspace = true }
 -rpassword = { workspace = true }
  rust-embed = { workspace = true }
--rusqlite = { workspace = true }
+-rusqlite = { workspace = true, optional = true }
  schemars = { workspace = true }
  serde = { workspace = true }
  serde_json = { workspace = true }
-@@ -69,17 +44,48 @@ strum = { workspace = true }
+@@ -93,18 +68,49 @@ strum = { workspace = true }
  tempfile = { workspace = true }
  tera = { workspace = true }
  thiserror = { workspace = true }
@@ -171,28 +169,28 @@ index ea225f0..7e708e9 100644
 -which = { workspace = true }
 +
 +[target.'cfg(not(target_os = "wasi"))'.dependencies]
-+aws-config = { workspace = true }
-+aws-sdk-kms = { workspace = true }
-+aws-sdk-secretsmanager = { workspace = true }
-+aws-sdk-ssm = { workspace = true }
-+aws-sdk-sts = { workspace = true }
-+azure_core = { workspace = true }
-+azure_identity = { workspace = true }
-+azure_security_keyvault_keys = { workspace = true }
-+azure_security_keyvault_secrets = { workspace = true }
-+gcp_auth = { workspace = true }
-+google-cloud-kms = { workspace = true }
-+google-cloud-secretmanager-v1 = { workspace = true }
++aws-config = { workspace = true, optional = true }
++aws-sdk-kms = { workspace = true, optional = true }
++aws-sdk-secretsmanager = { workspace = true, optional = true }
++aws-sdk-ssm = { workspace = true, optional = true }
++aws-sdk-sts = { workspace = true, optional = true }
++azure_core = { workspace = true, optional = true }
++azure_identity = { workspace = true, optional = true }
++azure_security_keyvault_keys = { workspace = true, optional = true }
++azure_security_keyvault_secrets = { workspace = true, optional = true }
++gcp_auth = { workspace = true, optional = true }
++google-cloud-kms = { workspace = true, optional = true }
++google-cloud-secretmanager-v1 = { workspace = true, optional = true }
 +jsonwebtoken = { workspace = true }
-+k8s-openapi = { workspace = true }
++k8s-openapi = { workspace = true, optional = true }
 +keepass = { workspace = true }
-+keeper-secrets-manager-core = { workspace = true }
++keeper-secrets-manager-core = { workspace = true, optional = true }
 +keyring-core = { workspace = true }
-+kube = { workspace = true }
++kube = { workspace = true, optional = true }
 +libloading = { workspace = true }
 +mlua = { workspace = true }
 +reqwest = { workspace = true }
-+rusqlite = { workspace = true }
++rusqlite = { workspace = true, optional = true }
  xx = { workspace = true }
 +demand = { workspace = true }
 +rpassword = { workspace = true }
@@ -205,9 +203,10 @@ index ea225f0..7e708e9 100644
 +tokio = { workspace = true, features = ["rt", "macros", "sync", "time", "io-util", "fs", "io-std"] }
  
  # ctap-hid-fido2 → hidapi → libudev cannot be statically linked on musl,
- # so the FIDO2 provider is excluded from musl builds.
+ # so the FIDO2 provider is excluded from musl builds even with the `fido2`
+ # feature on.
 -[target.'cfg(not(target_env = "musl"))'.dependencies]
 +[target.'cfg(all(not(target_env = "musl"), not(target_os = "wasi")))'.dependencies]
- ctap-hid-fido2 = { workspace = true }
+ ctap-hid-fido2 = { workspace = true, optional = true }
  
  [target.'cfg(target_os = "linux")'.dependencies]

@@ -4,37 +4,10 @@ Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 13/19] set: detect a terminal on WASI; refuse an empty sealed value
 
 diff --git a/src/commands/set.rs b/src/commands/set.rs
-index ba0c4d1..3f3addf 100644
+index 3c75dac..026dde5 100644
 --- a/src/commands/set.rs
 +++ b/src/commands/set.rs
-@@ -22,6 +22,17 @@ fn resolve_remote_key_name<'a>(
-         .unwrap_or(key)
- }
- 
-+#[cfg(not(target_os = "wasi"))]
-+fn stdin_is_terminal() -> bool {
-+    atty::is(atty::Stream::Stdin)
-+}
-+
-+#[cfg(target_os = "wasi")]
-+fn stdin_is_terminal() -> bool {
-+    use std::io::IsTerminal;
-+    std::io::stdin().is_terminal()
-+}
-+
- /// What `SetCommand::store_at` wrote
- pub(crate) struct Stored {
-     pub write_profile: String,
-@@ -389,7 +400,7 @@ impl SetCommand {
-         } else if let Some(ref v) = self.value {
-             // Value provided as argument
-             Some(v.clone())
--        } else if !atty::is(atty::Stream::Stdin) {
-+        } else if !stdin_is_terminal() {
-             // Read from stdin if piped
-             tracing::debug!("Reading secret value from stdin");
-             let mut buffer = String::new();
-@@ -477,6 +488,11 @@ impl SetCommand {
+@@ -503,6 +503,11 @@ impl SetCommand {
                  "not available in seven: a value on the command line is visible to other processes; pipe it on stdin".to_string(),
              ));
          }

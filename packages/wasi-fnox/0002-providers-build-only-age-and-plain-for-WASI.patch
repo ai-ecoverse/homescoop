@@ -4,41 +4,34 @@ Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 2/19] providers: build only age and plain for WASI
 
 diff --git a/crates/fnox-core/build/generate_providers.rs b/crates/fnox-core/build/generate_providers.rs
-index eacaaab..b9c9341 100644
+index 9874fcc..1bec659 100644
 --- a/crates/fnox-core/build/generate_providers.rs
 +++ b/crates/fnox-core/build/generate_providers.rs
-@@ -468,9 +468,19 @@ fn generate_provider_methods(
-             quote! { Self::#variant { daemon_cache, .. } => daemon_cache.unwrap_or(true) }
-         };
-         daemon_cache_arms.push(daemon_cache_arm);
--        env_deps_arms.push(quote! {
--            Self::#variant { .. } => #module::env_dependencies()
--        });
-+        if wasi_enabled(&provider.module) {
-+            env_deps_arms.push(quote! {
-+                Self::#variant { .. } => #module::env_dependencies()
-+            });
-+        } else {
+@@ -502,6 +502,15 @@ fn generate_provider_methods(
+             Self::#variant { cache_ttl, max_cache_ttl, .. } => (cache_ttl.as_deref(), max_cache_ttl.as_deref())
+         });
+         match provider.cfg() {
 +            // The module is compiled out, but its credentials must still be
 +            // scrubbed from children (proxy run) and ordered by the resolver,
 +            // as upstream does: take its list from the module's source.
-+            let deps = disabled_env_dependencies(&provider.module);
-+            env_deps_arms.push(quote! {
-+                Self::#variant { .. } => &[#(#deps),*]
-+            });
-+        }
-         if let Some(field) = &provider.requires_interactive_auth_field {
-             let field = Ident::new(field, Span::call_site());
-             interactive_auth_arms.push(quote! {
-@@ -489,6 +499,7 @@ fn generate_provider_methods(
-     // Build use statements for provider modules
-     let module_uses: Vec<TokenStream> = providers
++            _ if !wasi_enabled(&provider.module) => {
++                let deps = disabled_env_dependencies(&provider.module);
++                env_deps_arms.push(quote! {
++                    Self::#variant { .. } => &[#(#deps),*]
++                });
++            }
+             Some(cfg) => env_deps_arms.push(quote! {
+                 #[cfg(#cfg)]
+                 Self::#variant { .. } => #module::env_dependencies(),
+@@ -680,6 +689,7 @@ fn generate_provider_methods(
+ fn module_uses(providers: &[(String, ProviderToml)]) -> Vec<TokenStream> {
+     providers
          .iter()
 +        .filter(|(_name, provider)| wasi_enabled(&provider.module))
          .map(|(_name, provider)| {
              let module = Ident::new(&provider.module, Span::call_site());
-             quote! { use super::super::#module; }
-@@ -820,6 +831,95 @@ fn generate_from_wizard_fields_body(provider: &ProviderToml) -> TokenStream {
+             match provider.cfg() {
+@@ -904,6 +914,96 @@ fn generate_from_wizard_fields_body(provider: &ProviderToml) -> TokenStream {
      }
  }
  
@@ -96,6 +89,7 @@ index eacaaab..b9c9341 100644
 +/// `body` itself, or, when it names a constant (`SERVICE_PRINCIPAL_ENV_VARS`),
 +/// that constant's value from the module's source or another provider module.
 +fn const_list(path: &str, src: &str, body: &str) -> String {
++    let body = body.strip_prefix("super::").unwrap_or(body);
 +    if !body.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
 +        return body.to_string();
 +    }
@@ -134,7 +128,7 @@ index eacaaab..b9c9341 100644
  fn generate_provider_instantiate(
      providers: &[(String, ProviderToml)],
  ) -> Result<String, Box<dyn std::error::Error>> {
-@@ -837,6 +937,18 @@ fn generate_provider_instantiate(
+@@ -921,6 +1021,18 @@ fn generate_provider_instantiate(
              vec![]
          };
  
@@ -150,11 +144,11 @@ index eacaaab..b9c9341 100644
 +            });
 +            continue;
 +        }
-         if provider.fields.is_empty() {
-             arms.push(quote! {
+         let arm = if provider.fields.is_empty() {
+             quote! {
                  ResolvedProviderConfig::#variant => {
 diff --git a/crates/fnox-core/src/providers/age.rs b/crates/fnox-core/src/providers/age.rs
-index b5197d3..1709d76 100644
+index 0a1a34e..1e34d68 100644
 --- a/crates/fnox-core/src/providers/age.rs
 +++ b/crates/fnox-core/src/providers/age.rs
 @@ -353,6 +353,7 @@ impl crate::providers::Provider for AgeEncryptionProvider {
@@ -194,7 +188,7 @@ index b5197d3..1709d76 100644
          for plugin_name in plugin_names {
              let plugin = age::plugin::RecipientPluginV1::new(
                  &plugin_name,
-@@ -663,6 +674,12 @@ impl AgeEncryptionProvider {
+@@ -667,6 +678,12 @@ impl AgeEncryptionProvider {
                      source: e,
                  })?;
  
@@ -207,7 +201,7 @@ index b5197d3..1709d76 100644
              let content = if is_age_encrypted(&bytes) {
                  decrypt_identity_file(&key_file_path, &bytes)?
              } else {
-@@ -696,12 +713,14 @@ impl AgeEncryptionProvider {
+@@ -700,12 +717,14 @@ impl AgeEncryptionProvider {
                      // identities (e.g. AGE-PLUGIN-YUBIKEY-1...) by driving the
                      // matching `age-plugin-*` binary for PIN/touch prompts.
                      cursor.set_position(0);
@@ -227,7 +221,7 @@ index b5197d3..1709d76 100644
                          .map_err(|e| FnoxError::AgeIdentityParseFailed {
                              details: e.to_string(),
                          })?
-@@ -734,6 +753,9 @@ impl AgeEncryptionProvider {
+@@ -738,6 +757,9 @@ impl AgeEncryptionProvider {
      }
  }
  
@@ -237,7 +231,7 @@ index b5197d3..1709d76 100644
  /// Identity files decrypted with a prompted passphrase, so one run asks once per file.
  /// Keyed by canonical path; the encrypted bytes are kept so an edited file is not served stale.
  type DecryptedIdentities = HashMap<PathBuf, (Vec<u8>, String)>;
-@@ -806,6 +828,10 @@ fn decrypt_with_passphrase(
+@@ -810,6 +832,10 @@ fn decrypt_with_passphrase(
      String::from_utf8(out).map_err(|e| e.to_string())
  }
  
@@ -249,52 +243,70 @@ index b5197d3..1709d76 100644
  mod tests {
      use super::*;
 diff --git a/crates/fnox-core/src/providers/azure_shared.rs b/crates/fnox-core/src/providers/azure_shared.rs
-index 97368bd..7eff514 100644
+index 06047f5..7c59bbc 100644
 --- a/crates/fnox-core/src/providers/azure_shared.rs
 +++ b/crates/fnox-core/src/providers/azure_shared.rs
-@@ -1,10 +1,13 @@
+@@ -6,14 +6,17 @@
  use crate::env;
  use crate::error::{FnoxError, Result};
+ #[cfg(feature = "azure")]
 +#[cfg(not(target_os = "wasi"))]
  use azure_core::credentials::TokenCredential;
+ #[cfg(feature = "azure")]
 +#[cfg(not(target_os = "wasi"))]
  use azure_identity::{
      ClientSecretCredential, DeveloperToolsCredential, ManagedIdentityCredential,
-     ManagedIdentityCredentialOptions, UserAssignedId,
+     ManagedIdentityCredentialOptions, UserAssignedId, WorkloadIdentityCredential,
+     WorkloadIdentityCredentialOptions,
  };
+ #[cfg(feature = "azure")]
 +#[cfg(not(target_os = "wasi"))]
  use std::sync::Arc;
  
- /// The service principal variables [`build_credential`] reads in the default mode.
-@@ -60,6 +63,7 @@ impl AzureAuth {
-     }
+ /// The service principal and workload identity variables [`build_credential`]
+@@ -77,6 +80,7 @@ impl AzureAuth {
  
      /// Build the credential for this mode.
+     #[cfg(feature = "azure")]
 +    #[cfg(not(target_os = "wasi"))]
      pub fn build_credential(&self, provider: &str, url: &str) -> Result<Arc<dyn TokenCredential>> {
          let auth_failed = |e: azure_core::Error| FnoxError::ProviderAuthFailed {
              provider: provider.to_string(),
+@@ -124,6 +128,7 @@ impl AzureAuth {
+ }
+ 
+ #[cfg(feature = "azure")]
++#[cfg(not(target_os = "wasi"))]
+ fn workload_identity_credential(
+     tenant_id: String,
+     client_id: String,
 diff --git a/crates/fnox-core/src/providers/mod.rs b/crates/fnox-core/src/providers/mod.rs
-index 8e5f243..03b560e 100644
+index 3bc57eb..cb48fac 100644
 --- a/crates/fnox-core/src/providers/mod.rs
 +++ b/crates/fnox-core/src/providers/mod.rs
-@@ -5,46 +5,89 @@ use std::path::PathBuf;
- 
- // Provider implementation modules
+@@ -8,54 +8,83 @@ use std::path::PathBuf;
+ // providers/*.toml, which gates the generated code that uses them.
  pub mod age;
+ #[cfg(feature = "aws")]
 +#[cfg(not(target_os = "wasi"))]
  pub mod aws_kms;
+ #[cfg(feature = "aws")]
 +#[cfg(not(target_os = "wasi"))]
  pub mod aws_ps;
+ #[cfg(feature = "aws")]
 +#[cfg(not(target_os = "wasi"))]
  mod aws_shared;
+ #[cfg(feature = "aws")]
 +#[cfg(not(target_os = "wasi"))]
  pub mod aws_sm;
+ #[cfg(feature = "azure")]
 +#[cfg(not(target_os = "wasi"))]
  pub mod azure_ac;
+ #[cfg(feature = "azure")]
 +#[cfg(not(target_os = "wasi"))]
  pub mod azure_kms;
  pub(crate) mod azure_shared;
+ #[cfg(feature = "azure")]
 +#[cfg(not(target_os = "wasi"))]
  pub mod azure_sm;
 +#[cfg(not(target_os = "wasi"))]
@@ -304,15 +316,18 @@ index 8e5f243..03b560e 100644
  pub mod discovery;
 +#[cfg(not(target_os = "wasi"))]
  pub mod doppler;
+ #[cfg(feature = "enpass")]
 +#[cfg(not(target_os = "wasi"))]
  pub mod enpass;
--#[cfg(not(target_env = "musl"))]
-+#[cfg(all(not(target_env = "musl"), not(target_os = "wasi")))]
+ #[cfg(all(feature = "fido2", not(target_env = "musl")))]
++#[cfg(not(target_os = "wasi"))]
  pub mod fido2;
 +#[cfg(not(target_os = "wasi"))]
  pub mod foks;
+ #[cfg(feature = "gcp")]
 +#[cfg(not(target_os = "wasi"))]
  pub mod gcp_kms;
+ #[cfg(feature = "gcp")]
 +#[cfg(not(target_os = "wasi"))]
  pub mod gcp_sm;
 +#[cfg(not(target_os = "wasi"))]
@@ -322,10 +337,12 @@ index 8e5f243..03b560e 100644
  pub mod infisical;
 +#[cfg(not(target_os = "wasi"))]
  pub mod keepass;
+ #[cfg(feature = "keeper")]
 +#[cfg(not(target_os = "wasi"))]
  pub mod keeper_sm;
 +#[cfg(not(target_os = "wasi"))]
  pub mod keychain;
+ #[cfg(feature = "kubernetes")]
 +#[cfg(not(target_os = "wasi"))]
  pub mod kubernetes;
 +#[cfg(not(target_os = "wasi"))]
@@ -350,6 +367,11 @@ index 8e5f243..03b560e 100644
 +#[cfg(not(target_os = "wasi"))]
  pub mod yubikey_usb;
  
+ /// Variables that hold the Enpass master password. Defined here rather than
+@@ -63,7 +92,22 @@ pub mod yubikey_usb;
+ /// keep them out of child environments.
+ pub const ENPASS_PASSWORD_ENV_VARS: &[&str] = &["ENPASS_PASSWORD", "FNOX_ENPASS_PASSWORD"];
+ 
 +#[cfg(not(target_os = "wasi"))]
  pub use bitwarden::BitwardenBackend;
 +#[cfg(target_os = "wasi")]
@@ -369,26 +391,7 @@ index 8e5f243..03b560e 100644
  pub use resolver::resolve_provider_config;
  pub use secret_ref::{
      OptionProviderSecretRef, OptionStringOrSecretRef, ResolvedStringOrProviderRef,
-@@ -160,14 +203,17 @@ mod generated {
-     }
-     pub(super) mod providers_instantiate {
-         // Need to import provider modules for instantiation
--        #[cfg(not(target_env = "musl"))]
-+        #[cfg(all(not(target_env = "musl"), not(target_os = "wasi")))]
-         use super::super::fido2;
-+        #[cfg(not(target_os = "wasi"))]
-         use super::super::{
-             age, aws_kms, aws_ps, aws_sm, azure_ac, azure_kms, azure_sm, bitwarden, bitwarden_sm,
-             doppler, enpass, foks, gcp_kms, gcp_sm, gopass, infisical, keepass, keeper_sm,
-             keychain, kubernetes, lua, onepassword, password_store, passwordstate, plain,
-             proton_pass, vault, yubikey,
-         };
-+        #[cfg(target_os = "wasi")]
-+        use super::super::{age, plain};
-         include!(concat!(
-             env!("OUT_DIR"),
-             "/generated/providers_instantiate.rs"
-@@ -540,6 +586,7 @@ pub(crate) fn get_provider_from_resolved_with_context_and_identity_cycle_guard(
+@@ -570,6 +614,7 @@ pub(crate) fn get_provider_from_resolved_with_context_and_identity_cycle_guard(
          };
          return get_provider_from_resolved(provider_name, &resolved);
      }
@@ -396,38 +399,14 @@ index 8e5f243..03b560e 100644
      if let ResolvedProviderConfig::Lua { plugin, options } = resolved {
          let plugin = if lua::plugin_is_path(plugin) {
              let provider_source = provider_source_path(config, profile, provider_name);
-diff --git a/src/child_env.rs b/src/child_env.rs
-index af0663e..cdf5ac7 100644
---- a/src/child_env.rs
-+++ b/src/child_env.rs
-@@ -47,9 +47,15 @@ pub fn scope_purpose(scope: EnvScope) -> Purpose {
- /// credentials with these names are still applied after the scrub.
- pub fn ambient_scrub_keys() -> impl Iterator<Item = &'static str> {
-     ["FNOX_AGE_KEY", "FNOX_AGE_KEY_FILE"].into_iter().chain(
--        fnox_core::providers::enpass::env_dependencies()
--            .iter()
--            .copied(),
-+        {
-+            #[cfg(not(target_os = "wasi"))]
-+            let deps = fnox_core::providers::enpass::env_dependencies();
-+            #[cfg(target_os = "wasi")]
-+            let deps: &[&str] = &["ENPASS_PASSWORD", "FNOX_ENPASS_PASSWORD"];
-+            deps
-+        }
-+        .iter()
-+        .copied(),
-     )
- }
- 
 diff --git a/src/commands/provider/add.rs b/src/commands/provider/add.rs
-index 56257e1..96b8527 100644
+index 576290d..4070763 100644
 --- a/src/commands/provider/add.rs
 +++ b/src/commands/provider/add.rs
-@@ -240,7 +240,14 @@ impl AddCommand {
-                 auth_command: None,
-                 daemon_cache: None,
+@@ -266,11 +266,19 @@ impl AddCommand {
+                 cache_ttl: None,
+                 max_cache_ttl: None,
              },
--            #[cfg(not(target_env = "musl"))]
 +            #[cfg(target_os = "wasi")]
 +            ProviderType::Fido2 | ProviderType::Yubikey => {
 +                return Err(FnoxError::Config(
@@ -435,12 +414,17 @@ index 56257e1..96b8527 100644
 +                        .to_string(),
 +                ));
 +            }
-+            #[cfg(all(not(target_env = "musl"), not(target_os = "wasi")))]
+             #[cfg(not(all(feature = "fido2", not(target_env = "musl"))))]
+             ProviderType::Fido2 => {
+                 return Err(FnoxError::not_in_build("Provider", "fido2", "fido2"));
+             }
+             #[cfg(all(feature = "fido2", not(target_env = "musl")))]
++            #[cfg(not(target_os = "wasi"))]
              ProviderType::Fido2 => {
                  let provider_name = self.provider.clone();
                  let (credential_id_hex, salt_hex, rp_id, _pin) =
-@@ -259,6 +266,7 @@ impl AddCommand {
-                     daemon_cache: None,
+@@ -291,6 +299,7 @@ impl AddCommand {
+                     max_cache_ttl: None,
                  }
              }
 +            #[cfg(not(target_os = "wasi"))]

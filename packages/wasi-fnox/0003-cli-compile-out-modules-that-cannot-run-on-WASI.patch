@@ -4,7 +4,7 @@ Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 3/19] cli: compile out modules that cannot run on WASI
 
 diff --git a/crates/fnox-core/src/auth_prompt.rs b/crates/fnox-core/src/auth_prompt.rs
-index 7db9075..8b1726c 100644
+index 2ca2a7c..6c7885f 100644
 --- a/crates/fnox-core/src/auth_prompt.rs
 +++ b/crates/fnox-core/src/auth_prompt.rs
 @@ -6,6 +6,7 @@
@@ -36,10 +36,10 @@ index 7db9075..8b1726c 100644
          return Ok(false);
      }
 diff --git a/crates/fnox-core/src/config.rs b/crates/fnox-core/src/config.rs
-index a18c517..6f7c429 100644
+index b9e2f2f..497e4cd 100644
 --- a/crates/fnox-core/src/config.rs
 +++ b/crates/fnox-core/src/config.rs
-@@ -199,8 +199,12 @@ pub struct Config {
+@@ -243,8 +243,12 @@ pub struct Config {
  
      /// Push targets (for default profile): write-only stores that
      /// `fnox push` copies secret values into
@@ -52,7 +52,7 @@ index a18c517..6f7c429 100644
  
      /// Lua provider plugins to install, as `name = "<git url>[#ref]"`.
      /// `owner/repo` is shorthand for a GitHub repository.
-@@ -405,8 +409,12 @@ pub struct ProfileConfig {
+@@ -470,8 +474,12 @@ pub struct ProfileConfig {
      pub providers: IndexMap<String, ProviderConfig>,
  
      /// Push targets for this profile
@@ -65,7 +65,7 @@ index a18c517..6f7c429 100644
  
      /// Default provider name for this profile
      #[serde(default, skip_serializing_if = "Option::is_none")]
-@@ -2245,6 +2253,7 @@ impl Config {
+@@ -2339,6 +2347,7 @@ impl Config {
  
      /// Get effective push targets for the active profile stack, with the same
      /// precedence as [`Self::get_leases`].
@@ -110,7 +110,7 @@ index 7609edd..fcb228e 100644
      build_or_default(client_builder().redirect(reqwest::redirect::Policy::none()))
  }
 diff --git a/crates/fnox-core/src/lease.rs b/crates/fnox-core/src/lease.rs
-index 94517b8..548cb20 100644
+index b9f9ae5..5d8a41c 100644
 --- a/crates/fnox-core/src/lease.rs
 +++ b/crates/fnox-core/src/lease.rs
 @@ -48,6 +48,7 @@ pub struct LeaseLedger {
@@ -147,20 +147,21 @@ index 94517b8..548cb20 100644
  
      /// Load the lease ledger from disk, creating an empty one if it doesn't exist.
 diff --git a/crates/fnox-core/src/lease_backends/aws_sts.rs b/crates/fnox-core/src/lease_backends/aws_sts.rs
-index 786e820..9f0eebd 100644
+index 55f2d7a..3a36646 100644
 --- a/crates/fnox-core/src/lease_backends/aws_sts.rs
 +++ b/crates/fnox-core/src/lease_backends/aws_sts.rs
-@@ -1,7 +1,9 @@
- use crate::error::{FnoxError, Result};
+@@ -6,8 +6,10 @@ use crate::error::{FnoxError, Result};
  use crate::lease_backends::{Lease, LeaseBackend};
  use async_trait::async_trait;
+ #[cfg(feature = "aws")]
 +#[cfg(not(target_os = "wasi"))]
  use aws_config::BehaviorVersion;
+ #[cfg(feature = "aws")]
 +#[cfg(not(target_os = "wasi"))]
  use aws_sdk_sts::Client;
  use indexmap::IndexMap;
  use std::time::Duration;
-@@ -64,6 +66,7 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
+@@ -70,6 +72,7 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
      ]
  }
  
@@ -168,7 +169,7 @@ index 786e820..9f0eebd 100644
  pub struct AwsStsBackend {
      region: String,
      profile: Option<String>,
-@@ -71,6 +74,7 @@ pub struct AwsStsBackend {
+@@ -77,6 +80,7 @@ pub struct AwsStsBackend {
      endpoint: Option<String>,
  }
  
@@ -176,15 +177,15 @@ index 786e820..9f0eebd 100644
  impl AwsStsBackend {
      pub fn new(
          region: String,
-@@ -105,6 +109,7 @@ impl AwsStsBackend {
-     }
+@@ -113,6 +117,7 @@ impl AwsStsBackend {
  }
  
+ #[cfg(feature = "aws")]
 +#[cfg(not(target_os = "wasi"))]
  #[async_trait]
  impl LeaseBackend for AwsStsBackend {
      async fn create_lease(&self, duration: Duration, label: &str) -> Result<Lease> {
-@@ -200,6 +205,7 @@ impl LeaseBackend for AwsStsBackend {
+@@ -208,6 +213,7 @@ impl LeaseBackend for AwsStsBackend {
  
  /// Sanitize a string for use as an AWS STS role session name.
  /// Session names must be 2-64 chars, matching [\w+=,.@-]+
@@ -193,28 +194,38 @@ index 786e820..9f0eebd 100644
      let sanitized: String = name
          .chars()
 diff --git a/crates/fnox-core/src/lease_backends/azure_token.rs b/crates/fnox-core/src/lease_backends/azure_token.rs
-index 3bc4a0e..86cbd91 100644
+index 4f8c17d..8f4d3cb 100644
 --- a/crates/fnox-core/src/lease_backends/azure_token.rs
 +++ b/crates/fnox-core/src/lease_backends/azure_token.rs
-@@ -2,6 +2,7 @@ use crate::error::{FnoxError, Result};
- use crate::lease_backends::{Lease, LeaseBackend};
+@@ -7,9 +7,11 @@ use crate::lease_backends::{Lease, LeaseBackend};
  use crate::providers::azure_shared::{self, AzureAuth};
  use async_trait::async_trait;
+ #[cfg(feature = "azure")]
 +#[cfg(not(target_os = "wasi"))]
  use azure_core::credentials::TokenCredential;
  use indexmap::IndexMap;
+ #[cfg(feature = "azure")]
++#[cfg(not(target_os = "wasi"))]
  use std::sync::Arc;
-@@ -26,6 +27,9 @@ pub fn check_prerequisites(
-     if azure_shared::service_principal_env().is_some() {
-         return None;
+ use std::time::Duration;
+ 
+@@ -29,10 +31,11 @@ pub fn check_prerequisites(
+         Err(_) => return None,
+         Ok(AzureAuth::Default) => {}
      }
+-    default_mode_prerequisite(
+-        azure_shared::has_env_credentials(),
+-        which::which("az").is_ok(),
+-    )
 +    #[cfg(target_os = "wasi")]
 +    let has_az = false;
 +    #[cfg(not(target_os = "wasi"))]
-     let has_az = which::which("az").is_ok();
-     if has_az {
-         None
-@@ -54,12 +58,14 @@ pub fn required_env_vars(auth: Option<&str>) -> Vec<(&'static str, &'static str)
++    let has_az = which::which("az").is_ok();
++    default_mode_prerequisite(azure_shared::has_env_credentials(), has_az)
+ }
+ 
+ /// The default mode needs an env credential (service principal or workload
+@@ -65,12 +68,14 @@ pub fn required_env_vars(auth: Option<&str>) -> Vec<(&'static str, &'static str)
      ]
  }
  
@@ -229,10 +240,10 @@ index 3bc4a0e..86cbd91 100644
  impl AzureTokenBackend {
      pub fn new(
          scope: String,
-@@ -99,6 +105,7 @@ impl AzureTokenBackend {
-     }
+@@ -112,6 +117,7 @@ impl AzureTokenBackend {
  }
  
+ #[cfg(feature = "azure")]
 +#[cfg(not(target_os = "wasi"))]
  #[async_trait]
  impl LeaseBackend for AzureTokenBackend {
@@ -293,10 +304,10 @@ index 2384644..9cc671e 100644
  impl LeaseBackend for CommandBackend {
      async fn create_lease(&self, duration: Duration, label: &str) -> Result<Lease> {
 diff --git a/crates/fnox-core/src/lease_backends/gcp_iam.rs b/crates/fnox-core/src/lease_backends/gcp_iam.rs
-index eddfb30..504d879 100644
+index b1077f7..2e089b0 100644
 --- a/crates/fnox-core/src/lease_backends/gcp_iam.rs
 +++ b/crates/fnox-core/src/lease_backends/gcp_iam.rs
-@@ -33,12 +33,14 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
+@@ -37,12 +37,14 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
      )]
  }
  
@@ -311,10 +322,10 @@ index eddfb30..504d879 100644
  impl GcpIamBackend {
      pub fn new(service_account_email: String, scopes: Vec<String>, env_var: String) -> Self {
          Self {
-@@ -49,6 +51,7 @@ impl GcpIamBackend {
-     }
+@@ -54,6 +56,7 @@ impl GcpIamBackend {
  }
  
+ #[cfg(feature = "gcp")]
 +#[cfg(not(target_os = "wasi"))]
  #[async_trait]
  impl LeaseBackend for GcpIamBackend {
@@ -489,24 +500,27 @@ index ba2df18..1f39e61 100644
  impl LeaseBackend for GitLabBackend {
      async fn create_lease(&self, duration: Duration, label: &str) -> Result<Lease> {
 diff --git a/crates/fnox-core/src/lease_backends/kubernetes.rs b/crates/fnox-core/src/lease_backends/kubernetes.rs
-index 1b40791..2906f55 100644
+index 0272d98..a48ed62 100644
 --- a/crates/fnox-core/src/lease_backends/kubernetes.rs
 +++ b/crates/fnox-core/src/lease_backends/kubernetes.rs
-@@ -2,9 +2,13 @@ use crate::error::{FnoxError, Result};
- use crate::lease_backends::{Lease, LeaseBackend};
+@@ -7,12 +7,16 @@ use crate::lease_backends::{Lease, LeaseBackend};
  use async_trait::async_trait;
  use indexmap::IndexMap;
+ #[cfg(feature = "kubernetes")]
 +#[cfg(not(target_os = "wasi"))]
  use k8s_openapi::api::authentication::v1::{TokenRequest, TokenRequestSpec};
+ #[cfg(feature = "kubernetes")]
 +#[cfg(not(target_os = "wasi"))]
  use k8s_openapi::api::core::v1::ServiceAccount;
+ #[cfg(feature = "kubernetes")]
 +#[cfg(not(target_os = "wasi"))]
  use kube::Api;
+ #[cfg(feature = "kubernetes")]
 +#[cfg(not(target_os = "wasi"))]
  use kube::api::PostParams;
  use std::time::Duration;
  
-@@ -37,6 +41,7 @@ pub struct KubernetesBackend {
+@@ -45,6 +49,7 @@ pub struct KubernetesBackend {
      env_var: String,
  }
  
@@ -514,16 +528,16 @@ index 1b40791..2906f55 100644
  impl KubernetesBackend {
      pub fn new(
          service_account: String,
-@@ -96,6 +101,7 @@ impl KubernetesBackend {
-     }
+@@ -106,6 +111,7 @@ impl KubernetesBackend {
  }
  
+ #[cfg(feature = "kubernetes")]
 +#[cfg(not(target_os = "wasi"))]
  #[async_trait]
  impl LeaseBackend for KubernetesBackend {
      async fn create_lease(&self, duration: Duration, _label: &str) -> Result<Lease> {
 diff --git a/crates/fnox-core/src/lease_backends/mod.rs b/crates/fnox-core/src/lease_backends/mod.rs
-index 629ecfa..c62bbb1 100644
+index ae2ba95..0261ab4 100644
 --- a/crates/fnox-core/src/lease_backends/mod.rs
 +++ b/crates/fnox-core/src/lease_backends/mod.rs
 @@ -70,6 +70,7 @@ pub(crate) fn env_credential(name: &str) -> Option<String> {
@@ -534,7 +548,7 @@ index 629ecfa..c62bbb1 100644
  pub(crate) fn require_secure_url(backend: &str, field: &str, value: &str) -> Result<()> {
      let url = reqwest::Url::parse(value).map_err(|e| {
          crate::error::FnoxError::Config(format!(
-@@ -519,12 +520,32 @@ impl LeaseBackendConfig {
+@@ -558,12 +559,32 @@ impl LeaseBackendConfig {
      }
  
      /// Create a lease backend instance from this configuration
@@ -726,7 +740,7 @@ index e711ff9..7d1390a 100644
      let arg0 = std::path::PathBuf::from(std::env::args_os().next()?);
      let invoked = if arg0.components().count() > 1 {
 diff --git a/src/commands/init.rs b/src/commands/init.rs
-index 1dd3da1..9219d0a 100644
+index 4af44a2..3de76e5 100644
 --- a/src/commands/init.rs
 +++ b/src/commands/init.rs
 @@ -1,8 +1,11 @@
@@ -739,19 +753,19 @@ index 1dd3da1..9219d0a 100644
  use demand::{Confirm, DemandOption, Input, Select};
 +#[cfg(not(target_os = "wasi"))]
  use std::collections::HashMap;
+ use std::io::IsTerminal;
  
- /// Create a fnox.toml config file
-@@ -71,6 +74,9 @@ impl InitCommand {
+@@ -72,6 +75,9 @@ impl InitCommand {
              })?;
          }
  
 +        #[cfg(target_os = "wasi")]
 +        let config = Config::new();
 +        #[cfg(not(target_os = "wasi"))]
-         let config = if self.skip_wizard || !atty::is(atty::Stream::Stdin) {
+         let config = if self.skip_wizard || !std::io::stdin().is_terminal() {
              // Non-interactive mode
              Config::new()
-@@ -99,6 +105,7 @@ impl InitCommand {
+@@ -100,6 +106,7 @@ impl InitCommand {
          Ok(())
      }
  
@@ -759,7 +773,7 @@ index 1dd3da1..9219d0a 100644
      async fn run_wizard(&self) -> Result<Config> {
          println!("\n🔐 Welcome to fnox setup wizard!\n");
          println!("This will help you configure your first secret provider.\n");
-@@ -178,6 +185,7 @@ impl InitCommand {
+@@ -179,6 +186,7 @@ impl InitCommand {
      }
  
      /// Select a provider category
@@ -767,7 +781,7 @@ index 1dd3da1..9219d0a 100644
      fn select_category(&self) -> Result<WizardCategory> {
          let mut select = Select::new("What type of provider do you want to use?")
              .description("Choose a category based on your security and convenience needs")
-@@ -206,6 +214,7 @@ impl InitCommand {
+@@ -207,6 +215,7 @@ impl InitCommand {
      }
  
      /// Select a specific provider from the given list
@@ -775,7 +789,7 @@ index 1dd3da1..9219d0a 100644
      fn select_provider(&self, providers: &[&'static WizardInfo]) -> Result<&'static WizardInfo> {
          let mut select = Select::new("Select provider:").filterable(false);
  
-@@ -232,6 +241,7 @@ impl InitCommand {
+@@ -233,6 +242,7 @@ impl InitCommand {
      }
  
      /// Collect field values from the user
@@ -783,7 +797,7 @@ index 1dd3da1..9219d0a 100644
      fn collect_fields(&self, info: &WizardInfo) -> Result<HashMap<String, String>> {
          let mut fields = HashMap::new();
  
-@@ -264,6 +274,7 @@ impl InitCommand {
+@@ -265,6 +275,7 @@ impl InitCommand {
      }
  
      /// Get the provider name from the user
@@ -791,7 +805,7 @@ index 1dd3da1..9219d0a 100644
      fn get_provider_name(&self, default: &str) -> Result<String> {
          Input::new("Provider name:")
              .placeholder(default)
-@@ -279,6 +290,7 @@ impl InitCommand {
+@@ -280,6 +291,7 @@ impl InitCommand {
      }
  
      /// Test the provider connection and print the result
@@ -800,10 +814,10 @@ index 1dd3da1..9219d0a 100644
          &self,
          provider_name: &str,
 diff --git a/src/commands/lease.rs b/src/commands/lease.rs
-index 5da54b3..140910e 100644
+index 78d2b99..59c7939 100644
 --- a/src/commands/lease.rs
 +++ b/src/commands/lease.rs
-@@ -355,6 +355,12 @@ impl LeaseCreateCommand {
+@@ -359,6 +359,12 @@ impl LeaseCreateCommand {
                  eprintln!();
                  for (var, description) in &required_vars {
                      if std::env::var(var).is_err() {
@@ -817,7 +831,7 @@ index 5da54b3..140910e 100644
                              .placeholder("paste value here")
                              .run()
 diff --git a/src/commands/mod.rs b/src/commands/mod.rs
-index 18220d3..50bd9fe 100644
+index dff8afb..c38cb2a 100644
 --- a/src/commands/mod.rs
 +++ b/src/commands/mod.rs
 @@ -10,6 +10,7 @@ pub mod check;
@@ -852,7 +866,7 @@ index 18220d3..50bd9fe 100644
  pub mod tui;
  pub mod usage;
  pub mod version;
-@@ -153,6 +159,7 @@ pub enum Commands {
+@@ -165,6 +171,7 @@ pub enum Commands {
  
      ConfigFiles(config_files::ConfigFilesCommand),
  
@@ -860,7 +874,7 @@ index 18220d3..50bd9fe 100644
      Daemon(daemon::DaemonCommand),
  
      Deactivate(deactivate::DeactivateCommand),
-@@ -183,16 +190,20 @@ pub enum Commands {
+@@ -195,16 +202,20 @@ pub enum Commands {
  
      List(list::ListCommand),
  
@@ -881,7 +895,7 @@ index 18220d3..50bd9fe 100644
      Push(push::PushCommand),
  
      Reencrypt(reencrypt::ReencryptCommand),
-@@ -215,6 +226,7 @@ pub enum Commands {
+@@ -227,6 +238,7 @@ pub enum Commands {
  
      Sync(sync::SyncCommand),
  
@@ -889,7 +903,7 @@ index 18220d3..50bd9fe 100644
      Tui(tui::TuiCommand),
  
      /// Generate usage specification
-@@ -326,6 +338,7 @@ impl Commands {
+@@ -338,6 +350,7 @@ impl Commands {
      ///
      /// Such a command must survive a peer that hangs up mid-write, so it
      /// ignores SIGPIPE; other commands die on it like a normal Unix tool.
@@ -897,7 +911,7 @@ index 18220d3..50bd9fe 100644
      pub fn serves_connections(&self) -> bool {
          match self {
              Commands::Daemon(cmd) => cmd.serves_connections(),
-@@ -342,9 +355,11 @@ impl Commands {
+@@ -354,9 +367,11 @@ impl Commands {
              Commands::Init(cmd) => cmd.run(cli).await,
              Commands::Completion(cmd) => cmd.run(cli).await,
              Commands::ConfigFiles(cmd) => cmd.run(cli).await,
@@ -909,7 +923,7 @@ index 18220d3..50bd9fe 100644
              Commands::Plugin(cmd) => cmd.run(cli).await,
              Commands::Usage(cmd) => cmd.run(cli).await,
              Commands::Activate(cmd) => cmd
-@@ -383,6 +398,7 @@ impl Commands {
+@@ -395,6 +410,7 @@ impl Commands {
              Commands::List(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              // Inside `fnox proxy run`, the proxy serves the tools; the relay
              // needs no config, which a sandbox may hide
@@ -917,7 +931,7 @@ index 18220d3..50bd9fe 100644
              Commands::Mcp(_) if crate::mcp::relay::requested() => {
                  crate::mcp::relay::check_flags(
                      &cli.config,
-@@ -392,6 +408,7 @@ impl Commands {
+@@ -405,6 +421,7 @@ impl Commands {
                  )?;
                  crate::mcp::relay::run().await
              }
@@ -925,7 +939,7 @@ index 18220d3..50bd9fe 100644
              Commands::Mcp(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Profiles(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Provider(cmd)
-@@ -400,7 +417,9 @@ impl Commands {
+@@ -413,7 +430,9 @@ impl Commands {
                  cmd.run(cli, Config::new()).await
              }
              Commands::Provider(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -935,7 +949,7 @@ index 18220d3..50bd9fe 100644
              Commands::Push(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Reencrypt(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Env(cmd) => cmd.run(cli).await,
-@@ -409,6 +428,7 @@ impl Commands {
+@@ -422,6 +441,7 @@ impl Commands {
              Commands::Set(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Sync(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Scan(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -944,10 +958,10 @@ index 18220d3..50bd9fe 100644
          }
      }
 diff --git a/src/commands/set.rs b/src/commands/set.rs
-index 03350f6..f7a91f1 100644
+index 409771c..0b60316 100644
 --- a/src/commands/set.rs
 +++ b/src/commands/set.rs
-@@ -354,6 +354,14 @@ impl SetCommand {
+@@ -380,6 +380,14 @@ impl SetCommand {
              config::validate_secret_url(url).map_err(FnoxError::Config)?;
          }
  
@@ -959,10 +973,10 @@ index 03350f6..f7a91f1 100644
 +            ));
 +        }
 +
-         if self.open && (!atty::is(atty::Stream::Stdin) || fnox_core::env::is_non_interactive()) {
+         if self.open && (!std::io::stdin().is_terminal() || fnox_core::env::is_non_interactive()) {
              return Err(FnoxError::Config(
                  "--open needs an interactive terminal to prompt for the new value".into(),
-@@ -398,15 +406,22 @@ impl SetCommand {
+@@ -424,15 +432,22 @@ impl SetCommand {
              // asks for a value, even alongside `--url` or `--description`)
              None
          } else {
@@ -985,7 +999,7 @@ index 03350f6..f7a91f1 100644
              Some(value)
          };
  
-@@ -648,6 +663,7 @@ impl SetCommand {
+@@ -674,6 +689,7 @@ impl SetCommand {
      /// Without a URL this only warns, so the value prompt still follows. A
      /// launcher that fails (no browser over SSH) is not an error either: the
      /// printed URL is the fallback.
@@ -994,10 +1008,10 @@ index 03350f6..f7a91f1 100644
          &self,
          config: &Config,
 diff --git a/src/daemon.rs b/src/daemon.rs
-index 762daff..cf59a25 100644
+index 7b45b2d..69511cd 100644
 --- a/src/daemon.rs
 +++ b/src/daemon.rs
-@@ -596,6 +596,15 @@ pub async fn start_background(cli: &Cli, config: Option<&Config>) -> Result<bool
+@@ -768,6 +768,15 @@ pub async fn start_background(cli: &Cli, config: Option<&Config>) -> Result<bool
      start_background_for_context(&ResolveContext::from_cli(cli), config).await
  }
  

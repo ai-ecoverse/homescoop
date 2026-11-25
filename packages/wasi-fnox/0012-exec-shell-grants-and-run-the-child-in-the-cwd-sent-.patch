@@ -53,7 +53,7 @@ index 9cf8473..3d85bf0 100644
      fn wait_polls_until_done() {
          let (_g, mock) = install();
 diff --git a/src/commands/exec.rs b/src/commands/exec.rs
-index 9173c7a..415261d 100644
+index f21f056..9d1f61d 100644
 --- a/src/commands/exec.rs
 +++ b/src/commands/exec.rs
 @@ -106,6 +106,13 @@ pub struct ExecCommand {

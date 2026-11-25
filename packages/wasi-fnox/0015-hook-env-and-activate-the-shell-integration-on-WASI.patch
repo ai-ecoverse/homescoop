@@ -45,7 +45,7 @@ index 7d1390a..a866a56 100644
          let opts = ActivateOptions {
              exe,
 diff --git a/src/hook_env.rs b/src/hook_env.rs
-index bc56d41..4a20540 100644
+index d19594f..89f2c29 100644
 --- a/src/hook_env.rs
 +++ b/src/hook_env.rs
 @@ -85,6 +85,12 @@ impl HookEnvSession {
