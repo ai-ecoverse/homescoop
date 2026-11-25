@@ -33,7 +33,7 @@
   "homescoop": {
     "recipe": "wasi-fastly",
     "upstream": "17.2.0",
-    "source": "fastly/cli@3e9473d248429bad874e848281f0e91ad6f41ea8",
+    "source": "fastly/cli@23a945ddd734be70671c246f3c5a8a4fecfb3a42",
     "patches": [
       "0001-wasip1-build.patch",
       "0002-wasip1-slicc-host.patch",

@@ -2,6 +2,7 @@
 // through the kernel's network (ctx.serve): the transport sees each
 // request, Fastly-Key included, and nothing else.
 import { SERVICE_ID, TOKEN, asUser, output, requests, stub } from './lib/stub.mjs'
+import { agentPattern, versionPattern } from './lib/version.mjs'
 
 export default async function (ctx) {
   const { assert } = ctx
@@ -10,7 +11,7 @@ export default async function (ctx) {
 
   const version = await fastly(['fastly', 'version'])
   assert.equal(version.status, 0, output(version))
-  assert.match(version.stdout, /^Fastly CLI version v17\.1\.0 \(3e9473d\)\nBuilt with go version go1\.\d+\.\d+ wasip1\/wasm \(\d{4}-\d\d-\d\d\)\n$/)
+  assert.match(version.stdout, versionPattern())
 
   const help = await fastly(['fastly', '--help'])
   assert.equal(help.status, 0, output(help))
@@ -32,7 +33,7 @@ export default async function (ctx) {
   assert.equal(seen[0].method, 'GET')
   assert.match(seen[0].url, /^https:\/\/api\.fastly\.com\/service(\?|$)/)
   assert.equal(seen[0].key, TOKEN)
-  assert.match(seen[0].agent, /^FastlyCLI\/v17\.1\.0, FastlyGo\//)
+  assert.match(seen[0].agent, agentPattern())
 
   const table = await fastly(['fastly', 'service', 'list'], { env })
   assert.equal(table.status, 0, output(table))

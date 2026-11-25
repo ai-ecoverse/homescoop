@@ -7,6 +7,7 @@ export default async function (ctx) {
   const fastly = await asUser(ctx, 'builder')
   await stub(ctx)
   await write('/home/builder/app/fastly.toml', 'manifest_version = 3\nname = "cert-app"\nlanguage = "rust"\nservice_id = "SU1Z0isxPaozGVKXdv0eY"\n')
+  await write('/home/builder/app/recv.vcl', 'set req.http.X-Cert = "1";\n')
   const env = { FASTLY_API_TOKEN: TOKEN }
   for (const [argv, message] of [
     [['compute', 'build'], /building a Compute package is not available in the Fastly CLI for slicc: it runs the project's language toolchain/],
@@ -15,6 +16,7 @@ export default async function (ctx) {
     [['compute', 'serve'], /'fastly compute serve' is not available in the Fastly CLI for slicc: it builds the package and runs it under Viceroy/],
     [['compute', 'init'], /'fastly compute init' is not available in the Fastly CLI for slicc/],
     [['compute', 'install-tools'], /'fastly compute install-tools' is not available in the Fastly CLI for slicc/],
+    [['vcl', 'serve', 'recv.vcl'], /'fastly vcl serve' is not available in the Fastly CLI for slicc: it publishes the VCL to a Fiddle sandbox and then serves it on a local port/],
     [['update'], /'fastly update' is not available in the Fastly CLI for slicc/],
     [['install', '17.0.0'], /'fastly install' is not available in the Fastly CLI for slicc/],
     [['auth', 'login', '--sso', '--token', 'work'], /SSO is not available in the Fastly CLI for slicc: it waits for the browser to come back to http:\/\/localhost:8080\/callback/],

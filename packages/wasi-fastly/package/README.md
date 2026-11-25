@@ -66,6 +66,11 @@ On slicc-kernel, with the host module:
   and versions), `domain`, `dns`, `tls-*`, `kv-store`, `config-store`,
   `secret-store`, `stats`, `whoami`, `auth` and the rest. Requests go to `https://api.fastly.com` through the
   kernel's network. The cert covers `service list` and `service create`;
+- `fastly vcl check` and `fastly vcl run`: they send the VCL to Fastly's
+  Fiddle sandbox (`https://fiddle.fastly.dev`), which needs no API token,
+  and none is sent there. `~/.config/fastly/vcl-sandbox.json` keeps the
+  sandbox's id and cache bucket, so the next run updates the same sandbox.
+  The cert covers both against a stand-in for the sandbox;
 - `--json` output, and prompts answered from stdin (`-y`, `-i` or a pipe).
 
 ## What does not work
@@ -82,6 +87,9 @@ On slicc-kernel, with the host module:
 - `fastly compute serve` (Viceroy, a native program, on a local port),
   `compute init` (git and the starter kit's scripts) and
   `compute install-tools` (it downloads Viceroy).
+- `fastly vcl serve`: it publishes the VCL to a Fiddle sandbox and then
+  serves it on a local port, which a slicc command can't open. Use
+  `fastly vcl check` here, and `vcl serve` where it can listen.
 - `fastly update` and `fastly install`: they replace the binary. Install
   another version of this package instead.
 - SSO (above), and opening a browser.
