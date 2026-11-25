@@ -240,3 +240,18 @@ export function driftErrors({ name, upstream, pkg, summary, readme, allow = load
 export function readText(path) {
   return existsSync(path) ? readFileSync(path, 'utf8') : '';
 }
+
+export function sourcePin(commit, field) {
+  if (typeof field !== 'string' || !/^[0-9a-f]{40}$/.test(String(commit ?? ''))) return null;
+  const at = field.lastIndexOf('@');
+  return `${at < 0 ? field : field.slice(0, at)}@${commit}`;
+}
+
+export function sourcePinErrors({ name, commit, pkg }) {
+  const field = pkg.homescoop?.source;
+  if (field === undefined || !/^[0-9a-f]{40}$/.test(String(commit ?? ''))) return [];
+  if (typeof field !== 'string') return [`package.json homescoop.source is ${JSON.stringify(field)}, not "<owner/repo>@${commit}" (the recipe's source.commit)`];
+  const want = sourcePin(commit, field);
+  if (want === field) return [];
+  return [`package.json homescoop.source "${field}" != "${want}", the recipe's source.commit (run: node scripts/sync-package-version.mjs ${name} --write)`];
+}

@@ -20,7 +20,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SLICC_SHIM_MARK, shimNoticeErrors } from './shim-notice.mjs';
 import { spawnSync } from 'node:child_process';
-import { driftErrors, readText } from './upstream-version-text.mjs';
+import { driftErrors, readText, sourcePinErrors } from './upstream-version-text.mjs';
 import { recipeTag } from './npm-tag.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -59,6 +59,7 @@ function packageDrift(pkgName, recipe, pkg) {
       summary: recipe.summary,
       readme: readText(join(root, 'packages', pkgName, 'package', 'README.md')),
     }),
+    ...sourcePinErrors({ name: pkgName, commit: recipe.source?.commit, pkg }),
   ];
 }
 

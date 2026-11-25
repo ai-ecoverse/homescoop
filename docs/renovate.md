@@ -21,7 +21,9 @@ When upstream cuts a release, Renovate opens a PR labeled `homescoop-recipe`
 
 The `recipe-sha` job runs `refresh-recipe-sha.mjs` and
 `sync-package-version.mjs --write` (which also rewrites the old upstream
-version in `description`, the recipe `summary` and `package/README.md`)
+version in `description`, the recipe `summary` and `package/README.md`, and
+sets `homescoop.source`, `<owner/repo>@<commit>` where a `package.json` keeps
+one, to the recipe's `source.commit`, #2230)
 and `readme-table.mjs --write` in its checkout, and **only checks**: CI
 never pushes to a pull request (a `github-actions[bot]` push leaves the new
 head's runs waiting for "Approve and run"). A stale branch fails with one
@@ -31,7 +33,9 @@ plus `recipe-sha: FAIL README.md: needs refresh: node scripts/readme-table.mjs -
 when only the root table is stale. Anyone can run the printed command and
 push. A refreshed PR then carries the new version everywhere;
 `check-package-meta.mjs` fails the build when any text still names the old one
-(docs/versioning.md, "Upstream versions in text").
+(docs/versioning.md, "Upstream versions in text"), or when `homescoop.source`
+names another commit than `source.commit`, and so does
+`scripts/test/homescoop-source.test.mjs` in the test job.
 
 ### The refresh
 
