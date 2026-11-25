@@ -1,5 +1,5 @@
 # fnox (jdx/fnox) for seven's kernel: the secrets tool as a WASI command.
-# Upstream is jdx/fnox v1.48.0; the patches live here (NNNN-*.patch, applied
+# Upstream is jdx/fnox v1.50.0; the patches live here (NNNN-*.patch, applied
 # in filename order by apply.sh) and are only those the WASI build or seven's
 # in-kernel integration needs. Needs slicc-kernel 1.175.0 and later
 # (/dev/sealed, exec tickets and the ask op).
@@ -12,7 +12,7 @@ summary: "fnox 1.50 for slicc WASI preview1 (command fnox; seven's sealed store)
 source:
   url: "https://github.com/jdx/fnox/archive/refs/tags/v{{version}}.tar.gz"
   sha256: "c02b71ab4c10b0d464fba0dc6ddb20bec16ae67c61d029919b50d55d39d15c05"
-  epoch: "1794255284"
+  epoch: "1794981138"
 # ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#536).
 reproducible: true
 toolchain:
@@ -26,7 +26,7 @@ about:
   homepage: https://fnox.jdx.dev
   license: MIT
   notes: |
-    Upstream is jdx/fnox v1.48.0; the patches live here, are not
+    Upstream is jdx/fnox v1.50.0; the patches live here, are not
     upstreamed (per Lars), and are kept only when (a) the WASI build
     needs them or (b) seven's in-kernel integration does. Host installs
     use upstream fnox as it is. apply.sh checks and applies the series
@@ -49,7 +49,10 @@ about:
            tokio::process), whose GNUPGHOME, GOPASS_HOMEDIR and
            GOPASS_CONFIG_NOWRAP proxy run scrubs the same way; from
            1.48.0 also a module directory whose list sits in a submodule
-           (keychain/provider.rs, re-exported by keychain/mod.rs)
+           (keychain/provider.rs, re-exported by keychain/mod.rs); from
+           1.50.0 upstream's Cargo feature gates stay under the WASI gate,
+           and a list named through super:: (enpass's
+           ENPASS_PASSWORD_ENV_VARS) is read from providers/mod.rs
       0003 compile out mcp (including request_secret and the proxy MCP
            relay), local_http, secret_session, tui, daemon, leases,
            prompts on WASI, and from 1.40.0 the plugin command and
@@ -74,7 +77,8 @@ about:
       0005 spawn `fnox exec` children through wasix-command
       0011 allow the lints that WASI-gated code leaves behind
       0013 set: std IsTerminal on WASI (atty is always false on wasm);
-           also (b): an empty sealed value is refused
+           also (b): an empty sealed value is refused; from 1.50.0
+           upstream uses std IsTerminal itself, so only the refusal stays
       0014 refuse `fnox edit` on WASI (tempfile's temp_dir() and the
            editor's std Command can't run there; it trapped with 134,
            homescoop#376): "fnox edit is not available in seven: use
@@ -93,7 +97,9 @@ about:
            SLICC_SEALED_TICKET; as_file refused; missing command → 127
       0009 proxy rules --json; proxy run passes placeholders on WASI;
            from 1.46.0 the stub validates port-specific allow_private
-           and refuses lease rules (native proxy leases stay compiled out)
+           and refuses lease rules (native proxy leases stay compiled out);
+           from 1.50.0 it refuses max_body_bytes = 0 and a rule on the
+           reserved FNOX_PROXY_MCP_WALK_UP, as upstream's validate_config
       0010 refuse sync/reencrypt, age decryption (slicc-vault#2); check
            asks the vault for each sealed record
       0012 exec --shell-grants: materialize {shellGrants} (slicc-vault#9)
@@ -115,7 +121,7 @@ about:
            ciphertext or plaintext
     cargo build --locked --release --bin fnox --target wasm32-wasip1
     with RUSTFLAGS --cfg tokio_unstable and SOURCE_DATE_EPOCH set to the
-    v1.48.0 commit time (source.epoch, 2026-11-09T20:14:44Z), so the
+    v1.50.0 commit time (source.epoch, 2026-11-18T05:52:18Z), so the
     build is byte-reproducible (homescoop#364), then wasm-opt -Oz
     (binaryen 133). No C toolchain. THIRD-PARTY-NOTICES.md from cargo metadata
     plus Rust's std and wasi-libc licences. 1.39.0-1 is certified and
@@ -209,3 +215,28 @@ about:
     0016, 0018 and 0019 keep the same added and removed lines.
     source.epoch is the v1.48.0 tag's commit time; build.sh's
     usage-test notice moves to 7.3.0 (the same LICENSE, f68207e9...).
+    1.50.0-1 rebases the series onto v1.50.0 (skipping 1.49 as Renovate
+    did). 1.50.0 puts the cloud SDKs, Kubernetes, Keeper, Enpass and
+    FIDO2 behind default Cargo features (upstream #1189); this build
+    keeps the default features, 0001 keeps those dependencies optional
+    in its non-WASI tables, and 0002 and 0003 stack the WASI gate under
+    each new feature gate, so the same providers, leases and SDKs are
+    compiled out and refused as in 1.48.0 (ensure_in_build is a no-op
+    here). Upstream now generates providers_instantiate's module uses,
+    so 0002 filters them for WASI and 0006 no longer edits a use list;
+    0006 gives the sealed provider 1.49.0's cache_ttl and max_cache_ttl
+    fields. 0002 reads enpass's list through super:: and azure's gains
+    AZURE_FEDERATED_TOKEN_FILE (1.49.0 workload identity); 0003 keeps
+    `which az` native-only in the azure-token prerequisite check; 0009
+    mirrors 1.49.0's max_body_bytes and FNOX_PROXY_MCP_WALK_UP checks.
+    Upstream drops atty for std IsTerminal (1.50.0), so 0013 keeps only
+    the empty sealed value refusal. 1.49.0's sensitive = false, daemon
+    cache TTLs (parsed, no daemon here), --walk-up / FNOX_WALK_UP for
+    set, remove and import, and 1.50.0's check --strict work as
+    upstream; the proxy audit log, 413 answers and TLS changes, Azure
+    workload identity, the daemon TTLs and MCP walk-up are native-only
+    and stay compiled out. Security patches 0007, 0008, 0010, 0012,
+    0016, 0018 and 0019 keep the same added and removed lines; 0006
+    and 0013 change only as above. source.epoch is the v1.50.0 tag's
+    commit time; build.sh's usage-test notice moves to 7.4.0 (the same
+    LICENSE, f68207e9...).

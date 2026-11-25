@@ -15,10 +15,10 @@ that stale PWD and looked for fnox.toml from the parent's directory.
 HOME_DIR comes from HOME on WASI.
 
 diff --git a/crates/fnox-core/src/env.rs b/crates/fnox-core/src/env.rs
-index 5d2479a..26c0c70 100644
+index 5411634..0d608ff 100644
 --- a/crates/fnox-core/src/env.rs
 +++ b/crates/fnox-core/src/env.rs
-@@ -40,12 +40,18 @@ pub fn remove_var<K: AsRef<OsStr>>(key: K) {
+@@ -50,12 +50,18 @@ pub fn utf8_vars() -> impl Iterator<Item = (String, String)> {
  }
  
  // Directory configuration
@@ -39,7 +39,7 @@ index 5d2479a..26c0c70 100644
                  return HOME_DIR.join(".config");
                  #[cfg(windows)]
                  return HOME_DIR.join("AppData").join("Local");
-@@ -58,7 +64,7 @@ pub static FNOX_STATE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+@@ -68,7 +74,7 @@ pub static FNOX_STATE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
      var_path("FNOX_STATE_DIR").unwrap_or_else(|| {
          var_path("XDG_STATE_HOME")
              .unwrap_or_else(|| {
@@ -48,7 +48,7 @@ index 5d2479a..26c0c70 100644
                  return HOME_DIR.join(".local").join("state");
                  #[cfg(windows)]
                  return HOME_DIR.join("AppData").join("Local");
-@@ -71,7 +77,7 @@ pub static FNOX_DATA_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+@@ -81,7 +87,7 @@ pub static FNOX_DATA_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
      var_path("FNOX_DATA_DIR").unwrap_or_else(|| {
          var_path("XDG_DATA_HOME")
              .unwrap_or_else(|| {

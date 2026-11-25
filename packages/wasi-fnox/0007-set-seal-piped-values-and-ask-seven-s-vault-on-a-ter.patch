@@ -4,10 +4,10 @@ Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 7/19] set: seal piped values and ask seven's vault on a terminal
 
 diff --git a/src/commands/set.rs b/src/commands/set.rs
-index f7a91f1..ba0c4d1 100644
+index 0b60316..3c75dac 100644
 --- a/src/commands/set.rs
 +++ b/src/commands/set.rs
-@@ -368,6 +368,8 @@ impl SetCommand {
+@@ -394,6 +394,8 @@ impl SetCommand {
              ));
          }
  
@@ -16,7 +16,7 @@ index f7a91f1..ba0c4d1 100644
          // Get the secret value if provided
          let mut generated: Option<String> = None;
          let secret_value = if self.generate {
-@@ -407,9 +409,10 @@ impl SetCommand {
+@@ -433,9 +435,10 @@ impl SetCommand {
              None
          } else {
              #[cfg(target_os = "wasi")]
@@ -30,7 +30,7 @@ index f7a91f1..ba0c4d1 100644
              // Interactive terminal - prompt for value
              #[cfg(not(target_os = "wasi"))]
              if self.open {
-@@ -457,6 +460,35 @@ impl SetCommand {
+@@ -483,6 +486,35 @@ impl SetCommand {
              )));
          }
  
@@ -66,7 +66,7 @@ index f7a91f1..ba0c4d1 100644
          // Check if secret should be base64 encoded
          let secret_value = if self.base64_encode {
              secret_value
-@@ -524,12 +556,16 @@ impl SetCommand {
+@@ -550,12 +582,16 @@ impl SetCommand {
                              provider_name
                          );
  
@@ -89,7 +89,7 @@ index f7a91f1..ba0c4d1 100644
  
                          if self.dry_run {
                              // In dry-run mode, skip actual remote storage
-@@ -607,6 +643,11 @@ impl SetCommand {
+@@ -633,6 +669,11 @@ impl SetCommand {
              secret_config.sync = None;
          }
  

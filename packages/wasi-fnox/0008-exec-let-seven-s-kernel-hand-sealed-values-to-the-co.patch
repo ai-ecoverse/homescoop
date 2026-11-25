@@ -4,7 +4,7 @@ Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 8/19] exec: let seven's kernel hand sealed values to the command
 
 diff --git a/src/commands/exec.rs b/src/commands/exec.rs
-index 1d4fc5a..9173c7a 100644
+index 1ad7f9a..f21f056 100644
 --- a/src/commands/exec.rs
 +++ b/src/commands/exec.rs
 @@ -195,6 +195,73 @@ impl ExecCommand {
@@ -92,7 +92,7 @@ index 1d4fc5a..9173c7a 100644
          #[cfg(unix)]
          if self.replace {
              use std::os::unix::process::CommandExt;
-@@ -257,10 +328,20 @@ impl ExecCommand {
+@@ -266,10 +337,20 @@ impl ExecCommand {
              cmd.stderr(Stdio::piped());
          }
  

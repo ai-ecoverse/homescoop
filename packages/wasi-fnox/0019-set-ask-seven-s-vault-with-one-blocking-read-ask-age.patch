@@ -371,10 +371,10 @@ index 3d28270..404f034 100644
              if_missing: None,
              length: None,
 diff --git a/src/commands/set.rs b/src/commands/set.rs
-index a14feee..4bb6560 100644
+index cf788e5..05c5285 100644
 --- a/src/commands/set.rs
 +++ b/src/commands/set.rs
-@@ -38,6 +38,7 @@ pub(crate) struct Stored {
+@@ -28,6 +28,7 @@ pub(crate) struct Stored {
      pub write_profile: String,
      pub secret: config::SecretConfig,
      pub generated: Option<String>,
@@ -382,7 +382,7 @@ index a14feee..4bb6560 100644
  }
  
  /// The project config file `fnox set` writes to without `--global`.
-@@ -218,6 +219,18 @@ pub struct SetCommand {
+@@ -228,6 +229,18 @@ pub struct SetCommand {
      #[usage(long, conflicts = "value", conflicts = "from_file")]
      pub generate: bool,
  
@@ -401,7 +401,7 @@ index a14feee..4bb6560 100644
      /// Kind of value `--generate` creates
      #[usage(long, value_enum, default_value_t = GenerateKind::Password, default = "password", requires = "generate")]
      pub generate_type: GenerateKind,
-@@ -271,6 +284,7 @@ impl SetCommand {
+@@ -281,6 +294,7 @@ impl SetCommand {
          let unsupported = [
              ("VALUE", self.value.is_some()),
              ("--generate", self.generate),
@@ -409,7 +409,7 @@ index a14feee..4bb6560 100644
              ("--base64-encode", self.base64_encode),
              ("--default", self.default.is_some()),
              ("--if-missing", self.if_missing.is_some()),
-@@ -388,7 +402,6 @@ impl SetCommand {
+@@ -403,7 +417,6 @@ impl SetCommand {
              ));
          }
  
@@ -417,17 +417,17 @@ index a14feee..4bb6560 100644
          let mut ask_vault = false;
          // Get the secret value if provided
          let mut generated: Option<String> = None;
-@@ -409,6 +422,9 @@ impl SetCommand {
+@@ -424,6 +437,9 @@ impl SetCommand {
          } else if let Some(ref v) = self.value {
              // Value provided as argument
              Some(v.clone())
 +        } else if self.ask {
 +            ask_vault = true;
 +            None
-         } else if !stdin_is_terminal() {
+         } else if !std::io::stdin().is_terminal() {
              // Read from stdin if piped
              tracing::debug!("Reading secret value from stdin");
-@@ -480,17 +496,27 @@ impl SetCommand {
+@@ -495,17 +511,27 @@ impl SetCommand {
              )));
          }
  
@@ -465,7 +465,7 @@ index a14feee..4bb6560 100644
          }
          if sealed_provider && self.value.is_some() {
              return Err(FnoxError::Seven(
-@@ -499,7 +525,7 @@ impl SetCommand {
+@@ -514,7 +540,7 @@ impl SetCommand {
          }
          if sealed_provider && secret_value.as_deref() == Some("") {
              return Err(FnoxError::Seven(
@@ -474,7 +474,7 @@ index a14feee..4bb6560 100644
              ));
          }
          if sealed_provider && self.key_name.is_some() {
-@@ -508,11 +534,24 @@ impl SetCommand {
+@@ -523,11 +549,24 @@ impl SetCommand {
                      .to_string(),
              ));
          }
@@ -501,7 +501,7 @@ index a14feee..4bb6560 100644
  
          // Check if secret should be base64 encoded
          let secret_value = if self.base64_encode {
-@@ -721,6 +760,7 @@ impl SetCommand {
+@@ -736,6 +775,7 @@ impl SetCommand {
              write_profile,
              secret: secret_config,
              generated,
@@ -509,7 +509,7 @@ index a14feee..4bb6560 100644
          })
      }
  
-@@ -770,6 +810,7 @@ impl SetCommand {
+@@ -785,6 +825,7 @@ impl SetCommand {
              write_profile,
              secret: secret_config,
              generated,
@@ -517,7 +517,7 @@ index a14feee..4bb6560 100644
          } = stored;
          if self.dry_run {
              // Show what would be done
-@@ -829,12 +870,19 @@ impl SetCommand {
+@@ -844,12 +885,19 @@ impl SetCommand {
              let styled_key = console::style(self.key()).cyan();
              let styled_profile = console::style(write_profile).magenta();
              let global_suffix = if self.global { " (global)" } else { "" };
@@ -542,10 +542,10 @@ index a14feee..4bb6560 100644
              if let Some(value) = generated {
                  if self.show {
 diff --git a/src/secret_session.rs b/src/secret_session.rs
-index a3c7602..004c9bc 100644
+index 7761b47..4ee100f 100644
 --- a/src/secret_session.rs
 +++ b/src/secret_session.rs
-@@ -428,6 +428,7 @@ impl SecretSession {
+@@ -443,6 +443,7 @@ impl SecretSession {
              force: false,
              from_file: None,
              generate: false,
