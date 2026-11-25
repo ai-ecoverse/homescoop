@@ -14,11 +14,26 @@ function responder (req) {
   const header = name => (req.headers.find(([key]) => key.toLowerCase() === name) || [])[1] || ''
   const body = req.body instanceof Uint8Array ? new TextDecoder().decode(req.body) : String(req.body || '')
   const url = new URL(req.url)
-  window.fastlyLog.push({ method: req.method, url: req.url, key: header('fastly-key'), agent: header('user-agent'), body })
+  window.fastlyLog.push({ method: req.method, url: req.url, key: header('fastly-key'), auth: header('authorization'), agent: header('user-agent'), body })
   const json = (status, value) => ({ status, statusText: status === 200 ? 'OK' : 'Error', headers: [['content-type', 'application/json']], body: JSON.stringify(value) })
   if (url.hostname === 'accounts.fastly.com') return json(500, { error: 'accounts.fastly.com is down in this cert' })
   if (url.hostname === 'api.github.com' || url.hostname === 'developer.fastly.com') {
     return json(200, { tag_name: 'v99.0.0', name: 'v99.0.0', version: '99.0.0', url: 'https://example.invalid/fastly.tar.gz' })
+  }
+  if (url.hostname === 'fiddle.fastly.dev') {
+    if ((req.method === 'POST' && url.pathname === '/fiddle') || (req.method === 'PUT' && url.pathname === '/fiddle/cert-fiddle')) {
+      const vcl = JSON.parse(body).vcl || {}
+      const broken = Object.values(vcl).some(source => source.includes('req.http.nope'))
+      const lintStatus = broken ? { recv: [{ level: 'error', str: 'req.http.nope', line: 1, message: 'Unknown variable' }] } : {}
+      return json(200, { fiddle: { id: 'cert-fiddle', srcVersion: 1 }, valid: !broken, lintStatus })
+    }
+    if (req.method === 'POST' && url.pathname === '/fiddle/cert-fiddle/execute') return json(200, { sessionID: 'cert-session' })
+    if (req.method === 'GET' && url.pathname === '/results/cert-session/stream') {
+      const clientFetch = { req: 'GET / HTTP/2', resp: 'HTTP/2 200 OK\ncontent-type: text/plain; charset=utf-8\nx-cache: MISS', status: 200, bodyPreview: 'hello from the cert edge', bodyBytesReceived: 24, isText: true, complete: true }
+      const result = { id: 'cert-session', requestCount: 1, execHost: '00fa571c00-00000000-cert-fiddlev1-1-100.exec64.fiddle.fastly.dev', clientFetches: { 0: clientFetch }, originFetches: {}, events: [] }
+      return { status: 200, statusText: 'OK', headers: [['content-type', 'text/event-stream']], body: `event: updateResult\ndata: ${JSON.stringify(result)}\n\n` }
+    }
+    return json(404, { msg: `no ${req.method} ${url.pathname} on the sandbox in this cert` })
   }
   if (url.hostname !== 'api.fastly.com') return json(502, { msg: `no such host in this cert: ${url.hostname}` })
   const key = header('fastly-key')

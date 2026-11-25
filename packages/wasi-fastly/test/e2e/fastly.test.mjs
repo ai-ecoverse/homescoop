@@ -7,6 +7,7 @@ import { join, relative } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { attachKernel, createNodeKernel } from '@ai-ecoverse/slicc-kernel/node'
+import { agentPattern, versionPattern } from '../../cert/lib/version.mjs'
 
 const PACKAGE = fileURLToPath(new URL('../../package/', import.meta.url))
 const HOME = '/home/app'
@@ -80,7 +81,7 @@ test('fastly version and --help run without the network', async () => {
   try {
     const version = await run(kernel, ['version'])
     assert.equal(version.status, 0, output(version))
-    assert.match(version.stdout, /^Fastly CLI version v17\.1\.0 \(3e9473d\)\nBuilt with go version go1\.\d+\.\d+ wasip1\/wasm \(\d{4}-\d\d-\d\d\)\n$/)
+    assert.match(version.stdout, versionPattern())
     const help = await run(kernel, ['--help'])
     assert.equal(help.status, 0, output(help))
     assert.match(output(help), /A tool to interact with the Fastly API/)
@@ -103,7 +104,7 @@ for (const blocking of ['sync', 'async']) {
       assert.equal(seen.length, 1, JSON.stringify(seen))
       assert.equal(new URL(seen[0].url).origin, 'https://api.fastly.com')
       assert.equal(seen[0].key, TOKEN)
-      assert.match(seen[0].agent, /^FastlyCLI\/v17\.1\.0/)
+      assert.match(seen[0].agent, agentPattern())
     } finally {
       kernel.terminate()
     }
@@ -163,12 +164,14 @@ test('auth login takes a piped token', async () => {
 test('commands that need a native toolchain, a local port or a new binary refuse with a reason', async () => {
   const { kernel, seen } = await kernelWith()
   try {
+    await kernel.writeFile(`${HOME}/recv.vcl`, 'set req.http.X-Cert = "1";\n')
     for (const [argv, message] of [
       [['compute', 'build'], /building a Compute package is not available in the Fastly CLI for slicc/],
       [['compute', 'publish'], /building a Compute package is not available in the Fastly CLI for slicc/],
       [['compute', 'serve'], /'fastly compute serve' is not available in the Fastly CLI for slicc: it builds the package and runs it under Viceroy/],
       [['compute', 'init'], /'fastly compute init' is not available/],
       [['compute', 'install-tools'], /'fastly compute install-tools' is not available/],
+      [['vcl', 'serve', 'recv.vcl'], /'fastly vcl serve' is not available in the Fastly CLI for slicc: it publishes the VCL to a Fiddle sandbox/],
       [['update'], /'fastly update' is not available/],
       [['auth', 'login', '--sso', '--token', 'work'], /SSO is not available in the Fastly CLI for slicc: it waits for the browser to come back to http:\/\/localhost:8080\/callback/],
     ]) {

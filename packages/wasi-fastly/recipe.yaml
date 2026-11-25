@@ -5,17 +5,16 @@ name: wasi-fastly
 builder: host
 reproducible: true
 # renovate: datasource=github-releases depName=fastly/cli extractVersion=^v(?<version>.*)$
-version: "17.1.0"
+version: "17.2.0"
 npm: "@ai-ecoverse/wasi-fastly"
-summary: "Fastly CLI 17.1.0 for slicc WASI preview1 (command fastly)"
+summary: "Fastly CLI 17.2.0 for slicc WASI preview1 (command fastly)"
 source:
-  url: "https://github.com/fastly/cli/archive/3e9473d248429bad874e848281f0e91ad6f41ea8.tar.gz"
-  sha256: "a3a0fbcd7b85fd4b1594c2e548b61f539259068e5888383d3d9c94673c042120"
+  url: "https://github.com/fastly/cli/archive/23a945ddd734be70671c246f3c5a8a4fecfb3a42.tar.gz"
+  sha256: "be0f2e80ba0588b35e93f710f746910537590690a4569da3a2fff79ee2d0fffa"
   tag: "v{{version}}"
-  commit: "3e9473d248429bad874e848281f0e91ad6f41ea8"
-  tree: "3ec1c88d5dbac25b4beacbd6d3b64e69b309e2e3"
+  commit: "23a945ddd734be70671c246f3c5a8a4fecfb3a42"
+  tree: "8fca3e1633547cd11c01079f9180e7d564e55ad9"
 toolchain:
-  # fastly v17.1.0's go.mod requires go 1.26.10.
   go: "1.27.3"
   go_sha256_linux_x64: "65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40"
   go_sha256_macos_arm64: "dd3908cf20959d798c1e06ebe5b72213f0505ce01373b40ce3110975a6cd99c2"
@@ -27,8 +26,9 @@ about:
   homepage: https://www.fastly.com/documentation/reference/cli/
   license: Apache-2.0
   notes: |
-    fastly v17.1.0 (tag v17.1.0, commit 3e9473d). build.sh fetches the
-    pinned source and Go 1.27.3, vendors the modules (go.sum checked),
+    fastly at source.tag and source.commit (the version above; its go.mod
+    requires go 1.26.10). build.sh fetches the pinned source and Go
+    (toolchain.go), vendors the modules (go.sum checked),
     applies patches/*.patch and builds ./cmd/fastly with GOOS=wasip1
     GOARCH=wasm CGO_ENABLED=0 -trimpath -buildvcs=false and upstream's
     release ldflags (-s -w, revision.AppVersion v<version>,
@@ -40,8 +40,8 @@ about:
     (fastly_host imports), modes for the config directory, config.toml and
     errors.log, and a piped token for fastly auth login.
     patches/0003-wasip1-unavailable-commands.patch: SSO, compute
-    build/publish/serve/init/install-tools, update and install refuse with
-    a clear error; no update check, no build-data notice.
+    build/publish/serve/init/install-tools, vcl serve, update and install
+    refuse with a clear error; no update check, no build-data notice.
     patches/0004-lazy-oidc-metadata.patch: the OpenID Connect metadata is
     fetched only when an SSO token may need it.
     build.sh runs wasm-opt -Oz and fails above 62 MiB, so fastly.wasm fits

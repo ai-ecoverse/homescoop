@@ -1,13 +1,13 @@
 # @ai-ecoverse/wasi-fastly
 
-The [Fastly CLI](https://www.fastly.com/documentation/reference/cli/) 17.1.0
+The [Fastly CLI](https://www.fastly.com/documentation/reference/cli/) 17.2.0
 as a WASI preview1 command for SLICC: `fastly`. On
 `@ai-ecoverse/slicc-kernel` ≥ 1.187.0, `host/fastly-host.mjs` (loaded
 through `slicc.commands.fastly.imports`) sends its HTTP requests through the
 kernel's network and sets the modes of its config files.
 
-`bin/fastly.wasm` is built by homescoop from Fastly's source (v17.1.0,
-commit `3e9473d`) with Go 1.27.3 (`GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0
+`bin/fastly.wasm` is built by homescoop from Fastly's source (v17.2.0,
+commit `23a945d`) with Go 1.27.3 (`GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0
 -trimpath`) and upstream's release ldflags, then `wasm-opt -Oz`, so it is not
 an upstream release. The patches:
 
@@ -66,6 +66,11 @@ On slicc-kernel, with the host module:
   and versions), `domain`, `dns`, `tls-*`, `kv-store`, `config-store`,
   `secret-store`, `stats`, `whoami`, `auth` and the rest. Requests go to `https://api.fastly.com` through the
   kernel's network. The cert covers `service list` and `service create`;
+- `fastly vcl check` and `fastly vcl run`: they send the VCL to Fastly's
+  Fiddle sandbox (`https://fiddle.fastly.dev`), which needs no API token,
+  and none is sent there. `~/.config/fastly/vcl-sandbox.json` keeps the
+  sandbox's id and cache bucket, so the next run updates the same sandbox.
+  The cert covers both against a stand-in for the sandbox;
 - `--json` output, and prompts answered from stdin (`-y`, `-i` or a pipe).
 
 ## What does not work
@@ -82,6 +87,9 @@ On slicc-kernel, with the host module:
 - `fastly compute serve` (Viceroy, a native program, on a local port),
   `compute init` (git and the starter kit's scripts) and
   `compute install-tools` (it downloads Viceroy).
+- `fastly vcl serve`: it publishes the VCL to a Fiddle sandbox and then
+  serves it on a local port, which a slicc command can't open. Use
+  `fastly vcl check` here, and `vcl serve` where it can listen.
 - `fastly update` and `fastly install`: they replace the binary. Install
   another version of this package instead.
 - SSO (above), and opening a browser.

@@ -9,6 +9,8 @@ says why and what to do instead:
   deploy a package built elsewhere with compute deploy --package;
 - compute serve (Viceroy on a local port), compute init (git and post-init
   scripts), compute install-tools (downloads Viceroy);
+- vcl serve (it publishes the VCL to a Fiddle sandbox, then listens on a
+  local port);
 - update and install (they replace the binary; the npm package is the
   update);
 - SSO (auth login --sso, sso, profile create/update --sso): it waits for
@@ -83,7 +85,7 @@ diff --git a/pkg/app/run.go b/pkg/app/run.go
 diff --git a/pkg/app/slicc.go b/pkg/app/slicc.go
 --- /dev/null
 +++ b/pkg/app/slicc.go
-@@ -0,0 +1,66 @@
+@@ -0,0 +1,70 @@
 +package app
 +
 +import (
@@ -113,6 +115,10 @@ diff --git a/pkg/app/slicc.go b/pkg/app/slicc.go
 +	"compute install-tools": {
 +		"it downloads Viceroy, a native program",
 +		"Run 'fastly compute install-tools' where Viceroy can run.",
++	},
++	"vcl serve": {
++		"it publishes the VCL to a Fiddle sandbox and then serves it on a local port, which a slicc command cannot open",
++		"Run 'fastly vcl serve' where it can listen on a local port; 'fastly vcl check' compiles the VCL from here.",
 +	},
 +	"update": {
 +		"it replaces the fastly binary, which here comes from the npm package @ai-ecoverse/wasi-fastly",

@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasi-fastly",
-  "version": "17.1.0-1",
-  "description": "The Fastly CLI 17.1.0 (fastly) for slicc: manage Fastly services, domains, TLS, stores and stats through slicc's network.",
+  "version": "17.2.0-1",
+  "description": "The Fastly CLI 17.2.0 (fastly) for slicc: manage Fastly services, domains, TLS, stores and stats through slicc's network.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -32,8 +32,8 @@
   },
   "homescoop": {
     "recipe": "wasi-fastly",
-    "upstream": "17.1.0",
-    "source": "fastly/cli@3e9473d248429bad874e848281f0e91ad6f41ea8",
+    "upstream": "17.2.0",
+    "source": "fastly/cli@23a945ddd734be70671c246f3c5a8a4fecfb3a42",
     "patches": [
       "0001-wasip1-build.patch",
       "0002-wasip1-slicc-host.patch",
