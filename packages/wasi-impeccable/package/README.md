@@ -18,8 +18,24 @@ impeccable --version   # prints the engine version (e.g. 0.1.27)
 **Also wired:** `palette`, `doctor`, `ignores`, `pin`, `detect-csp`,
 `surface-brief`, `critique-storage`, `audit-storage`, `embed-prompt`, `signals` /
 `context-signals`, `context`, `comp-spec`, `comp-diff`, `hook` /
-`hook-before-edit` / `hooks`, `foundations`, and the skills verbs `help`, `link`,
-`update` and `check`.
+`hook-before-edit` / `hooks`, `foundations`, `design-compact`, `design-lookup`,
+`font-fetch`, `switches`, and the skills verbs `help`, `link`, `update` and
+`check`.
+
+**Sampled contrast** (since 0.1.27): `detect` measures text over a local or
+data-URI `background-image` against the image's pixels, decoded in the
+engine, and caches the samples under `~/.impeccable/sample-cache/`, which the
+edit hook reads. `detect --sarif` (since 0.1.27) writes a SARIF 2.1.0 log,
+and `detect --report-unused-ignores` lists inline waivers that waived
+nothing. `design-compact` (since 0.1.27) proposes a long DESIGN.md as the
+map `context` carries and, with `--write`, moves the original to
+`.impeccable/design-full.md`; `design-lookup <term>` finds a token or
+section in either. `font-fetch "<Family>"` (since 0.1.27) downloads a
+Google font's latin and latin-ext WOFF2 files into the project through the
+kernel's proxy and prints their `@font-face` rules. `switches` (since
+0.1.27) lists the Impeccable lines in each agent's user-level rule file;
+Cursor's per-repository rule needs `git`, so without it in the kernel
+there is no Cursor line.
 
 **Wiring check** (`impeccable detect --before page.html`, then `--kept`,
 since 0.1.25) records each static HTML file's links, forms, fields, buttons,
@@ -72,9 +88,13 @@ running app's DevTools port), `serve-question` and the capture verbs refuse
 with `not available in this build yet` instead of `Unknown command`, and so
 do the account verbs: `login`, `logout`, `whoami`, `health` since 0.1.22,
 `setup`, `critiques` since 0.1.23, `world`, `taste-refresh` since 0.1.24,
-and `status` since 0.1.25. `motion-capture` (since 0.1.25) drives a Chrome
-and refuses the same way, and so does `walkthrough` (since 0.1.24), which
-needs the system's ffmpeg. Without sign-in, `detect` never
+`status` since 0.1.25, and `mcp` and `switches-refresh` since 0.1.27.
+`motion-capture` (since 0.1.25), `first-viewport` and `shot` (since 0.1.27)
+drive a Chrome and refuse the same way, and so do `agents running`
+(since 0.1.27), which lists the sessions `mcp` records, and `walkthrough`
+(since 0.1.24), which needs the system's ffmpeg. `install` registers no
+browser relay and offers no sign-in, and `context` prints no `ACCOUNT:`
+line, so the skill never suggests a sign-in. Without sign-in, `detect` never
 uploads a design health scan and never hands a scan to Impeccable Pro,
 `critique-storage` saves a critique locally and never uploads it, and no
 setup report is sent. `loop install` refuses as upstream does off macOS,

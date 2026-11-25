@@ -74,6 +74,23 @@ fn send_string_bytes_and_json_set_content_types_like_ureq() {
 }
 
 #[test]
+fn user_agent_is_the_builders_unless_the_request_sets_one() {
+    let server = serve(|req| ok(req.header("user-agent").unwrap_or("none")));
+    let base = server.base();
+    let text = |r: ureq::Result<ureq::Response>| r.unwrap().into_string().unwrap();
+    assert_eq!(text(ureq::get(&base).call()), "ureq/2.12.1");
+    let agent = ureq::AgentBuilder::new()
+        .user_agent("Mozilla/5.0 (test)")
+        .redirects(0)
+        .build();
+    assert_eq!(text(agent.get(&base).call()), "Mozilla/5.0 (test)");
+    assert_eq!(
+        text(agent.get(&base).set("User-Agent", "mine/1").call()),
+        "mine/1"
+    );
+}
+
+#[test]
 fn redirects_zero_hands_back_the_redirect() {
     let server = serve(|req| match req.target.as_str() {
         "/r" => {
