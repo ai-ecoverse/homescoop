@@ -6,7 +6,7 @@ builder: host
 # AWS CLI v2 tags are plain versions (2.40.4); v1 tags (1.x) are in the same
 # repo, and renovate.json keeps this pin on 2.x.
 # renovate: datasource=github-tags depName=aws/aws-cli
-version: "2.41.0"
+version: "2.41.1"
 npm: "@ai-ecoverse/aws-cli"
 summary: "The AWS Command Line Interface v2: aws, to manage AWS services from slicc."
 source:
@@ -14,7 +14,7 @@ source:
   # from. requirements/download-deps/system-sandbox-lock.txt in it pins every
   # dependency with its sha256; build.sh checks each wheel below against it.
   url: "https://awscli.amazonaws.com/awscli-{{version}}.tar.gz"
-  sha256: "bc38bfa38b7738f527011eb52d05b840c38ba0a115cb103aa1cf86a96e829175"
+  sha256: "b16ae7477af82a69bcf1d5d0179f80bb950d7fc4dddcf78b78c45cde8c804aed"
 # The pure-Python dependencies (the .whl sources), the versions the source
 # distribution's lock file pins (awscrt and ruamel.yaml.clib are native; see
 # about.notes). A version bump whose lock moves one of them fails the build

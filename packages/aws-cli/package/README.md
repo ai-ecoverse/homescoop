@@ -2,7 +2,7 @@
 
 The AWS Command Line Interface v2: aws, to manage AWS services from slicc.
 
-This is AWS's own CLI, release 2.41.0, not a reimplementation. It runs on
+This is AWS's own CLI, release 2.41.1, not a reimplementation. It runs on
 `@ai-ecoverse/wasix-python`, which it installs. Upstream syntax works as
 documented: `aws sts get-caller-identity`, `aws s3 ls`, `aws s3 cp`,
 `aws s3 sync`, `aws ec2 describe-instances`, `aws lambda list-functions`,
