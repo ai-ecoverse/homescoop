@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { gunzipSync } from 'node:zlib';
-import { dashedRevision, isDashedBase, isSpelling, loadAllow, npmify, rewriteUpstream, summaryLine, versionBase } from './upstream-version-text.mjs';
+import { dashedRevision, isDashedBase, isSpelling, loadAllow, npmify, rewriteUpstream, sourcePin, summaryLine, versionBase } from './upstream-version-text.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -250,6 +250,17 @@ const upstreamStale = hsUpstream === undefined || !isSpelling(allow, name, upstr
 const goVersion = pkg.slicc?.go?.version;
 const goWant = `go${upstream}`;
 const goStale = goVersion !== undefined && goVersion !== goWant;
+const hsSource = pkg.homescoop?.source;
+let sourceWant = null;
+if (write && hsSource !== undefined) {
+  const commit = spawnSync('node', [join(root, 'scripts/read-recipe.mjs'), name, '--field', 'source.commit'], { encoding: 'utf8', cwd: root });
+  if (commit.status !== 0) {
+    console.error(commit.stderr || 'read-recipe failed');
+    process.exit(1);
+  }
+  sourceWant = sourcePin(commit.stdout.trim(), hsSource);
+}
+const sourceStale = sourceWant !== null && sourceWant !== hsSource;
 if (argv.includes('--check')) {
   const drift = [];
   if (next !== current) drift.push(`version is ${current}, but recipe.yaml ${upstream} gives ${next}`);
@@ -261,7 +272,7 @@ if (argv.includes('--check')) {
   }
 }
 
-if (write && (next !== current || rewriteText || upstreamStale || goStale)) {
+if (write && (next !== current || rewriteText || upstreamStale || goStale || sourceStale)) {
   const raw = readFileSync(pkgPath, 'utf8');
   const want = JSON.parse(raw);
   let out = raw;
@@ -282,6 +293,11 @@ if (write && (next !== current || rewriteText || upstreamStale || goStale)) {
     want.slicc.go.version = goWant;
     out = setJsonString(out, /("go"\s*:\s*\{[^{}]*?"version"\s*:\s*)"(?:[^"\\]|\\.)*"/, goWant);
     console.error(`sync-package-version: ${name} slicc.go.version ${goVersion} → ${goWant}`);
+  }
+  if (sourceStale) {
+    want.homescoop.source = sourceWant;
+    out = out.replace(/("source"\s*:\s*)"(?:[^"\\]|\\.)*"/g, (m, head) => (JSON.parse(m.slice(head.length)) === hsSource ? `${head}${JSON.stringify(sourceWant)}` : m));
+    console.error(`sync-package-version: ${name} homescoop.source ${hsSource} → ${sourceWant}`);
   }
   if (rewriteText) {
     const ctx = { allow, name };
