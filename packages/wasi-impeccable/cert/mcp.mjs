@@ -4,6 +4,11 @@ export default async function ({ run, write, read, assert }) {
   const STAGING = 'https://api.staging.impeccable.style/mcp';
   const CLAUDE_SIGN_IN = 'in Claude Code, run /mcp, choose impeccable, then Authenticate.';
   const CODEX_SIGN_IN = 'run codex mcp login impeccable (skip it if Codex just signed you in).';
+  const LATER = [
+    { agent: 'cursor', label: 'Cursor', result: 'not_found' },
+    { agent: 'copilot', label: 'GitHub Copilot CLI', result: 'not_found' },
+    { agent: 'opencode', label: 'opencode', result: 'not_found' },
+  ];
   const REFUSED = "IMPECCABLE_ACCOUNT_URL isn't the Impeccable account or its staging service, so no MCP server was added. Unset it to connect to Impeccable.";
   await write(`${H.slice(1)}/.keep`, '');
   const show = (label, r) => `${label} → rc=${r.status}\n--- stdout\n${r.stdout.slice(0, 1200)}\n--- stderr\n${r.stderr.slice(0, 1200)}`;
@@ -22,7 +27,7 @@ export default async function ({ run, write, read, assert }) {
   assert.equal(none.stdout, '', show('loop connect --mcp-only (no agent)', none));
   assert.equal(
     none.stderr,
-    'Claude Code: not found, skipped.\nCodex: not found, skipped.\nNo coding agent found to connect (Claude Code or Codex).\n',
+    'Claude Code: not found, skipped.\nCodex: not found, skipped.\nCursor: not found, skipped.\nGitHub Copilot CLI: not found, skipped.\nopencode: not found, skipped.\nNo coding agent found to connect (Claude Code, Codex, Cursor, GitHub Copilot CLI, opencode).\n',
     show('loop connect --mcp-only (no agent)', none),
   );
   assert.deepEqual((await ls(H)).sort(), ['.impeccable', '.keep']);
@@ -36,6 +41,7 @@ export default async function ({ run, write, read, assert }) {
     agents: [
       { agent: 'claude', label: 'Claude Code', result: 'not_found' },
       { agent: 'codex', label: 'Codex', result: 'not_found' },
+      ...LATER,
     ],
   }, show('loop connect --mcp-only --json (no agent)', noneJson));
 
@@ -57,8 +63,9 @@ export default async function ({ run, write, read, assert }) {
   assert.deepEqual(JSON.parse(both.stdout), {
     ok: true,
     agents: [
-      { agent: 'claude', label: 'Claude Code', result: 'connected', added: false, signIn: CLAUDE_SIGN_IN },
-      { agent: 'codex', label: 'Codex', result: 'connected', added: false, signIn: CODEX_SIGN_IN },
+      { agent: 'claude', label: 'Claude Code', result: 'connected', added: false, signIn: CLAUDE_SIGN_IN, manualMcp: null },
+      { agent: 'codex', label: 'Codex', result: 'connected', added: false, signIn: CODEX_SIGN_IN, manualMcp: null },
+      ...LATER,
     ],
   }, show('loop connect --mcp-only --json', both));
 
@@ -98,11 +105,11 @@ export default async function ({ run, write, read, assert }) {
   const unknown = await imp(['loop', 'connect', '--mcp-only', '--agent', 'gemini']);
   assert.equal(unknown.status, 1, show('loop connect --mcp-only --agent gemini', unknown));
   clean('loop connect --mcp-only --agent gemini', unknown);
-  assert.equal(unknown.stderr, 'Unknown agent: gemini. Use claude or codex.\n', show('loop connect --mcp-only --agent gemini', unknown));
+  assert.equal(unknown.stderr, 'Unknown agent: gemini. Use claude, codex, cursor, copilot, opencode.\n', show('loop connect --mcp-only --agent gemini', unknown));
 
   const taste = await imp(['loop', 'connect', '--mcp-only', '--taste']);
   assert.equal(taste.status, 1, show('loop connect --mcp-only --taste', taste));
-  assert.match(taste.stderr, /^--mcp-only goes with loop connect \[--agent claude\|codex\] \[--json\], and nothing else\.$/m, show('loop connect --mcp-only --taste', taste));
+  assert.match(taste.stderr, /^--mcp-only goes with loop connect \[--agent claude\|codex\|cursor\|copilot\|opencode\] \[--json\], and nothing else\.$/m, show('loop connect --mcp-only --taste', taste));
 
   const H2 = '/home/impmcp2';
   await write(`${H2.slice(1)}/bin/claude`, '#!/bin/sh\n');
@@ -114,7 +121,7 @@ export default async function ({ run, write, read, assert }) {
 
   const usage = await imp(['loop']);
   assert.equal(usage.status, 1, show('loop', usage));
-  assert.match(usage.stderr, /^ +impeccable loop connect --mcp-only \[--agent claude\|codex\] \[--json\]$/m, show('loop', usage));
+  assert.match(usage.stderr, /^ +impeccable loop connect --mcp-only \[--agent claude\|codex\|cursor\|copilot\|opencode\] \[--json\]$/m, show('loop', usage));
 
   const status = await imp(['status']);
   assert.equal(status.status, 1, show('status', status));

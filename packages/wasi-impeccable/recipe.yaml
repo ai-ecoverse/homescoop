@@ -13,14 +13,14 @@ inputs:
   - scripts/build-common.sh
   - scripts/rust-wasm-refresh-alloc.rs
 # renovate: datasource=github-releases depName=pbakaus/impeccable extractVersion=^engine-v(?<version>.*)$
-version: "0.1.27"
+version: "0.1.28"
 npm: "@ai-ecoverse/wasi-impeccable"
 toolchain:
   rust: "1.98.1"
-summary: "impeccable engine 0.1.27 for slicc WASI preview1 (command impeccable; file-local, HTTP and live verbs)"
+summary: "impeccable engine 0.1.28 for slicc WASI preview1 (command impeccable; file-local, HTTP and live verbs)"
 source:
   url: "https://github.com/pbakaus/impeccable/archive/refs/tags/engine-v{{version}}.tar.gz"
-  sha256: "a2e1eebec33eb790c5e553e3d6b8e5fb450a7216d9db87d8c942163944c00250"
+  sha256: "fafa269ad91ae95829d74865797eacdb2b176cce7a6aa56b60ac85cfaea0e635"
 # homescoop#1287: the initial heap from the measured peak, with headroom.
 wasm:
   initial-memory: 64MiB
@@ -163,3 +163,17 @@ about:
     through wasix-command, and font-fetch's browser User-Agent needs
     wasix-ureq's new AgentBuilder::user_agent (cert/sampled.mjs,
     cert/design.mjs, cert/fonts.mjs, cert/switches.mjs).
+    0.1.28-1: 0001 rebased onto engine-v0.1.28. loop connect describes
+    five agents in one table (Claude Code, Codex, Cursor, GitHub Copilot
+    CLI, opencode), and the agent lookup joins each one's binary
+    (cursor-agent for Cursor), which was the one rejected hunk: on wasm it
+    still splits PATH on `:`. For Cursor, Copilot and opencode the agents
+    engine writes the MCP entry itself (journaled JSON entries, undone by
+    agents undo), so loop connect --mcp-only connects Copilot and opencode
+    on WASI; Cursor's cursor-agent enable step goes through std, which
+    can't start it there, so Cursor reports not connected with its entry
+    written (cert/journal.mjs). The new Codex hook trust (codex app-server
+    over std::process and a thread) builds for wasm as is and is reached
+    only from loop connect / disconnect, which refuse off macOS.
+    foundations-scan's new error-capture and legal-page checks build as
+    is. No new crates.
