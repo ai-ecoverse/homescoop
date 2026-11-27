@@ -37,7 +37,7 @@ export default async function ({ run, write, assert }) {
   }
   const usage = await imp(['loop']);
   assert.equal(usage.status, 1, show('loop', usage));
-  assert.match(usage.stderr, /^ +impeccable loop connect \[--agent claude\|codex\]( \[--taste\|--no-taste\])? \[--json\]$/m, show('loop', usage));
+  assert.match(usage.stderr, /^ +impeccable loop connect \[--agent claude\|codex(\|cursor\|copilot\|opencode)?\]( \[--taste\|--no-taste\])? \[--json\]$/m, show('loop', usage));
   assert.match(usage.stderr, /^ +impeccable loop status \[--json\]$/m, show('loop', usage));
 
   const T = '/home/imptaste';
