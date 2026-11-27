@@ -6,7 +6,7 @@ builder: host
 # AWS CLI v2 tags are plain versions (2.40.4); v1 tags (1.x) are in the same
 # repo, and renovate.json keeps this pin on 2.x.
 # renovate: datasource=github-tags depName=aws/aws-cli
-version: "2.41.1"
+version: "2.41.2"
 npm: "@ai-ecoverse/aws-cli"
 summary: "The AWS Command Line Interface v2: aws, to manage AWS services from slicc."
 source:
