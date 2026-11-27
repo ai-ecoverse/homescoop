@@ -7,7 +7,7 @@ npm: "@ai-ecoverse/wasm-cmake"
 summary: "CMake built for slicc (wasm tool)"
 source:
   url: "https://github.com/Kitware/CMake/releases/download/v{{version}}/cmake-{{version}}.tar.gz"
-  sha256: "424352d6133e8455e020da787008e8dc67abb18820af3532572ab35657e49213"
+  sha256: "a79bf33cbe05686fdf79c2bbbcfe5e8e62ad16d3d540fa737cbedfeed41fb69e"
 inputs:
   - "packages/wasm-emscripten/patches/**"
 dependencies:
