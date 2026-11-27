@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasi-impeccable`
 
-[Impeccable](https://impeccable.style) engine **0.1.27** for
+[Impeccable](https://impeccable.style) engine **0.1.28** for
 [slicc](https://github.com/ai-ecoverse/slicc)'s WASI preview1 realm
 (`abi: "wasi"`: a module only, no Emscripten glue).
 
@@ -12,7 +12,7 @@ impeccable install --providers=claude -y   # downloads and verifies the signed s
 impeccable check
 impeccable generate-image --prompt "…" --out comps/hero.png   # needs OPENAI_API_KEY
 impeccable concept-seed --scope surface
-impeccable --version   # prints the engine version (e.g. 0.1.27)
+impeccable --version   # prints the engine version (e.g. 0.1.28)
 ```
 
 **Also wired:** `palette`, `doctor`, `ignores`, `pin`, `detect-csp`,
@@ -33,7 +33,7 @@ map `context` carries and, with `--write`, moves the original to
 section in either. `font-fetch "<Family>"` (since 0.1.27) downloads a
 Google font's latin and latin-ext WOFF2 files into the project through the
 kernel's proxy and prints their `@font-face` rules. `switches` (since
-0.1.27) lists the Impeccable lines in each agent's user-level rule file;
+0.1.28) lists the Impeccable lines in each agent's user-level rule file;
 Cursor's per-repository rule needs `git`, so without it in the kernel
 there is no Cursor line.
 
