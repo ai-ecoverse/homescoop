@@ -16,7 +16,7 @@ export default async function (ctx) {
     assert.ok(((await ctx.read(`${dir}/licenses/${f}`)) ?? '').length > 100, `licenses/${f}`);
   }
   const sources = (await ctx.read(`${dir}/SOURCES.md`)) ?? '';
-  assert.match(sources, /php-8\.5\.12\.tar\.xz\]\(https:\/\/www\.php\.net\/distributions\/php-8\.5\.12\.tar\.xz\) \| `08bc2eba/);
+  assert.match(sources, /php-8\.5\.13\.tar\.xz\]\(https:\/\/www\.php\.net\/distributions\/php-8\.5\.13\.tar\.xz\) \| `607602ac/);
   for (const p of ['0001-configure-wasi-host', '0002-zend-fibers-unavailable-wasi', '0003-zend-setjmp-wasi', '0004-zend-alloc-chunks-wasi', '0005-tmpdir-wasi', '0006-fd-wrapper-dtablesize-wasi', '0007-http-wrapper-env-proxy-wasi', '0008-max-execution-time-real-timer-wasi', '0009-zend-call-stack-wasi']) {
     assert.match((await ctx.read(`${dir}/patches/${p}.patch`)) ?? '', /^--- a\//m, `patches/${p}.patch`);
   }

@@ -12,27 +12,27 @@ configure, so a buildconf regenerates it.
 
 --- a/configure
 +++ b/configure
-@@ -81000,10 +81000,18 @@
+@@ -83077,10 +83077,18 @@
  printf "%s\n" "#define ZEND_FIBER_UCONTEXT 1" >>confdefs.h
  
- else $as_nop
-+  case $host_os in #(
+ else case e in #(
+-  e) { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in '$ac_pwd':" >&5
++  e) case $host_os in #(
 +  wasi*) :
 +    # WASIX: no ucontext and no stack switching; Fiber::start throws FiberError.
 +
 +printf "%s\n" "#define ZEND_FIBER_UNAVAILABLE 1" >>confdefs.h
 + ;; #(
 +  *) :
-   { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
- printf "%s\n" "$as_me: error: in \`$ac_pwd':" >&2;}
++    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in '$ac_pwd':" >&5
+ printf "%s\n" "$as_me: error: in '$ac_pwd':" >&2;}
  as_fn_error $? "fibers not available on this platform
--See \`config.log' for more details" "$LINENO" 5; }
-+See \`config.log' for more details" "$LINENO" 5; } ;;
-+esac
+ See 'config.log' for more details" "$LINENO" 5; } ;;
++esac ;;
+ esac
  fi
  
- fi
-@@ -82780,7 +82788,13 @@
+@@ -84924,7 +84932,13 @@
  printf "%s\n" "#define PHP_UNAME \"$PHP_UNAME\"" >>confdefs.h
  
  
@@ -104,7 +104,7 @@ configure, so a buildconf regenerates it.
  
  /* Number of bits in non-UTF mode for PCRE library. */
  #undef PCRE2_CODE_UNIT_WIDTH
-@@ -2188,6 +2188,9 @@
+@@ -2192,6 +2192,9 @@
  /* Define to 1 if Zend fiber uses ucontext instead of boost context. */
  #undef ZEND_FIBER_UCONTEXT
  

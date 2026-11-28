@@ -370,8 +370,8 @@ for path in sorted(list(src.glob("Zend/*.[ch]")) + list(src.glob("ext/*/*.[ch]")
             raise SystemExit(f"homescoop wasix-php: {fn} pads ZEND_WASI_PAD_{m.group(1)}, which zend_call_stack.h doesn't define")
         sites[fn] = (m.group(1), pads[m.group(1)])
 unused = sorted(set(pads) - {k for k, _ in sites.values()})
-if unused or len(sites) < 41:
-    raise SystemExit(f"homescoop wasix-php: patches/0009 pads {len(sites)} functions (41 expected), and no function uses ZEND_WASI_PAD_{unused}")
+if unused or len(sites) < 42:
+    raise SystemExit(f"homescoop wasix-php: patches/0009 pads {len(sites)} functions (42 expected), and no function uses ZEND_WASI_PAD_{unused}")
 def uleb(buf, i):
     r = s = 0
     while True:
@@ -463,7 +463,7 @@ for fn, (name, pad) in sorted(sites.items()):
             problems.append(f"{h} takes {frame(h)} bytes of shadow stack, under {fn}'s {pad}-byte ZEND_WASI_PAD_{name}")
 if problems:
     raise SystemExit(f"homescoop wasix-php: patches/0009's stack pads are missing from php.wasm, so the stack check no longer counts the browser's stack ({len(problems)} problems): " + "; ".join(problems))
-print(f"php.wasm: patches/0009's stack pads in {len(sites)} functions ({len(pads)} sizes), each frame at least its pad: execute_ex {frame('execute_ex')}, php_var_serialize_intern {frame('php_var_serialize_intern')}, zend_hash_compare {frame('zend_hash_compare')}, php_array_user_compare_unstable {frame('php_array_user_compare_unstable')}")
+print(f"php.wasm: patches/0009's stack pads in {len(sites)} functions ({len(pads)} sizes), each frame at least its pad: execute_ex {frame('execute_ex')}, php_var_serialize_intern {frame('php_var_serialize_intern')}, zend_hash_compare {frame('zend_hash_compare')}, php_array_user_compare_unstable {frame('php_array_user_compare_unstable')}, php_var_export_ex {frame('php_var_export_ex')}")
 PY
 
 # --- licences, notices, sources ----------------------------------------------

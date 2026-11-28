@@ -19,9 +19,9 @@ export default async function (ctx) {
   const v = await run(['php', '-v'], { cwd: '/tmp' });
   assert.equal(v.status, 0, v.stderr);
   // "built:" is the release tarball's date (SOURCE_DATE_EPOCH), not the build's.
-  assert.match(v.stdout, /^PHP 8\.5\.12 \(cli\) \(built: Oct 19 2026 17:02:46\) \(NTS\)\nCopyright \(c\) The PHP Group\nBuilt by homescoop \(https:\/\/github\.com\/ai-ecoverse\/homescoop\)\n/, v.stdout);
-  assert.match(v.stdout, /Zend Engine v4\.5\.12/);
-  assert.match(v.stdout, /with Zend OPcache v8\.5\.12/);
+  assert.match(v.stdout, /^PHP 8\.5\.13 \(cli\) \(built: Nov 17 2026 14:30:51\) \(NTS\)\nCopyright \(c\) The PHP Group\nBuilt by homescoop \(https:\/\/github\.com\/ai-ecoverse\/homescoop\)\n/, v.stdout);
+  assert.match(v.stdout, /Zend Engine v4\.5\.13/);
+  assert.match(v.stdout, /with Zend OPcache v8\.5\.13/);
 
   const m = await run(['php', '-m'], { cwd: '/tmp' });
   assert.equal(m.status, 0, m.stderr);
@@ -29,7 +29,7 @@ export default async function (ctx) {
   assert.deepEqual([...mods].sort(), [...MODULES].sort(), `php -m: ${mods.join(', ')}`);
 
   assert.equal(await phpOk(ctx, '<?php echo PHP_VERSION, "|", PHP_OS, "|", PHP_OS_FAMILY, "|", PHP_INT_SIZE, "|", PHP_INT_MAX, "|", PHP_EOL === "\\n" ? "lf" : "?", "\\n";'),
-    '8.5.12|WASI|Unknown|4|2147483647|lf\n');
+    '8.5.13|WASI|Unknown|4|2147483647|lf\n');
   // php_uname() is the kernel's uname(); PHP_BINARY is the command's /usr/bin entry.
   assert.match(await phpOk(ctx, '<?php echo php_uname("s"), "|", php_uname("m"), "|", PHP_BINARY, "\\n";'), /^wasi\|wasm32\|\/usr\/bin\/php\n$/);
   const ini = await run(['php', '--ini'], { cwd: '/tmp' });

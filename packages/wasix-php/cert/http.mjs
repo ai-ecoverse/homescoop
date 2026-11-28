@@ -90,6 +90,14 @@ $off = stream_context_create(["ssl" => ["cafile" => "/tmp/decoy-ca.pem", "verify
 echo file_get_contents("https://example.test/hello", false, $off);
 `), '/etc/ssl/certs/slicc-kernel-ca.pem|SSL_CERT_FILE\nbool(false)\nverify failed\nhello https: GET\n');
 
+  assert.equal(await phpOk(ctx, `<?php
+echo file_get_contents("HTTPS://example.test/hello");
+$bad = stream_context_create(["ssl" => ["cafile" => "/tmp/decoy-ca.pem"]]);
+$errs = []; set_error_handler(function ($no, $str) use (&$errs) { $errs[] = $str; return true; });
+var_dump(file_get_contents("HtTpS://example.test/hello", false, $bad)); restore_error_handler();
+echo preg_match("/certificate verify failed/", implode(" ", $errs)) ? "verify failed" : implode(" ", $errs), "\\n";
+`), 'hello https: GET\nbool(false)\nverify failed\n');
+
   // The environment rules (the patch). no_proxy names, suffixes and *: a
   // direct connection to example.test has no route (getaddrinfo fails).
   const direct = 'var_dump(@file_get_contents("http://example.test/hello")); echo error_get_last()["message"] ?? "", "\\n";';

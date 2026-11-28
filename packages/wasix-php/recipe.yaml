@@ -4,14 +4,14 @@
 name: wasix-php
 builder: host
 # renovate: datasource=github-tags depName=php/php-src extractVersion=^php-(?<version>8\.5\.\d+)$
-version: "8.5.12"
+version: "8.5.13"
 npm: "@ai-ecoverse/wasix-php"
 summary: "PHP 8.5 for slicc WASIX (command php)"
 # ladder-pr builds it twice and compares the package.tgz sha256.
 reproducible: true
 source:
   url: "https://www.php.net/distributions/php-{{version}}.tar.xz"
-  sha256: "08bc2eba2a588654ade1357174aa646b761556c862dda0678345ee29ed481209"
+  sha256: "607602acaf0c3061818e9916ec44a058e8b3d43959a83862b9cd3ec7bf5b785f"
 sources:
   # Build-time WASIX dev packages (static lib/ flavour), pinned by the
   # certified tarball sha.
