@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-graphviz",
-  "version": "16.1.1-1",
+  "version": "16.1.2-1",
   "description": "Graphviz's dot, the graph layout program, with its layouts and core renderers (svg, json, xdot, dot).",
   "license": "EPL-2.0",
   "repository": {
@@ -14,7 +14,7 @@
   "publishConfig": { "access": "public" },
   "homescoop": {
     "recipe": "graphviz",
-    "upstream": "16.1.1"
+    "upstream": "16.1.2"
   },
   "slicc": {
     "abi": "emscripten",
