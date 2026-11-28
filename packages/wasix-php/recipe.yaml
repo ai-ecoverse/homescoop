@@ -4,7 +4,7 @@
 name: wasix-php
 builder: host
 # renovate: datasource=github-tags depName=php/php-src extractVersion=^php-(?<version>8\.5\.\d+)$
-version: "8.5.12"
+version: "8.5.13"
 npm: "@ai-ecoverse/wasix-php"
 summary: "PHP 8.5 for slicc WASIX (command php)"
 # ladder-pr builds it twice and compares the package.tgz sha256.
