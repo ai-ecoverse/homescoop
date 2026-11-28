@@ -5,10 +5,10 @@ runner: pool
 # renovate: datasource=gitlab-releases depName=graphviz/graphviz
 version: "16.1.2"
 npm: "@ai-ecoverse/wasm-graphviz"
-summary: "Graphviz dot 16.1.1 for slicc: layouts and the core renderers (svg, json, xdot, dot)"
+summary: "Graphviz dot 16.1.2 for slicc: layouts and the core renderers (svg, json, xdot, dot)"
 source:
   url: "https://gitlab.com/api/v4/projects/4207231/packages/generic/graphviz-releases/{{version}}/graphviz-{{version}}.tar.xz"
-  sha256: "52e7fb9a57b52b5c67f41dba6504ba3231e118258779421cb8f4f99104de71f6"
+  sha256: "9780938f03659e2effbbfbbaec94940108e794199b73196fa339ca911890e8c9"
 wasm:
   initial-memory: 32MiB
   measured-peak: 32MiB
