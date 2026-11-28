@@ -4,7 +4,7 @@ bin/php.wasm is built from these sources, with `patches/` applied to PHP:
 
 | source | sha256 |
 | --- | --- |
-| [php-8.5.12.tar.xz](https://www.php.net/distributions/php-8.5.12.tar.xz) | `08bc2eba2a588654ade1357174aa646b761556c862dda0678345ee29ed481209` |
+| [php-8.5.13.tar.xz](https://www.php.net/distributions/php-8.5.13.tar.xz) | `607602acaf0c3061818e9916ec44a058e8b3d43959a83862b9cd3ec7bf5b785f` |
 | [libxml2-2.15.4.tar.xz](https://download.gnome.org/sources/libxml2/2.15/libxml2-2.15.4.tar.xz) | `98087fd181d9070724f3fbc65c7377db03038eb92bd882374daff44940138821` |
 | [sqlite-amalgamation-3540000.zip](https://www.sqlite.org/2026/sqlite-amalgamation-3540000.zip) | `68e913b0fe8ec6b4e5f391c594a28872884e80d6cd042a1e50c957be46b5aa4d` |
 | [@ai-ecoverse/wasix-zlib 1.3.1-3](https://registry.npmjs.org/@ai-ecoverse/wasix-zlib/-/wasix-zlib-1.3.1-3.tgz) | `f55d56c0837722e5d1e309f4344f723c95c7f68cd3ddb3089d6b4c025aaf14c7` |

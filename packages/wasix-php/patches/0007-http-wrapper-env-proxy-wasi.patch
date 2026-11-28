@@ -14,8 +14,8 @@ otherwise; https goes through CONNECT, as with a context proxy.
 
 --- a/ext/standard/http_fopen_wrapper.c
 +++ b/ext/standard/http_fopen_wrapper.c
-@@ -397,6 +397,185 @@
- 	return NULL;
+@@ -393,6 +393,185 @@
+ 	return false;
  }
  
 +#ifdef __wasi__
@@ -200,7 +200,7 @@ otherwise; https goes through CONNECT, as with a context proxy.
  static php_stream *php_stream_url_wrap_http_ex(php_stream_wrapper *wrapper,
  		const char *path, const char *mode, int options, zend_string **opened_path,
  		php_stream_context *context, int redirect_max, int flags,
-@@ -488,6 +667,14 @@
+@@ -484,6 +663,14 @@
  			Z_STRLEN_P(tmpzval) > 0) {
  			use_proxy = 1;
  			transport_string = zend_string_copy(Z_STR_P(tmpzval));

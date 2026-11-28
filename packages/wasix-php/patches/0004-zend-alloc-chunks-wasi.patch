@@ -154,7 +154,7 @@ memory to 252 MiB.
  	void *ptr = zend_mm_mmap(size);
  
  	if (ptr == NULL) {
-@@ -937,6 +1060,7 @@
+@@ -940,6 +1063,7 @@
  #endif
  		return ptr;
  	}
@@ -162,7 +162,7 @@ memory to 252 MiB.
  }
  
  static void *zend_mm_chunk_alloc(zend_mm_heap *heap, size_t size, size_t alignment)
-@@ -959,7 +1083,11 @@
+@@ -962,7 +1086,11 @@
  		return;
  	}
  #endif
@@ -174,7 +174,7 @@ memory to 252 MiB.
  }
  
  static int zend_mm_chunk_truncate(zend_mm_heap *heap, void *addr, size_t old_size, size_t new_size)
-@@ -973,7 +1101,12 @@
+@@ -976,7 +1104,12 @@
  		}
  	}
  #endif
@@ -188,7 +188,7 @@ memory to 252 MiB.
  	zend_mm_munmap((char*)addr + new_size, old_size - new_size);
  	return 1;
  #else
-@@ -992,7 +1125,9 @@
+@@ -995,7 +1128,9 @@
  		}
  	}
  #endif

@@ -29,10 +29,14 @@ or none. So:
   getIterator 1920, ArrayAccess 1392, __get/__set/__isset/__unset 1104,
   __destruct 864); and each check site of a recursion without a callback
   takes its own (serialize 2032, json_encode 1984, == on arrays 3280 and
-  on objects 1696, var_dump 1136, debug_zval_dump 1680, count 800,
-  array_walk 1040, compact 1232, array_replace_recursive 1424,
+  on objects 1696, var_dump 1136, debug_zval_dump 1680, var_export 2032,
+  count 800, array_walk 1040, compact 1232, array_replace_recursive 1424,
   http_build_query 2400, mbstring 1232, DOM 1552, the compiler 1504 and
   its constant folding 2048).
+
+var_export's check is new in PHP 8.5.13 (GH-24605). Its pad is sized from
+the roughly 1500 levels the browser allowed var_export on 8.5.12-3, which
+had no check there, so the Error comes at about 62% of that depth.
 
 zend.max_allowed_stack_size still sets a different size (-d or php.ini),
 and -1 turns the check off. The README has the levels each path reaches.
@@ -77,7 +81,7 @@ and -1 turns the check off. The README has the levels each path reaches.
  #if defined(__NetBSD__)
  # ifdef HAVE_PTHREAD_GETATTR_NP
  static bool zend_call_stack_get_netbsd_pthread(zend_call_stack *stack)
-@@ -824,6 +848,10 @@
+@@ -827,6 +851,10 @@
  		return true;
  	}
  
@@ -90,7 +94,7 @@ and -1 turns the check off. The README has the levels each path reaches.
  
 --- a/Zend/zend_call_stack.h
 +++ b/Zend/zend_call_stack.h
-@@ -32,6 +32,38 @@
+@@ -32,6 +32,39 @@
  #include <intrin.h>
  #endif
  
@@ -102,6 +106,7 @@ and -1 turns the check off. The README has the levels each path reaches.
 +# define ZEND_WASI_PAD_OBJECT_COMPARE 1696
 +# define ZEND_WASI_PAD_VAR_DUMP 1136
 +# define ZEND_WASI_PAD_ZVAL_DUMP 1680
++# define ZEND_WASI_PAD_VAR_EXPORT 2032
 +# define ZEND_WASI_PAD_COUNT 800
 +# define ZEND_WASI_PAD_WALK 1040
 +# define ZEND_WASI_PAD_COMPACT 1232
@@ -131,7 +136,7 @@ and -1 turns the check off. The README has the levels each path reaches.
  typedef struct _zend_call_stack {
 --- a/Zend/zend_compile.c
 +++ b/Zend/zend_compile.c
-@@ -11949,6 +11949,7 @@
+@@ -11955,6 +11955,7 @@
  
  static void zend_compile_expr(znode *result, zend_ast *ast)
  {
@@ -139,7 +144,7 @@ and -1 turns the check off. The README has the levels each path reaches.
  	zend_check_stack_limit();
  
  	uint32_t checkpoint = zend_short_circuiting_checkpoint();
-@@ -12011,6 +12012,7 @@
+@@ -12017,6 +12018,7 @@
  
  static zend_op *zend_compile_var(znode *result, zend_ast *ast, uint32_t type, bool by_ref) /* {{{ */
  {
@@ -147,7 +152,7 @@ and -1 turns the check off. The README has the levels each path reaches.
  	zend_check_stack_limit();
  
  	uint32_t checkpoint = zend_short_circuiting_checkpoint();
-@@ -12021,6 +12023,7 @@
+@@ -12027,6 +12029,7 @@
  
  static zend_op *zend_delayed_compile_var(znode *result, zend_ast *ast, uint32_t type, bool by_ref) /* {{{ */
  {
@@ -155,7 +160,7 @@ and -1 turns the check off. The README has the levels each path reaches.
  	zend_check_stack_limit();
  
  	switch (ast->kind) {
-@@ -12082,6 +12085,7 @@
+@@ -12088,6 +12091,7 @@
  
  static void zend_eval_const_expr(zend_ast **ast_ptr) /* {{{ */
  {
@@ -277,7 +282,7 @@ and -1 turns the check off. The README has the levels each path reaches.
  	if (destructor) {
 --- a/Zend/zend_vm_execute.h
 +++ b/Zend/zend_vm_execute.h
-@@ -112762,6 +112762,7 @@
+@@ -112788,6 +112788,7 @@
  #endif
  {
  	DCL_OPLINE
@@ -315,7 +320,7 @@ and -1 turns the check off. The README has the levels each path reaches.
  	}
 --- a/ext/dom/xml_serializer.c
 +++ b/ext/dom/xml_serializer.c
-@@ -1270,6 +1270,7 @@
+@@ -1274,6 +1274,7 @@
  	bool require_well_formed
  )
  {
@@ -335,7 +340,7 @@ and -1 turns the check off. The README has the levels each path reaches.
  	HashTable *myht, *prop_ht;
 --- a/ext/mbstring/mbstring.c
 +++ b/ext/mbstring/mbstring.c
-@@ -3751,6 +3751,7 @@
+@@ -3756,6 +3756,7 @@
  
  static unsigned int mb_recursive_count_strings(zval *var)
  {
@@ -343,7 +348,7 @@ and -1 turns the check off. The README has the levels each path reaches.
  	unsigned int count = 0;
  	ZVAL_DEREF(var);
  
-@@ -3786,6 +3787,7 @@
+@@ -3791,6 +3792,7 @@
  
  static bool mb_recursive_find_strings(zval *var, const unsigned char **val_list, size_t *len_list, unsigned int *count)
  {
@@ -351,7 +356,7 @@ and -1 turns the check off. The README has the levels each path reaches.
  	ZVAL_DEREF(var);
  
  	if (mb_check_stack_limit()) {
-@@ -3827,6 +3829,7 @@
+@@ -3832,6 +3834,7 @@
  
  static bool mb_recursive_convert_variable(zval *var, const mbfl_encoding* from_encoding, const mbfl_encoding* to_encoding)
  {
@@ -421,7 +426,7 @@ and -1 turns the check off. The README has the levels each path reaches.
  	zval *value_ptr, data;
  
  	ZVAL_DEREF(entry);
-@@ -4197,6 +4202,7 @@
+@@ -4201,6 +4206,7 @@
  
  PHPAPI int php_array_replace_recursive(HashTable *dest, HashTable *src) /* {{{ */
  {
@@ -429,7 +434,7 @@ and -1 turns the check off. The README has the levels each path reaches.
  	zval *src_entry, *dest_entry, *src_zval, *dest_zval;
  	zend_string *string_key;
  	zend_ulong num_key;
-@@ -5177,6 +5183,7 @@
+@@ -5181,6 +5187,7 @@
  
  static int zval_user_compare(zval *a, zval *b) /* {{{ */
  {
@@ -481,7 +486,15 @@ and -1 turns the check off. The README has the levels each path reaches.
  	const char *prop_name, *class_name;
  
  #ifdef ZEND_CHECK_STACK_LIMIT
-@@ -1119,6 +1123,7 @@
+@@ -536,6 +540,7 @@
+ 
+ PHPAPI zend_result php_var_export_ex(zval *struc, int level, smart_str *buf) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_VAR_EXPORT);
+ 	HashTable *myht;
+ 	zend_string *ztmp, *ztmp2;
+ 	zend_ulong index;
+@@ -1131,6 +1136,7 @@
  
  static void php_var_serialize_intern(smart_str *buf, zval *struc, php_serialize_data_t var_hash, bool in_rcn_array, bool is_root) /* {{{ */
  {
