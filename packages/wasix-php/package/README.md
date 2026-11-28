@@ -64,4 +64,4 @@ What runs out first is the browser's native stack, where every wasm frame sits, 
 
 ## Source
 
-PHP 8.5.12 from php.net, with the patches in `patches/` (their headers say why), plus libxml2 and SQLite, which this recipe builds; `SOURCES.md` lists every source and its sha256.
+PHP 8.5.13 from php.net, with the patches in `patches/` (their headers say why), plus libxml2 and SQLite, which this recipe builds; `SOURCES.md` lists every source and its sha256.
